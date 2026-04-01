@@ -70,7 +70,7 @@ export function AppSidebar() {
         </h1>
       </div>
 
-      <nav className="mt-8 flex flex-1 flex-col gap-2">
+      <nav className="mt-8 flex-1 flex-col gap-2 overflow-y-auto">
         <TooltipProvider delayDuration={0}>
           {navItems.map((item) => (
             <Tooltip key={item.href}>
@@ -99,7 +99,7 @@ export function AppSidebar() {
         </TooltipProvider>
       </nav>
 
-      <div className="mt-auto">
+      <div className="mt-auto pt-4">
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
