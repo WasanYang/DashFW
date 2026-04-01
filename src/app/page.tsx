@@ -5,18 +5,15 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { DollarSign, ListTodo, Package, Wallet } from 'lucide-react';
-import { getTranslations } from 'next-intl/server';
 
 export default async function DashboardPage() {
-  const t = await getTranslations('Dashboard');
-
   return (
     <div className="flex flex-col gap-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              {t('activeProjects')}
+              Active Projects
             </CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -30,7 +27,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              {t('pipeline')}
+              Money in Pipeline
             </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -44,7 +41,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              {t('earnings')}
+              Earnings this Month
             </CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -57,7 +54,7 @@ export default async function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('openTasks')}</CardTitle>
+            <CardTitle className="text-sm font-medium">Open Tasks</CardTitle>
             <ListTodo className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -70,7 +67,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>{t('recentActivity')}</CardTitle>
+            <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-4">
@@ -113,7 +110,7 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{t('upcomingDeadlines')}</CardTitle>
+            <CardTitle>Upcoming Deadlines</CardTitle>
           </CardHeader>
           <CardContent>
           <ul className="space-y-4">

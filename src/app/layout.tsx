@@ -1,6 +1,4 @@
 import type { Metadata } from 'next';
-import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/sidebar';
@@ -12,16 +10,13 @@ export const metadata: Metadata = {
   description: 'A personalized project management tool for a Full-stack Developer & Digital Marketer.',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getLocale();
-  const messages = await getMessages();
-
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -39,18 +34,16 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <SidebarProvider>
-            <div className="flex min-h-screen">
-              <AppSidebar />
-              <main className="flex flex-1 flex-col min-w-0 bg-muted/40">
-                <Header />
-                <div className="p-4 sm:p-6 md:p-8">{children}</div>
-              </main>
-            </div>
-          </SidebarProvider>
-          <Toaster />
-        </NextIntlClientProvider>
+        <SidebarProvider>
+          <div className="flex min-h-screen">
+            <AppSidebar />
+            <main className="flex flex-1 flex-col min-w-0 bg-muted/40">
+              <Header />
+              <div className="p-4 sm:p-6 md:p-8">{children}</div>
+            </main>
+          </div>
+        </SidebarProvider>
+        <Toaster />
       </body>
     </html>
   );

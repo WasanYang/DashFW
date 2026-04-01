@@ -13,7 +13,6 @@ import {
   Wallet,
   BotMessageSquare,
   ListChecks,
-  Globe,
 } from 'lucide-react';
 import {
   Sheet,
@@ -41,31 +40,27 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { DevFlowProIcon } from './icons';
-import { useLocale, useTranslations } from 'next-intl';
-import { useRouter } from 'next-intl/navigation';
 
 const navItems = [
-    { href: '/', labelKey: 'dashboard', icon: LayoutGrid },
-    { href: '/board', labelKey: 'board', icon: Columns3 },
-    { href: '/clients', labelKey: 'clients', icon: Users },
-    { href: '/financials', labelKey: 'financials', icon: Wallet },
-    { href: '/snippets', labelKey: 'snippets', icon: BotMessageSquare },
-    { href: '/checklists', labelKey: 'checklists', icon: ListChecks },
+    { href: '/', label: 'Dashboard', icon: LayoutGrid },
+    { href: '/board', label: 'Kanban Board', icon: Columns3 },
+    { href: '/clients', label: 'Clients & CRM', icon: Users },
+    { href: '/financials', label: 'Financials', icon: Wallet },
+    { href: '/snippets', label: 'AI Snippets', icon: BotMessageSquare },
+    { href: '/checklists', label: 'AI Checklists', icon: ListChecks },
 ];
 
+const breadcrumbLabels: { [key: string]: string } = {
+  'dashboard': 'Dashboard',
+  'board': 'Board',
+  'clients': 'Clients',
+  'financials': 'Financials',
+  'snippets': 'Snippets',
+  'checklists': 'Checklists'
+};
+
 export function Header() {
-  const tNav = useTranslations('Nav');
-  const tHeader = useTranslations('Header');
-  const tBreadcrumb = useTranslations('Breadcrumb');
-  
-  const router = useRouter();
   const pathname = usePathname();
-  const locale = useLocale();
-
-  const switchLocale = (nextLocale: string) => {
-    router.replace(pathname, { locale: nextLocale, scroll: false });
-  };
-
   const segments = pathname.split('/').filter(Boolean);
 
   return (
@@ -74,7 +69,7 @@ export function Header() {
         <SheetTrigger asChild>
           <Button size="icon" variant="outline" className="sm:hidden">
             <PanelLeft className="h-5 w-5" />
-            <span className="sr-only">{tHeader('toggleMenu')}</span>
+            <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs">
@@ -94,7 +89,7 @@ export function Header() {
                 }`}
               >
                 <item.icon className="h-5 w-5" />
-                {tNav(item.labelKey as any)}
+                {item.label}
               </Link>
             ))}
           </nav>
@@ -105,12 +100,12 @@ export function Header() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="/">{tBreadcrumb('dashboard')}</Link>
+              <Link href="/">Dashboard</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           {segments.map((segment, index) => {
               const href = `/${segments.slice(0, index + 1).join('/')}`;
-              const label = tBreadcrumb(segment as any) || segment.charAt(0).toUpperCase() + segment.slice(1);
+              const label = breadcrumbLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
               return (
                 <React.Fragment key={segment}>
                   <BreadcrumbSeparator />
@@ -137,24 +132,11 @@ export function Header() {
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           type="search"
-          placeholder={tHeader('search')}
+          placeholder="Search..."
           className="w-full rounded-lg bg-muted pl-8 md:w-[200px] lg:w-[320px]"
         />
       </div>
       
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon">
-            <Globe className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{tHeader('language')}</DropdownMenuLabel>
-          <DropdownMenuItem onSelect={() => switchLocale('en')} disabled={locale === 'en'}>English</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => switchLocale('th')} disabled={locale === 'th'}>ไทย</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
@@ -162,12 +144,12 @@ export function Header() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{tHeader('myAccount')}</DropdownMenuLabel>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>{tHeader('settings')}</DropdownMenuItem>
-          <DropdownMenuItem>{tHeader('support')}</DropdownMenuItem>
+          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem>Support</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>{tHeader('logout')}</DropdownMenuItem>
+          <DropdownMenuItem>Logout</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
