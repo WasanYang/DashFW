@@ -1,3 +1,22 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "client-1",
+      "description": "Avatar for a client",
+      "imageUrl": "https://picsum.photos/seed/c1/100/100",
+      "imageHint": "portrait person"
+    },
+    {
+      "id": "client-2",
+      "description": "Avatar for another client",
+      "imageUrl": "https://picsum.photos/seed/c2/100/100",
+      "imageHint": "portrait person"
+    },
+    {
+      "id": "client-3",
+      "description": "Avatar for a third client",
+      "imageUrl": "https://picsum.photos/seed/c3/100/100",
+      "imageHint": "portrait person"
+    }
+  ]
 }
