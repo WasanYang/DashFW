@@ -23,17 +23,19 @@ import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { DevFlowProIcon } from './icons';
 import { useSidebar } from '@/components/ui/sidebar';
+import { useTranslations } from 'next-intl';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/board', label: 'Kanban Board', icon: Columns3 },
-  { href: '/clients', label: 'Clients & CRM', icon: Users },
-  { href: '/financials', label: 'Financials', icon: Wallet },
-  { href: '/snippets', label: 'AI Snippets', icon: BotMessageSquare },
-  { href: '/checklists', label: 'AI Checklists', icon: ListChecks },
+  { href: '/', labelKey: 'dashboard', icon: LayoutGrid },
+  { href: '/board', labelKey: 'board', icon: Columns3 },
+  { href: '/clients', labelKey: 'clients', icon: Users },
+  { href: '/financials', labelKey: 'financials', icon: Wallet },
+  { href: '/snippets', labelKey: 'snippets', icon: BotMessageSquare },
+  { href: '/checklists', labelKey: 'checklists', icon: ListChecks },
 ];
 
 export function AppSidebar() {
+  const t = useTranslations('Nav');
   const pathname = usePathname();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
@@ -82,17 +84,17 @@ export function AppSidebar() {
                       'w-full justify-start gap-3',
                       isCollapsed && 'w-12 justify-center'
                     )}
-                    aria-label={item.label}
+                    aria-label={t(item.labelKey as any)}
                   >
                     <item.icon className="h-5 w-5" />
                     <span className={cn('truncate', isCollapsed && 'hidden')}>
-                      {item.label}
+                      {t(item.labelKey as any)}
                     </span>
                   </Button>
                 </Link>
               </TooltipTrigger>
               {isCollapsed && (
-                <TooltipContent side="right">{item.label}</TooltipContent>
+                <TooltipContent side="right">{t(item.labelKey as any)}</TooltipContent>
               )}
             </Tooltip>
           ))}
@@ -112,12 +114,12 @@ export function AppSidebar() {
                   )}
                 >
                   <Settings className="h-5 w-5" />
-                  <span className={cn(isCollapsed && 'hidden')}>Settings</span>
+                  <span className={cn(isCollapsed && 'hidden')}>{t('settings')}</span>
                 </Button>
               </Link>
             </TooltipTrigger>
             {isCollapsed && (
-              <TooltipContent side="right">Settings</TooltipContent>
+              <TooltipContent side="right">{t('settings')}</TooltipContent>
             )}
           </Tooltip>
         </TooltipProvider>

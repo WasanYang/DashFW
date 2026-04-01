@@ -1,4 +1,10 @@
 import type { Metadata } from 'next';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
+import { Toaster } from '@/components/ui/toaster';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/sidebar';
+import { Header } from '@/components/header';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -6,13 +12,16 @@ export const metadata: Metadata = {
   description: 'A personalized project management tool for a Full-stack Developer & Digital Marketer.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -29,7 +38,20 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased">{children}</body>
+      <body className="font-body antialiased">
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <SidebarProvider>
+            <div className="flex min-h-screen">
+              <AppSidebar />
+              <main className="flex flex-1 flex-col min-w-0 bg-muted/40">
+                <Header />
+                <div className="p-4 sm:p-6 md:p-8">{children}</div>
+              </main>
+            </div>
+          </SidebarProvider>
+          <Toaster />
+        </NextIntlClientProvider>
+      </body>
     </html>
   );
 }
