@@ -1,3 +1,9 @@
+export type SubTask = {
+  id: string;
+  text: string;
+  completed: boolean;
+};
+
 export type ProjectStatus = 'Backlog' | 'In Progress' | 'Review' | 'Completed' | 'Paid';
 
 export type Project = {
@@ -9,6 +15,7 @@ export type Project = {
   gross_price: number;
   deadline: Date;
   revisions: number;
+  subTasks?: SubTask[];
 };
 
 export type Client = {

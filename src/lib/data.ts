@@ -57,6 +57,13 @@ export const mockProjects: Project[] = [
     gross_price: 500,
     deadline: new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
     revisions: 0,
+    subTasks: [
+        { id: 'sub-1-1', text: 'Booking.com', completed: true },
+        { id: 'sub-1-2', text: 'Trip.com', completed: false },
+        { id: 'sub-1-3', text: 'Agoda', completed: false },
+        { id: 'sub-1-4', text: 'Line OA', completed: true },
+        { id: 'sub-1-5', text: 'Facebook Page', completed: false },
+    ]
   },
   {
     id: 'proj-2',
@@ -67,6 +74,11 @@ export const mockProjects: Project[] = [
     gross_price: 350,
     deadline: new Date(new Date().getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
     revisions: 1,
+    subTasks: [
+        { id: 'sub-2-1', text: 'Verify business', completed: true },
+        { id: 'sub-2-2', text: 'Optimize description', completed: true },
+        { id: 'sub-2-3', text: 'Upload photos', completed: false },
+    ]
   },
   {
     id: 'proj-3',

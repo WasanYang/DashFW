@@ -1,12 +1,22 @@
 'use client';
 
-import { useState, useEffect, DragEvent } from 'react';
+import { useState, useEffect, DragEvent, useMemo } from 'react';
 import { Project } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Minus, Plus } from 'lucide-react';
+import { Clock, Minus, Plus, ChevronDown, ListTodo } from 'lucide-react';
 import { formatDistanceToNow, isPast } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { cn } from '@/lib/utils';
+
 
 interface KanbanCardProps {
   project: Project;
@@ -16,6 +26,7 @@ interface KanbanCardProps {
 
 export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardProps) {
   const [timeLeft, setTimeLeft] = useState('');
+  const [isSubtasksOpen, setIsSubtasksOpen] = useState(false);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -34,6 +45,21 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
     const newRevisions = Math.max(0, project.revisions + increment);
     updateProject({ ...project, revisions: newRevisions });
   }
+
+  const handleSubTaskToggle = (subTaskId: string) => {
+    const newSubTasks = project.subTasks?.map(st => 
+        st.id === subTaskId ? { ...st, completed: !st.completed } : st
+    );
+    updateProject({ ...project, subTasks: newSubTasks });
+  }
+
+  const subTaskProgress = useMemo(() => {
+    if (!project.subTasks || project.subTasks.length === 0) {
+      return 0;
+    }
+    const completed = project.subTasks.filter(st => st.completed).length;
+    return (completed / project.subTasks.length) * 100;
+  }, [project.subTasks]);
 
   return (
     <Card
@@ -56,6 +82,14 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
             ${project.gross_price.toFixed(2)}
           </Badge>
         </div>
+
+        {project.subTasks && project.subTasks.length > 0 && (
+          <div>
+            <Progress value={subTaskProgress} className="h-2" />
+             <p className="text-xs text-muted-foreground mt-1">{Math.round(subTaskProgress)}% complete</p>
+          </div>
+        )}
+        
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Revisions:</span>
           <div className="flex items-center gap-1">
@@ -68,6 +102,35 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
             </Button>
           </div>
         </div>
+
+        {project.subTasks && project.subTasks.length > 0 && (
+            <Collapsible open={isSubtasksOpen} onOpenChange={setIsSubtasksOpen}>
+                <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-start px-0 -mb-2">
+                        <ListTodo className="h-4 w-4 mr-2"/>
+                        <span>Sub-tasks</span>
+                        <ChevronDown className={cn("h-4 w-4 ml-auto transition-transform", isSubtasksOpen && "rotate-180")} />
+                    </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 mt-2">
+                    {project.subTasks.map(subtask => (
+                        <div key={subtask.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                            <Checkbox 
+                                id={`subtask-${subtask.id}`} 
+                                checked={subtask.completed}
+                                onCheckedChange={() => handleSubTaskToggle(subtask.id)}
+                            />
+                            <Label 
+                                htmlFor={`subtask-${subtask.id}`}
+                                className={cn("text-sm", subtask.completed && "line-through text-muted-foreground")}
+                            >
+                                {subtask.text}
+                            </Label>
+                        </div>
+                    ))}
+                </CollapsibleContent>
+            </Collapsible>
+        )}
       </CardContent>
     </Card>
   );
