@@ -25,7 +25,7 @@ import { DevFlowProIcon } from './icons';
 import { useSidebar } from '@/components/ui/sidebar';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutGrid },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
   { href: '/board', label: 'Kanban Board', icon: Columns3 },
   { href: '/clients', label: 'Clients & CRM', icon: Users },
   { href: '/financials', label: 'Financials', icon: Wallet },
