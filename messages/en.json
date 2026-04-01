@@ -1,0 +1,51 @@
+{
+  "Nav": {
+    "dashboard": "Dashboard",
+    "board": "Kanban Board",
+    "clients": "Clients & CRM",
+    "financials": "Financials",
+    "snippets": "AI Snippets",
+    "checklists": "AI Checklists",
+    "settings": "Settings"
+  },
+  "Header": {
+    "search": "Search...",
+    "myAccount": "My Account",
+    "settings": "Settings",
+    "support": "Support",
+    "logout": "Logout",
+    "toggleMenu": "Toggle Menu",
+    "language": "Language"
+  },
+  "Breadcrumb": {
+    "dashboard": "Dashboard",
+    "board": "Board",
+    "clients": "Clients",
+    "financials": "Financials",
+    "snippets": "Snippets",
+    "checklists": "Checklists"
+  },
+  "Board": {
+    "title": "Kanban Board",
+    "newProject": "New Project",
+    "createNewProjectTitle": "Create New Project",
+    "createNewProjectDescription": "Fill in the details below to add a new project to your board.",
+    "form": {
+      "titleLabel": "Project Title",
+      "clientLabel": "Client",
+      "selectClientPlaceholder": "Select a client",
+      "priceLabel": "Gross Price",
+      "deadlineLabel": "Deadline",
+      "pickDatePlaceholder": "Pick a date",
+      "subtasksLabel": "Sub-tasks",
+      "addSubtask": "Add Sub-task",
+      "removeSubtask": "Remove",
+      "createProjectButton": "Create Project",
+      "creatingProjectButton": "Creating...",
+      "titleRequired": "Project title is required.",
+      "clientRequired": "Please select a client.",
+      "priceRequired": "Price must be a positive number.",
+      "deadlineRequired": "Deadline is required."
+    }
+  }
+}
