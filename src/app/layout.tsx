@@ -1,9 +1,5 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-import { SidebarProvider } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/sidebar';
-import { Header } from '@/components/header';
 
 export const metadata: Metadata = {
   title: 'DevFlow Pro',
@@ -33,18 +29,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased">
-        <SidebarProvider>
-          <div className="flex min-h-screen">
-            <AppSidebar />
-            <main className="flex-1 flex-col bg-muted/40">
-              <Header />
-              <div className="p-4 sm:p-6 md:p-8">{children}</div>
-            </main>
-          </div>
-        </SidebarProvider>
-        <Toaster />
-      </body>
+      <body className="font-body antialiased">{children}</body>
     </html>
   );
 }

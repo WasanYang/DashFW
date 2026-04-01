@@ -4,14 +4,16 @@ import { mockSnippets } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { getTranslations } from "next-intl/server";
 
-export default function SnippetsPage() {
+export default async function SnippetsPage() {
+  const t = await getTranslations('Snippets');
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
       <div className="lg:col-span-1">
         <Card className="sticky top-24">
           <CardHeader>
-            <CardTitle>AI-Powered Snippet Generator</CardTitle>
+            <CardTitle>{t('aiTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <SnippetGenerator />
@@ -21,7 +23,7 @@ export default function SnippetsPage() {
 
       <div className="lg:col-span-2">
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Snippet Manager</h1>
+            <h1 className="text-3xl font-bold">{t('title')}</h1>
             <div className="space-y-4">
             {mockSnippets.map((snippet) => (
                 <Card key={snippet.id}>

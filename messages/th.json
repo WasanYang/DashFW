@@ -47,5 +47,28 @@
       "priceRequired": "ราคาต้องเป็นตัวเลขบวก",
       "deadlineRequired": "กรุณาเลือกวันกำหนดส่ง"
     }
+  },
+  "Dashboard": {
+    "title": "แดชบอร์ด",
+    "activeProjects": "โปรเจกต์ที่กำลังทำอยู่",
+    "pipeline": "รายได้ที่คาดว่าจะได้รับ",
+    "earnings": "รายได้เดือนนี้",
+    "openTasks": "งานที่ต้องทำ",
+    "recentActivity": "กิจกรรมล่าสุด",
+    "upcomingDeadlines": "เดดไลน์ที่ใกล้จะถึง"
+  },
+  "Clients": {
+    "title": "ลูกค้า & จัดการทรัพย์สิน"
+  },
+  "Checklists": {
+    "title": "เทมเพลตเช็คลิสต์",
+    "aiTitle": "เครื่องมือสร้างเช็คลิสต์ AI"
+  },
+  "Financials": {
+    "title": "การเงิน"
+  },
+  "Snippets": {
+    "title": "จัดการ Snippet",
+    "aiTitle": "เครื่องมือสร้าง Snippet AI"
   }
 }

@@ -3,14 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { mockChecklists } from "@/lib/data";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { getTranslations } from "next-intl/server";
 
-export default function ChecklistsPage() {
+
+export default async function ChecklistsPage() {
+  const t = await getTranslations('Checklists');
+
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
       <div className="lg:col-span-1">
         <Card className="sticky top-24">
           <CardHeader>
-            <CardTitle>AI-Powered Checklist Creator</CardTitle>
+            <CardTitle>{t('aiTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <ChecklistGenerator />
@@ -20,7 +24,7 @@ export default function ChecklistsPage() {
 
       <div className="lg:col-span-2">
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Checklist Templates</h1>
+            <h1 className="text-3xl font-bold">{t('title')}</h1>
             <div className="space-y-4">
             {mockChecklists.map((checklist) => (
                 <Card key={checklist.id}>

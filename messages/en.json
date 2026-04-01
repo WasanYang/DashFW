@@ -47,5 +47,28 @@
       "priceRequired": "Price must be a positive number.",
       "deadlineRequired": "Deadline is required."
     }
+  },
+  "Dashboard": {
+    "title": "Dashboard",
+    "activeProjects": "Active Projects",
+    "pipeline": "Money in Pipeline",
+    "earnings": "Earnings this Month",
+    "openTasks": "Open Tasks",
+    "recentActivity": "Recent Activity",
+    "upcomingDeadlines": "Upcoming Deadlines"
+  },
+  "Clients": {
+    "title": "Client & Property CRM"
+  },
+  "Checklists": {
+    "title": "Checklist Templates",
+    "aiTitle": "AI-Powered Checklist Creator"
+  },
+  "Financials": {
+    "title": "Financials"
+  },
+  "Snippets": {
+    "title": "Snippet Manager",
+    "aiTitle": "AI-Powered Snippet Generator"
   }
 }
