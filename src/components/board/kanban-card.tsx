@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, DragEvent, useMemo } from 'react';
+import Link from 'next/link';
 import { Project } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -68,7 +69,9 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
       className="cursor-grab active:cursor-grabbing"
     >
       <CardHeader className="p-4">
-        <CardTitle className="text-base">{project.title}</CardTitle>
+        <Link href={`/board/${project.id}`} className="hover:underline">
+            <CardTitle className="text-base">{project.title}</CardTitle>
+        </Link>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 p-4 pt-0">
         <div className="flex items-center justify-between text-sm text-muted-foreground">
