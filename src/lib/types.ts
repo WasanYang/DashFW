@@ -1,6 +1,7 @@
 export type SubTask = {
   id: string;
   text: string;
+  description?: string;
   completed: boolean;
 };
 

@@ -2,11 +2,11 @@
 
 import { useState, useEffect, DragEvent, useMemo } from 'react';
 import Link from 'next/link';
-import { Project } from '@/lib/types';
+import { Project, SubTask } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Minus, Plus, ChevronDown, ListTodo } from 'lucide-react';
+import { Clock, Minus, Plus, ChevronDown, ListTodo, Trash2, PlusCircle } from 'lucide-react';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,6 +17,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Input } from '../ui/input';
 
 
 interface KanbanCardProps {
@@ -28,6 +30,8 @@ interface KanbanCardProps {
 export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardProps) {
   const [timeLeft, setTimeLeft] = useState('');
   const [isSubtasksOpen, setIsSubtasksOpen] = useState(false);
+  const [newSubtaskText, setNewSubtaskText] = useState('');
+  const [isAddSubtaskOpen, setAddSubtaskOpen] = useState(false);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -53,6 +57,22 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
     );
     updateProject({ ...project, subTasks: newSubTasks });
   }
+
+  const handleAddSubtask = () => {
+    if (newSubtaskText.trim() === '') return;
+    const newSubTask: SubTask = {
+      id: `sub-${Date.now()}`,
+      text: newSubtaskText.trim(),
+      completed: false,
+    };
+    updateProject({ ...project, subTasks: [...(project.subTasks || []), newSubTask] });
+    setNewSubtaskText('');
+    setAddSubtaskOpen(false);
+  };
+  
+  const handleRemoveSubtask = (subTaskId: string) => {
+    updateProject({ ...project, subTasks: project.subTasks?.filter(st => st.id !== subTaskId) });
+  };
 
   const subTaskProgress = useMemo(() => {
     if (!project.subTasks || project.subTasks.length === 0) {
@@ -106,7 +126,7 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
           </div>
         </div>
 
-        {project.subTasks && project.subTasks.length > 0 && (
+        {project.subTasks && (
             <Collapsible open={isSubtasksOpen} onOpenChange={setIsSubtasksOpen}>
                 <CollapsibleTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start px-0 -mb-2">
@@ -115,9 +135,9 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
                         <ChevronDown className={cn("h-4 w-4 ml-auto transition-transform", isSubtasksOpen && "rotate-180")} />
                     </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
+                <CollapsibleContent className="space-y-2 mt-4 pt-2 border-t">
                     {project.subTasks.map(subtask => (
-                        <div key={subtask.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                        <div key={subtask.id} className="flex items-center gap-2 p-1 rounded-md hover:bg-muted/50">
                             <Checkbox 
                                 id={`subtask-${subtask.id}`} 
                                 checked={subtask.completed}
@@ -125,12 +145,33 @@ export function KanbanCard({ project, onDragStart, updateProject }: KanbanCardPr
                             />
                             <Label 
                                 htmlFor={`subtask-${subtask.id}`}
-                                className={cn("text-sm", subtask.completed && "line-through text-muted-foreground")}
+                                className={cn("text-sm flex-grow", subtask.completed && "line-through text-muted-foreground")}
                             >
                                 {subtask.text}
                             </Label>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveSubtask(subtask.id)}>
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
                         </div>
                     ))}
+                    <Popover open={isAddSubtaskOpen} onOpenChange={setAddSubtaskOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-full mt-2">
+                                <PlusCircle className="h-4 w-4 mr-2" /> Add sub-task
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-60 p-2">
+                            <div className="flex gap-2">
+                                <Input
+                                placeholder="New sub-task..."
+                                value={newSubtaskText}
+                                onChange={(e) => setNewSubtaskText(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddSubtask() }}
+                                />
+                                <Button size="sm" onClick={handleAddSubtask}>Add</Button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                 </CollapsibleContent>
             </Collapsible>
         )}

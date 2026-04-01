@@ -58,10 +58,10 @@ export const mockProjects: Project[] = [
     deadline: new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
     revisions: 0,
     subTasks: [
-        { id: 'sub-1-1', text: 'Booking.com', completed: true },
-        { id: 'sub-1-2', text: 'Trip.com', completed: false },
+        { id: 'sub-1-1', text: 'Booking.com', completed: true, description: 'Set up with all photos and link to channel manager.' },
+        { id: 'sub-1-2', text: 'Trip.com', completed: false, description: 'Waiting for client to provide contract details.' },
         { id: 'sub-1-3', text: 'Agoda', completed: false },
-        { id: 'sub-1-4', text: 'Line OA', completed: true },
+        { id: 'sub-1-4', text: 'Line OA', completed: true, description: 'Create rich menu and automated reply for booking inquiries.' },
         { id: 'sub-1-5', text: 'Facebook Page', completed: false },
     ]
   },
@@ -76,8 +76,8 @@ export const mockProjects: Project[] = [
     revisions: 1,
     subTasks: [
         { id: 'sub-2-1', text: 'Verify business', completed: true },
-        { id: 'sub-2-2', text: 'Optimize description', completed: true },
-        { id: 'sub-2-3', text: 'Upload photos', completed: false },
+        { id: 'sub-2-2', text: 'Optimize description', completed: true, description: 'Include all provided keywords and a link to the website.' },
+        { id: 'sub-2-3', text: 'Upload photos', completed: false, description: 'Need at least 15 high-res photos of the property.' },
     ]
   },
   {
