@@ -19,6 +19,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTrigger,
+  SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import {
@@ -66,7 +67,7 @@ export function Header() {
           <SheetHeader className="mb-4 text-left">
             <Link href="/" className="flex items-center gap-2">
               <DevFlowProIcon className="h-8 w-8 text-primary" />
-              <h1 className="text-xl font-bold text-primary">DevFlow</h1>
+              <SheetTitle className="text-xl font-bold text-primary">DevFlow</SheetTitle>
             </Link>
           </SheetHeader>
           <nav className="flex flex-col gap-2">
