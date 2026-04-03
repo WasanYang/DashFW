@@ -50,20 +50,20 @@ export function AppSidebar() {
     <aside
       className={cn(
         'relative hidden h-screen flex-col border-r bg-card p-4 transition-all duration-300 ease-in-out md:flex',
-        isCollapsed ? 'w-20 items-center' : 'w-64',
+        isCollapsed ? 'w-20' : 'w-64'
       )}
     >
       <div
         className={cn(
-          'flex items-center gap-2',
-          isCollapsed && 'justify-center',
+          'flex h-8 items-center gap-2',
+          isCollapsed && 'justify-center'
         )}
       >
-        <DevFlowProIcon className='h-8 w-8 text-primary' />
+        <DevFlowProIcon className='h-8 w-8 flex-shrink-0 text-primary' />
         <h1
           className={cn(
-            'text-xl font-bold text-primary transition-opacity',
-            isCollapsed && 'opacity-0 w-0',
+            'origin-left text-xl font-bold text-primary transition-all duration-200 ease-in-out',
+            isCollapsed && 'scale-x-0 opacity-0'
           )}
         >
           DevFlow
@@ -80,7 +80,7 @@ export function AppSidebar() {
                     variant={pathname === item.href ? 'secondary' : 'ghost'}
                     className={cn(
                       'w-full justify-start gap-3',
-                      isCollapsed && 'w-12 justify-center',
+                      isCollapsed && 'w-12 justify-center'
                     )}
                     aria-label={item.label}
                   >
@@ -108,7 +108,7 @@ export function AppSidebar() {
                   variant='ghost'
                   className={cn(
                     'w-full justify-start gap-3',
-                    isCollapsed && 'w-12 justify-center',
+                    isCollapsed && 'w-12 justify-center'
                   )}
                 >
                   <Settings className='h-5 w-5' />
@@ -132,7 +132,7 @@ export function AppSidebar() {
         <ChevronLeft
           className={cn(
             'h-4 w-4 transition-transform',
-            isCollapsed && 'rotate-180',
+            isCollapsed && 'rotate-180'
           )}
         />
       </Button>
