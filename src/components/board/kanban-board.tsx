@@ -376,12 +376,11 @@ export function KanbanBoard({
                           </Button>
                       ) : (
                           <div className="flex items-center gap-2">
-                              <Button size="sm" onClick={handleSaveDetails}>
-                                  <Check className="mr-2 h-4 w-4" />
-                                  Save
+                              <Button variant="ghost" size="icon" onClick={handleSaveDetails}>
+                                  <Check className="h-5 w-5" />
                               </Button>
-                              <Button size="sm" variant="outline" onClick={handleCancelDetails}>
-                                  Cancel
+                              <Button variant="ghost" size="icon" onClick={handleCancelDetails}>
+                                  <X className="h-5 w-5" />
                               </Button>
                           </div>
                       )}
