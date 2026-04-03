@@ -12,6 +12,10 @@ import {
   Clock,
   ListTodo,
   PlusCircle,
+  Pencil,
+  Check,
+  X,
+  CalendarIcon,
 } from 'lucide-react';
 import {
   Dialog,
@@ -30,6 +34,10 @@ import {
   Accordion,
 } from '../ui/accordion';
 import { SubtaskItem } from './subtask-item';
+import { Input } from '../ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar } from '../ui/calendar';
+import { cn } from '@/lib/utils';
 
 interface KanbanBoardProps {
   initialProjects: Project[];
@@ -120,6 +128,11 @@ export function KanbanBoard({
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editableProject, setEditableProject] = useState<Project | null>(null);
+
+
   const groupedProjects = useMemo(() => {
     return columns.reduce((acc, status) => {
       acc[status] = projects.filter((p) => p.status === status);
@@ -170,47 +183,105 @@ export function KanbanBoard({
     setCreateDialogOpen(false);
   };
 
+  const handleCardClick = (project: Project) => {
+    setSelectedProject(project);
+    setEditableProject({ ...project });
+    setIsEditingTitle(false);
+    setIsEditingDetails(false);
+  };
+  
+  const handleCloseModal = () => {
+    setSelectedProject(null);
+    setEditableProject(null);
+    setIsEditingTitle(false);
+    setIsEditingDetails(false);
+  };
+
+  const handleValueChange = (key: keyof Project, value: any) => {
+    if(editableProject) {
+        setEditableProject({...editableProject, [key]: value});
+    }
+  };
+
+  const handleSaveTitle = () => {
+      if(editableProject) {
+          updateProject(editableProject);
+          setSelectedProject(editableProject);
+      }
+      setIsEditingTitle(false);
+  };
+  
+  const handleCancelTitle = () => {
+      if(selectedProject) {
+          setEditableProject({...selectedProject});
+      }
+      setIsEditingTitle(false);
+  };
+
+  const handleSaveDetails = () => {
+      if(editableProject) {
+          updateProject(editableProject);
+          setSelectedProject(editableProject);
+      }
+      setIsEditingDetails(false);
+  };
+
+  const handleCancelDetails = () => {
+      if(selectedProject) {
+          setEditableProject({...selectedProject});
+      }
+      setIsEditingDetails(false);
+  };
+
   const handleSubtaskUpdateInModal = (
     taskId: string,
     field: 'text' | 'description' | 'completed',
     value: string | boolean
   ) => {
-    if (!selectedProject) return;
-    const newSubTasks = updateSubtaskRecursively(selectedProject.subTasks || [], taskId, field, value);
-    updateProject({ ...selectedProject, subTasks: newSubTasks });
+    if (!editableProject) return;
+    const newSubTasks = updateSubtaskRecursively(editableProject.subTasks || [], taskId, field, value);
+    setEditableProject({ ...editableProject, subTasks: newSubTasks });
+    updateProject({ ...editableProject, subTasks: newSubTasks });
+    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
   };
 
   const addSubtaskInModal = () => {
-    if (!selectedProject) return;
+    if (!editableProject) return;
     const newSubTask: SubTask = {
       id: `sub-${Date.now()}`,
       text: 'New sub-task',
       description: '',
       completed: false,
     };
-    const newSubTasks = [...(selectedProject.subTasks || []), newSubTask];
-    updateProject({ ...selectedProject, subTasks: newSubTasks });
+    const newSubTasks = [...(editableProject.subTasks || []), newSubTask];
+    setEditableProject({ ...editableProject, subTasks: newSubTasks });
+    updateProject({ ...editableProject, subTasks: newSubTasks });
+    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
   };
 
   const addChildSubtaskInModal = (parentId: string) => {
-    if (!selectedProject) return;
+    if (!editableProject) return;
     const newSubTask: SubTask = {
         id: `sub-${Date.now()}`,
         text: 'New nested sub-task',
         description: '',
         completed: false,
     };
-    const newSubTasks = addChildToSubtaskRecursively(selectedProject.subTasks || [], parentId, newSubTask);
-    updateProject({ ...selectedProject, subTasks: newSubTasks });
+    const newSubTasks = addChildToSubtaskRecursively(editableProject.subTasks || [], parentId, newSubTask);
+    setEditableProject({ ...editableProject, subTasks: newSubTasks });
+    updateProject({ ...editableProject, subTasks: newSubTasks });
+    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
   };
 
   const removeSubtaskInModal = (taskId: string) => {
-    if (!selectedProject) return;
+    if (!editableProject) return;
     const newSubTasks = removeSubtaskRecursively(
-      selectedProject.subTasks || [],
+      editableProject.subTasks || [],
       taskId
     );
-    updateProject({ ...selectedProject, subTasks: newSubTasks });
+    setEditableProject({ ...editableProject, subTasks: newSubTasks });
+    updateProject({ ...editableProject, subTasks: newSubTasks });
+    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
   };
 
   const selectedClient = useMemo(() => {
@@ -251,20 +322,41 @@ export function KanbanBoard({
 
       <Dialog
         open={!!selectedProject}
-        onOpenChange={(isOpen) => !isOpen && setSelectedProject(null)}
+        onOpenChange={(isOpen) => !isOpen && handleCloseModal()}
       >
         <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col">
-          {selectedProject && (
+          {selectedProject && editableProject && (
             <>
               <DialogHeader>
-                <DialogTitle>
-                  <Link
-                    href={`/board/${selectedProject.id}`}
-                    className="hover:underline"
-                  >
-                    {selectedProject.title}
-                  </Link>
-                </DialogTitle>
+                <div className="flex items-center gap-2 pr-12">
+                    {!isEditingTitle ? (
+                        <>
+                            <DialogTitle className='flex-grow text-2xl'>
+                                <Link href={`/board/${selectedProject.id}`} className="hover:underline">
+                                    {selectedProject.title}
+                                </Link>
+                            </DialogTitle>
+                            <Button variant="ghost" size="icon" onClick={() => setIsEditingTitle(true)}>
+                                <Pencil className="h-5 w-5" />
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Input 
+                                value={editableProject.title} 
+                                onChange={(e) => handleValueChange('title', e.target.value)}
+                                className="text-2xl font-semibold flex-grow h-auto py-1"
+                                autoFocus
+                            />
+                            <Button variant="ghost" size="icon" onClick={handleSaveTitle}>
+                                <Check className="h-5 w-5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={handleCancelTitle}>
+                                <X className="h-5 w-5" />
+                            </Button>
+                        </>
+                    )}
+                </div>
                 <DialogDescription>
                   In status{' '}
                   <span className="font-semibold">{selectedProject.status}</span>{' '}
@@ -275,42 +367,93 @@ export function KanbanBoard({
 
               <ScrollArea className="flex-grow pr-6 -mr-6">
                 <div className="space-y-6 pb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
-                      <DollarSign className="h-6 w-6 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Price</p>
-                        <p className="font-semibold text-lg">
-                          ${selectedProject.gross_price.toFixed(2)}
-                        </p>
-                      </div>
+                  
+                  <div className='space-y-2'>
+                    <div className='flex justify-end items-center -mb-2'>
+                      {!isEditingDetails ? (
+                          <Button variant="ghost" size="icon" onClick={() => setIsEditingDetails(true)}>
+                              <Pencil className="h-4 w-4" />
+                          </Button>
+                      ) : (
+                          <div className="flex items-center gap-2">
+                              <Button size="sm" onClick={handleSaveDetails}>
+                                  <Check className="mr-2 h-4 w-4" />
+                                  Save
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={handleCancelDetails}>
+                                  Cancel
+                              </Button>
+                          </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
-                      <MessageSquare className="h-6 w-6 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Revisions
-                        </p>
-                        <p className="font-semibold text-lg">
-                          {selectedProject.revisions}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
-                      <Clock className="h-6 w-6 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Deadline
-                        </p>
-                        <p className="font-semibold">
-                          {format(
-                            new Date(selectedProject.deadline),
-                            'MMM d, yyyy'
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                        <DollarSign className="h-6 w-6 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Price</p>
+                          {isEditingDetails ? (
+                            <Input type="number" value={editableProject.gross_price} onChange={(e) => handleValueChange('gross_price', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto border-0 bg-transparent focus-visible:ring-0 focus-visible:bg-white -ml-1" />
+                          ) : (
+                            <p className="font-semibold text-lg">
+                              ${selectedProject.gross_price.toFixed(2)}
+                            </p>
                           )}
-                        </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                        <MessageSquare className="h-6 w-6 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Revisions</p>
+                          {isEditingDetails ? (
+                             <Input type="number" value={editableProject.revisions} onChange={(e) => handleValueChange('revisions', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto border-0 bg-transparent focus-visible:ring-0 focus-visible:bg-white -ml-1" />
+                          ) : (
+                            <p className="font-semibold text-lg">
+                              {selectedProject.revisions}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                        <Clock className="h-6 w-6 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Deadline</p>
+                          {isEditingDetails ? (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "pl-3 text-left font-normal h-auto py-1",
+                                            !editableProject.deadline && "text-muted-foreground"
+                                        )}
+                                    >
+                                        {editableProject.deadline ? (
+                                            format(new Date(editableProject.deadline), "PPP")
+                                        ) : (
+                                            <span>Pick a date</span>
+                                        )}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={new Date(editableProject.deadline)}
+                                        onSelect={(date) => handleValueChange('deadline', date)}
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                          ) : (
+                            <p className="font-semibold">
+                              {format(new Date(selectedProject.deadline), 'MMM d, yyyy')}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
+
 
                   <Separator />
 
@@ -391,7 +534,7 @@ export function KanbanBoard({
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             updateProject={updateProject}
-            onCardClick={(project) => setSelectedProject(project)}
+            onCardClick={handleCardClick}
           />
         ))}
       </div>
