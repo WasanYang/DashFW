@@ -55,7 +55,9 @@ export function ClientsProvider({
 
   const addClient = useCallback((data: Omit<Client, 'id'>) => {
     const id = `client-${Date.now()}`;
-    const newSocials = data.socials?.map((s, i) => ({ ...s, id: `soc-${Date.now()}-${i}` })) || [];
+    const newSocials =
+      data.socials?.map((s, i) => ({ ...s, id: `soc-${Date.now()}-${i}` })) ||
+      [];
     const created: Client = { ...data, id, socials: newSocials };
     setClients((prev) => {
       const next = [created, ...prev];
@@ -65,36 +67,41 @@ export function ClientsProvider({
     return created;
   }, []);
 
-  const updateClient = useCallback((id: string, data: Partial<Omit<Client, 'id'>>) => {
-    setClients((prev) => {
-      const next = prev.map((c) => {
-        if (c.id === id) {
-          const updatedClient = { ...c, ...data };
-          // Ensure new socials have IDs
-          updatedClient.socials = updatedClient.socials?.map((s, i) => ({
-            ...s,
-            id: s.id || `soc-${Date.now()}-${i}`,
-          }));
-          return updatedClient;
-        }
-        return c;
+  const updateClient = useCallback(
+    (id: string, data: Partial<Omit<Client, 'id'>>) => {
+      setClients((prev) => {
+        const next = prev.map((c) => {
+          if (c.id === id) {
+            const updatedClient = { ...c, ...data };
+            // Ensure new socials have IDs
+            updatedClient.socials = updatedClient.socials?.map((s, i) => ({
+              ...s,
+              id: s.id || `soc-${Date.now()}-${i}`,
+            }));
+            return updatedClient;
+          }
+          return c;
+        });
+        persist(next);
+        return next;
       });
-      persist(next);
-      return next;
-    });
-  }, []);
+    },
+    [],
+  );
 
   const getClient = useCallback(
     (id: string) => clients.find((c) => c.id === id),
-    [clients]
+    [clients],
   );
 
   const value = useMemo(
     () => ({ clients, addClient, updateClient, getClient }),
-    [clients, addClient, updateClient, getClient]
+    [clients, addClient, updateClient, getClient],
   );
 
-  return <ClientsContext.Provider value={value}>{children}</ClientsContext.Provider>;
+  return (
+    <ClientsContext.Provider value={value}>{children}</ClientsContext.Provider>
+  );
 }
 
 export function useClients() {
