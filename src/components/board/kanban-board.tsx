@@ -125,8 +125,7 @@ export function KanbanBoard({
   translations,
 }: KanbanBoardProps) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [modalContent, setModalContent] = useState<Project | 'create' | null>(null);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
@@ -167,8 +166,8 @@ export function KanbanBoard({
   const updateProject = (updatedProject: Project) => {
     const newProjects = projects.map((p) => (p.id === updatedProject.id ? updatedProject : p));
     setProjects(newProjects);
-    if (selectedProject && selectedProject.id === updatedProject.id) {
-      setSelectedProject(updatedProject);
+    if (typeof modalContent === 'object' && modalContent?.id === updatedProject.id) {
+      setModalContent(updatedProject);
     }
   };
 
@@ -182,11 +181,11 @@ export function KanbanBoard({
       revisions: 0,
     };
     setProjects((prevProjects) => [newProject, ...prevProjects]);
-    setCreateDialogOpen(false);
+    setModalContent(null);
   };
 
   const handleCardClick = (project: Project) => {
-    setSelectedProject(project);
+    setModalContent(project);
     setEditableProject({ ...project });
     setIsEditingTitle(false);
     setIsEditingPrice(false);
@@ -195,7 +194,7 @@ export function KanbanBoard({
   };
   
   const handleCloseModal = () => {
-    setSelectedProject(null);
+    setModalContent(null);
     setEditableProject(null);
     setIsEditingTitle(false);
     setIsEditingPrice(false);
@@ -212,14 +211,14 @@ export function KanbanBoard({
   const handleSaveTitle = () => {
       if(editableProject) {
           updateProject(editableProject);
-          setSelectedProject(editableProject);
+          setModalContent(editableProject);
       }
       setIsEditingTitle(false);
   };
   
   const handleCancelTitle = () => {
-      if(selectedProject) {
-          setEditableProject({...selectedProject});
+      if(modalContent && typeof modalContent === 'object') {
+          setEditableProject({...modalContent});
       }
       setIsEditingTitle(false);
   };
@@ -227,13 +226,13 @@ export function KanbanBoard({
   const handleSavePrice = () => {
     if(editableProject) {
       updateProject(editableProject);
-      setSelectedProject(editableProject);
+      setModalContent(editableProject);
     }
     setIsEditingPrice(false);
   };
   const handleCancelPrice = () => {
-    if(selectedProject) {
-      setEditableProject({...selectedProject});
+    if(modalContent && typeof modalContent === 'object') {
+      setEditableProject({...modalContent});
     }
     setIsEditingPrice(false);
   };
@@ -241,13 +240,13 @@ export function KanbanBoard({
   const handleSaveRevisions = () => {
     if(editableProject) {
       updateProject(editableProject);
-      setSelectedProject(editableProject);
+      setModalContent(editableProject);
     }
     setIsEditingRevisions(false);
   };
   const handleCancelRevisions = () => {
-    if(selectedProject) {
-      setEditableProject({...selectedProject});
+    if(modalContent && typeof modalContent === 'object') {
+      setEditableProject({...modalContent});
     }
     setIsEditingRevisions(false);
   };
@@ -255,13 +254,13 @@ export function KanbanBoard({
   const handleSaveDeadline = () => {
     if(editableProject) {
       updateProject(editableProject);
-      setSelectedProject(editableProject);
+      setModalContent(editableProject);
     }
     setIsEditingDeadline(false);
   };
   const handleCancelDeadline = () => {
-    if(selectedProject) {
-      setEditableProject({...selectedProject});
+    if(modalContent && typeof modalContent === 'object') {
+      setEditableProject({...modalContent});
     }
     setIsEditingDeadline(false);
   };
@@ -273,9 +272,10 @@ export function KanbanBoard({
   ) => {
     if (!editableProject) return;
     const newSubTasks = updateSubtaskRecursively(editableProject.subTasks || [], taskId, field, value);
-    setEditableProject({ ...editableProject, subTasks: newSubTasks });
-    updateProject({ ...editableProject, subTasks: newSubTasks });
-    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
+    const updatedEditableProject = { ...editableProject, subTasks: newSubTasks };
+    setEditableProject(updatedEditableProject);
+    updateProject(updatedEditableProject);
+    setModalContent(updatedEditableProject);
   };
 
   const addSubtaskInModal = () => {
@@ -287,9 +287,10 @@ export function KanbanBoard({
       completed: false,
     };
     const newSubTasks = [...(editableProject.subTasks || []), newSubTask];
-    setEditableProject({ ...editableProject, subTasks: newSubTasks });
-    updateProject({ ...editableProject, subTasks: newSubTasks });
-    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
+    const updatedEditableProject = { ...editableProject, subTasks: newSubTasks };
+    setEditableProject(updatedEditableProject);
+    updateProject(updatedEditableProject);
+    setModalContent(updatedEditableProject);
   };
 
   const addChildSubtaskInModal = (parentId: string) => {
@@ -301,9 +302,10 @@ export function KanbanBoard({
         completed: false,
     };
     const newSubTasks = addChildToSubtaskRecursively(editableProject.subTasks || [], parentId, newSubTask);
-    setEditableProject({ ...editableProject, subTasks: newSubTasks });
-    updateProject({ ...editableProject, subTasks: newSubTasks });
-    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
+    const updatedEditableProject = { ...editableProject, subTasks: newSubTasks };
+    setEditableProject(updatedEditableProject);
+    updateProject(updatedEditableProject);
+    setModalContent(updatedEditableProject);
   };
 
   const removeSubtaskInModal = (taskId: string) => {
@@ -312,61 +314,61 @@ export function KanbanBoard({
       editableProject.subTasks || [],
       taskId
     );
-    setEditableProject({ ...editableProject, subTasks: newSubTasks });
-    updateProject({ ...editableProject, subTasks: newSubTasks });
-    setSelectedProject({ ...editableProject, subTasks: newSubTasks });
+    const updatedEditableProject = { ...editableProject, subTasks: newSubTasks };
+    setEditableProject(updatedEditableProject);
+    updateProject(updatedEditableProject);
+    setModalContent(updatedEditableProject);
   };
 
   const selectedClient = useMemo(() => {
-    if (!selectedProject) return undefined;
-    return clients.find((c) => c.id === selectedProject.clientId);
-  }, [selectedProject, clients]);
+    if (!modalContent || typeof modalContent !== 'object') return undefined;
+    return clients.find((c) => c.id === modalContent.clientId);
+  }, [modalContent, clients]);
 
   const modalSubTaskProgress = useMemo(() => {
-    if (!selectedProject) return 0;
-    return calculateProgress(selectedProject.subTasks);
-  }, [selectedProject]);
+    if (!modalContent || typeof modalContent !== 'object') return 0;
+    return calculateProgress(modalContent.subTasks);
+  }, [modalContent]);
 
   return (
     <>
       <div className="flex-shrink-0 flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold">{translations.pageTitle}</h1>
-        <Button onClick={() => setCreateDialogOpen(true)}>
+        <Button onClick={() => setModalContent('create')}>
           <Plus className="mr-2 h-4 w-4" />
           {translations.newProject}
         </Button>
       </div>
 
-      <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>{translations.createNewProjectTitle}</DialogTitle>
-            <DialogDescription>
-              {translations.createNewProjectDescription}
-            </DialogDescription>
-          </DialogHeader>
-          <CreateProjectForm
-            clients={clients}
-            onSubmit={addProject}
-            translations={translations}
-          />
-        </DialogContent>
-      </Dialog>
-
       <Dialog
-        open={!!selectedProject}
+        open={!!modalContent}
         onOpenChange={(isOpen) => !isOpen && handleCloseModal()}
       >
         <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col">
-          {selectedProject && editableProject && (
+          {modalContent === 'create' ? (
+             <>
+                <DialogHeader>
+                    <DialogTitle>{translations.createNewProjectTitle}</DialogTitle>
+                    <DialogDescription>
+                    {translations.createNewProjectDescription}
+                    </DialogDescription>
+                </DialogHeader>
+                <CreateProjectForm
+                    clients={clients}
+                    onSubmit={addProject}
+                    translations={translations}
+                />
+            </>
+          ) : (
+            modalContent && typeof modalContent === 'object' && editableProject && (
             <>
               <DialogHeader>
                 <div className="flex items-center gap-2 pr-12">
                     {!isEditingTitle ? (
                         <>
                             <DialogTitle className='flex-grow text-2xl'>
-                                <Link href={`/board/${selectedProject.id}`} className="hover:underline">
-                                    {selectedProject.title}
+                                <Link href={`/board/${modalContent.id}`} className="hover:underline">
+                                    {modalContent.title}
                                 </Link>
                             </DialogTitle>
                             <Button variant="ghost" size="icon" onClick={() => setIsEditingTitle(true)}>
@@ -392,9 +394,9 @@ export function KanbanBoard({
                 </div>
                 <DialogDescription>
                   In status{' '}
-                  <span className="font-semibold">{selectedProject.status}</span>{' '}
+                  <span className="font-semibold">{modalContent.status}</span>{' '}
                   &bull; Due by{' '}
-                  {format(new Date(selectedProject.deadline), 'PPP')}
+                  {format(new Date(modalContent.deadline), 'PPP')}
                 </DialogDescription>
               </DialogHeader>
 
@@ -410,7 +412,7 @@ export function KanbanBoard({
                             <Input type="number" value={editableProject.gross_price} onChange={(e) => handleValueChange('gross_price', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto" />
                             ) : (
                             <p className="font-semibold text-lg">
-                                ${selectedProject.gross_price.toFixed(2)}
+                                ${modalContent.gross_price.toFixed(2)}
                             </p>
                             )}
                         </div>
@@ -431,7 +433,7 @@ export function KanbanBoard({
                                 <Input type="number" value={editableProject.revisions} onChange={(e) => handleValueChange('revisions', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto" />
                             ) : (
                                 <p className="font-semibold text-lg">
-                                {selectedProject.revisions}
+                                {modalContent.revisions}
                                 </p>
                             )}
                         </div>
@@ -477,7 +479,7 @@ export function KanbanBoard({
                                 </Popover>
                             ) : (
                                 <p className="font-semibold">
-                                {format(new Date(selectedProject.deadline), 'MMM d, yyyy')}
+                                {format(new Date(modalContent.deadline), 'MMM d, yyyy')}
                                 </p>
                             )}
                         </div>
@@ -518,7 +520,7 @@ export function KanbanBoard({
                     </div>
                   )}
 
-                  {selectedProject.subTasks !== undefined && (
+                  {modalContent.subTasks !== undefined && (
                     <div>
                       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <ListTodo className="h-5 w-5" />
@@ -533,7 +535,7 @@ export function KanbanBoard({
                         </div>
 
                         <Accordion type="multiple" className="w-full space-y-2">
-                          {selectedProject.subTasks.map((subtask) => (
+                          {modalContent.subTasks.map((subtask) => (
                             <SubtaskItem
                               key={subtask.id}
                               subtask={subtask}
@@ -558,7 +560,7 @@ export function KanbanBoard({
                 </div>
               </ScrollArea>
             </>
-          )}
+          )))}
         </DialogContent>
       </Dialog>
 
@@ -579,5 +581,3 @@ export function KanbanBoard({
     </>
   );
 }
-
-    
