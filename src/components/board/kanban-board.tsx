@@ -11,7 +11,6 @@ import {
   MessageSquare,
   Clock,
   ListTodo,
-  Trash2,
   PlusCircle,
 } from 'lucide-react';
 import {
@@ -29,15 +28,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import { Progress } from '../ui/progress';
 import {
   Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
 } from '../ui/accordion';
-import { Checkbox } from '../ui/checkbox';
-import { cn } from '@/lib/utils';
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
-import { Textarea } from '../ui/textarea';
+import { SubtaskItem } from './subtask-item';
 
 interface KanbanBoardProps {
   initialProjects: Project[];
@@ -52,6 +44,72 @@ const columns: ProjectStatus[] = [
   'Completed',
   'Paid',
 ];
+
+const updateSubtaskRecursively = (tasks: SubTask[], taskId: string, field: 'text' | 'description' | 'completed', value: string | boolean): SubTask[] => {
+  return tasks.map(task => {
+      if (task.id === taskId) {
+          return { ...task, [field]: value };
+      }
+      if (task.children) {
+          return { ...task, children: updateSubtaskRecursively(task.children, taskId, field, value) };
+      }
+      return task;
+  });
+};
+
+const removeSubtaskRecursively = (tasks: SubTask[], taskId: string): SubTask[] => {
+  let newTasks: SubTask[] = [];
+  for (const task of tasks) {
+      if (task.id === taskId) {
+          continue;
+      }
+      if (task.children) {
+          task.children = removeSubtaskRecursively(task.children, taskId);
+      }
+      newTasks.push(task);
+  }
+  return newTasks;
+}
+
+const addChildToSubtaskRecursively = (tasks: SubTask[], parentId: string, newSubtask: SubTask): SubTask[] => {
+  return tasks.map(task => {
+      if (task.id === parentId) {
+          const children = task.children ? [...task.children, newSubtask] : [newSubtask];
+          return { ...task, children };
+      }
+      if (task.children) {
+          return { ...task, children: addChildToSubtaskRecursively(task.children, parentId, newSubtask) };
+      }
+      return task;
+  });
+};
+
+const calculateProgress = (tasks: SubTask[] | undefined): number => {
+    if (!tasks || tasks.length === 0) {
+        return 0;
+    }
+    
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    const countTasks = (tasks: SubTask[]) => {
+        tasks.forEach(task => {
+            totalTasks++;
+            if (task.completed) {
+                completedTasks++;
+            }
+            if (task.children) {
+                countTasks(task.children);
+            }
+        });
+    };
+    
+    countTasks(tasks);
+
+    if (totalTasks === 0) return 0;
+
+    return (completedTasks / totalTasks) * 100;
+};
 
 export function KanbanBoard({
   initialProjects,
@@ -92,9 +150,8 @@ export function KanbanBoard({
   };
 
   const updateProject = (updatedProject: Project) => {
-    setProjects(
-      projects.map((p) => (p.id === updatedProject.id ? updatedProject : p))
-    );
+    const newProjects = projects.map((p) => (p.id === updatedProject.id ? updatedProject : p));
+    setProjects(newProjects);
     if (selectedProject && selectedProject.id === updatedProject.id) {
       setSelectedProject(updatedProject);
     }
@@ -119,11 +176,8 @@ export function KanbanBoard({
     value: string | boolean
   ) => {
     if (!selectedProject) return;
-    const newSubTasks = selectedProject.subTasks?.map((st) =>
-      st.id === taskId ? { ...st, [field]: value } : st
-    );
-    const updatedProject = { ...selectedProject, subTasks: newSubTasks };
-    updateProject(updatedProject);
+    const newSubTasks = updateSubtaskRecursively(selectedProject.subTasks || [], taskId, field, value);
+    updateProject({ ...selectedProject, subTasks: newSubTasks });
   };
 
   const addSubtaskInModal = () => {
@@ -135,17 +189,28 @@ export function KanbanBoard({
       completed: false,
     };
     const newSubTasks = [...(selectedProject.subTasks || []), newSubTask];
-    const updatedProject = { ...selectedProject, subTasks: newSubTasks };
-    updateProject(updatedProject);
+    updateProject({ ...selectedProject, subTasks: newSubTasks });
+  };
+
+  const addChildSubtaskInModal = (parentId: string) => {
+    if (!selectedProject) return;
+    const newSubTask: SubTask = {
+        id: `sub-${Date.now()}`,
+        text: 'New nested sub-task',
+        description: '',
+        completed: false,
+    };
+    const newSubTasks = addChildToSubtaskRecursively(selectedProject.subTasks || [], parentId, newSubTask);
+    updateProject({ ...selectedProject, subTasks: newSubTasks });
   };
 
   const removeSubtaskInModal = (taskId: string) => {
     if (!selectedProject) return;
-    const newSubTasks = selectedProject.subTasks?.filter(
-      (st) => st.id !== taskId
+    const newSubTasks = removeSubtaskRecursively(
+      selectedProject.subTasks || [],
+      taskId
     );
-    const updatedProject = { ...selectedProject, subTasks: newSubTasks };
-    updateProject(updatedProject);
+    updateProject({ ...selectedProject, subTasks: newSubTasks });
   };
 
   const selectedClient = useMemo(() => {
@@ -154,14 +219,9 @@ export function KanbanBoard({
   }, [selectedProject, clients]);
 
   const modalSubTaskProgress = useMemo(() => {
-    if (!selectedProject?.subTasks || selectedProject.subTasks.length === 0) {
-      return 0;
-    }
-    const completed = selectedProject.subTasks.filter(
-      (st) => st.completed
-    ).length;
-    return (completed / selectedProject.subTasks.length) * 100;
-  }, [selectedProject?.subTasks]);
+    if (!selectedProject) return 0;
+    return calculateProgress(selectedProject.subTasks);
+  }, [selectedProject]);
 
   return (
     <>
@@ -293,90 +353,14 @@ export function KanbanBoard({
 
                         <Accordion type="multiple" className="w-full space-y-2">
                           {selectedProject.subTasks.map((subtask) => (
-                            <AccordionItem
-                              value={subtask.id}
+                            <SubtaskItem
                               key={subtask.id}
-                              className="border rounded-md px-4 bg-muted/50"
-                            >
-                              <div className="flex items-center">
-                                <AccordionTrigger className="flex-grow py-3">
-                                  <div className="flex items-center gap-3">
-                                    <Checkbox
-                                      id={`modal-subtask-check-${subtask.id}`}
-                                      checked={subtask.completed}
-                                      onClick={(e) => e.stopPropagation()} // Prevent trigger from firing
-                                      onCheckedChange={(checked) =>
-                                        handleSubtaskUpdateInModal(
-                                          subtask.id,
-                                          'completed',
-                                          !!checked
-                                        )
-                                      }
-                                    />
-                                    <Label
-                                      htmlFor={`modal-subtask-check-${subtask.id}`}
-                                      className={cn(
-                                        'text-sm',
-                                        subtask.completed
-                                          ? 'line-through text-muted-foreground'
-                                          : ''
-                                      )}
-                                    >
-                                      {subtask.text}
-                                    </Label>
-                                  </div>
-                                </AccordionTrigger>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => removeSubtaskInModal(subtask.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <AccordionContent className="pb-4">
-                                <div className="space-y-3 pl-8">
-                                  <div className="space-y-1">
-                                    <Label
-                                      htmlFor={`modal-subtask-text-${subtask.id}`}
-                                    >
-                                      Task
-                                    </Label>
-                                    <Input
-                                      id={`modal-subtask-text-${subtask.id}`}
-                                      value={subtask.text}
-                                      onChange={(e) =>
-                                        handleSubtaskUpdateInModal(
-                                          subtask.id,
-                                          'text',
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label
-                                      htmlFor={`modal-subtask-desc-${subtask.id}`}
-                                    >
-                                      Description
-                                    </Label>
-                                    <Textarea
-                                      id={`modal-subtask-desc-${subtask.id}`}
-                                      placeholder="Add more details..."
-                                      value={subtask.description || ''}
-                                      onChange={(e) =>
-                                        handleSubtaskUpdateInModal(
-                                          subtask.id,
-                                          'description',
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
+                              subtask={subtask}
+                              onUpdate={handleSubtaskUpdateInModal}
+                              onRemove={removeSubtaskInModal}
+                              onAddChild={addChildSubtaskInModal}
+                              idPrefix="modal-"
+                            />
                           ))}
                         </Accordion>
 

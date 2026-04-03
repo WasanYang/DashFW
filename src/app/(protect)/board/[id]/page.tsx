@@ -6,19 +6,81 @@ import { Project, Client, SubTask } from '@/lib/types';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Clock, DollarSign, MessageSquare, ListTodo, PlusCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, DollarSign, MessageSquare, ListTodo, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+import { Accordion } from '@/components/ui/accordion';
+import { SubtaskItem } from '@/components/board/subtask-item';
+
+const updateSubtaskRecursively = (tasks: SubTask[], taskId: string, field: 'text' | 'description' | 'completed', value: string | boolean): SubTask[] => {
+    return tasks.map(task => {
+        if (task.id === taskId) {
+            return { ...task, [field]: value };
+        }
+        if (task.children) {
+            return { ...task, children: updateSubtaskRecursively(task.children, taskId, field, value) };
+        }
+        return task;
+    });
+};
+
+const removeSubtaskRecursively = (tasks: SubTask[], taskId: string): SubTask[] => {
+    let newTasks: SubTask[] = [];
+    for (const task of tasks) {
+        if (task.id === taskId) {
+            continue; 
+        }
+        if (task.children) {
+            task.children = removeSubtaskRecursively(task.children, taskId);
+        }
+        newTasks.push(task);
+    }
+    return newTasks;
+}
+
+const addChildToSubtaskRecursively = (tasks: SubTask[], parentId: string, newSubtask: SubTask): SubTask[] => {
+    return tasks.map(task => {
+        if (task.id === parentId) {
+            const children = task.children ? [...task.children, newSubtask] : [newSubtask];
+            return { ...task, children };
+        }
+        if (task.children) {
+            return { ...task, children: addChildToSubtaskRecursively(task.children, parentId, newSubtask) };
+        }
+        return task;
+    });
+};
+
+const calculateProgress = (tasks: SubTask[] | undefined): number => {
+    if (!tasks || tasks.length === 0) {
+        return 0;
+    }
+    
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    const countTasks = (tasks: SubTask[]) => {
+        tasks.forEach(task => {
+            totalTasks++;
+            if (task.completed) {
+                completedTasks++;
+            }
+            if (task.children) {
+                countTasks(task.children);
+            }
+        });
+    };
+    
+    countTasks(tasks);
+
+    if (totalTasks === 0) return 0;
+
+    return (completedTasks / totalTasks) * 100;
+};
 
 export default function ProjectDetailsPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<Project | undefined>(() => {
@@ -38,21 +100,12 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
 
   const client: Client | undefined = mockClients.find(c => c.id === project.clientId);
 
-  const subTaskProgress = () => {
-    if (!project.subTasks || project.subTasks.length === 0) {
-      return 0;
-    }
-    const completed = project.subTasks.filter(st => st.completed).length;
-    return (completed / project.subTasks.length) * 100;
-  };
-  const progress = subTaskProgress();
+  const progress = calculateProgress(project.subTasks);
 
   const handleSubtaskUpdate = (taskId: string, field: 'text' | 'description' | 'completed', value: string | boolean) => {
     setProject(prevProject => {
       if (!prevProject) return prevProject;
-      const newSubTasks = prevProject.subTasks?.map(st => 
-        st.id === taskId ? { ...st, [field]: value } : st
-      );
+      const newSubTasks = updateSubtaskRecursively(prevProject.subTasks || [], taskId, field, value);
       return { ...prevProject, subTasks: newSubTasks };
     });
   };
@@ -64,17 +117,33 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
         id: `sub-${Date.now()}`,
         text: 'New sub-task',
         description: '',
-        completed: false
+        completed: false,
+        children: []
       };
       const newSubTasks = [...(prevProject.subTasks || []), newSubTask];
       return { ...prevProject, subTasks: newSubTasks };
     });
   };
 
+  const addChildSubtask = (parentId: string) => {
+    setProject(prevProject => {
+        if (!prevProject) return prevProject;
+        const newSubTask: SubTask = {
+            id: `sub-${Date.now()}`,
+            text: 'New nested sub-task',
+            description: '',
+            completed: false,
+            children: []
+        };
+        const newSubTasks = addChildToSubtaskRecursively(prevProject.subTasks || [], parentId, newSubTask);
+        return { ...prevProject, subTasks: newSubTasks };
+    });
+  };
+
   const removeSubtask = (taskId: string) => {
     setProject(prevProject => {
       if (!prevProject) return prevProject;
-      const newSubTasks = prevProject.subTasks?.filter(st => st.id !== taskId);
+      const newSubTasks = removeSubtaskRecursively(prevProject.subTasks || [], taskId);
       return { ...prevProject, subTasks: newSubTasks };
     });
   };
@@ -153,50 +222,13 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                     
                     <Accordion type="multiple" className="w-full space-y-2">
                         {project.subTasks.map(subtask => (
-                            <AccordionItem value={subtask.id} key={subtask.id} className="border rounded-md px-4 bg-muted/50">
-                                <div className="flex items-center">
-                                    <AccordionTrigger className="flex-grow py-3">
-                                        <div className="flex items-center gap-3">
-                                            <Checkbox 
-                                                id={`subtask-check-${subtask.id}`} 
-                                                checked={subtask.completed}
-                                                onClick={(e) => e.stopPropagation()} // Prevent trigger from firing
-                                                onCheckedChange={(checked) => handleSubtaskUpdate(subtask.id, 'completed', !!checked)}
-                                            />
-                                            <Label 
-                                                htmlFor={`subtask-check-${subtask.id}`}
-                                                className={cn("text-sm", subtask.completed ? "line-through text-muted-foreground" : "")}
-                                            >
-                                                {subtask.text}
-                                            </Label>
-                                        </div>
-                                    </AccordionTrigger>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeSubtask(subtask.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                <AccordionContent className="pb-4">
-                                    <div className="space-y-3 pl-8">
-                                        <div className="space-y-1">
-                                            <Label htmlFor={`subtask-text-${subtask.id}`}>Task</Label>
-                                            <Input
-                                                id={`subtask-text-${subtask.id}`}
-                                                value={subtask.text}
-                                                onChange={(e) => handleSubtaskUpdate(subtask.id, 'text', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label htmlFor={`subtask-desc-${subtask.id}`}>Description</Label>
-                                            <Textarea
-                                                id={`subtask-desc-${subtask.id}`}
-                                                placeholder="Add more details..."
-                                                value={subtask.description || ''}
-                                                onChange={(e) => handleSubtaskUpdate(subtask.id, 'description', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </AccordionContent>
-                            </AccordionItem>
+                            <SubtaskItem
+                                key={subtask.id}
+                                subtask={subtask}
+                                onUpdate={handleSubtaskUpdate}
+                                onRemove={removeSubtask}
+                                onAddChild={addChildSubtask}
+                            />
                         ))}
                     </Accordion>
 

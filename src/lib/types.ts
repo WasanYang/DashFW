@@ -3,6 +3,7 @@ export type SubTask = {
   text: string;
   description?: string;
   completed: boolean;
+  children?: SubTask[];
 };
 
 export type ProjectStatus = 'Backlog' | 'In Progress' | 'Review' | 'Completed' | 'Paid';

@@ -34,6 +34,33 @@ interface KanbanCardProps {
   onCardClick: (project: Project) => void;
 }
 
+const calculateProgress = (tasks: SubTask[] | undefined): number => {
+    if (!tasks || tasks.length === 0) {
+        return 0;
+    }
+
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    const countTasks = (tasks: SubTask[]) => {
+        tasks.forEach(task => {
+            totalTasks++;
+            if (task.completed) {
+                completedTasks++;
+            }
+            if (task.children) {
+                countTasks(task.children);
+            }
+        });
+    };
+    
+    countTasks(tasks);
+
+    if (totalTasks === 0) return 0;
+
+    return (completedTasks / totalTasks) * 100;
+};
+
 export function KanbanCard({
   project,
   onDragStart,
@@ -65,9 +92,18 @@ export function KanbanCard({
   };
 
   const handleSubTaskToggle = (subTaskId: string) => {
-    const newSubTasks = project.subTasks?.map((st) =>
-      st.id === subTaskId ? { ...st, completed: !st.completed } : st
-    );
+    const toggleRecursively = (tasks: SubTask[]): SubTask[] => {
+      return tasks.map(st => {
+        if (st.id === subTaskId) {
+          return { ...st, completed: !st.completed };
+        }
+        if (st.children) {
+          return { ...st, children: toggleRecursively(st.children) };
+        }
+        return st;
+      });
+    };
+    const newSubTasks = toggleRecursively(project.subTasks || []);
     updateProject({ ...project, subTasks: newSubTasks });
   };
 
@@ -87,19 +123,62 @@ export function KanbanCard({
   };
 
   const handleRemoveSubtask = (subTaskId: string) => {
+      const removeRecursively = (tasks: SubTask[], id: string): SubTask[] => {
+      let newTasks: SubTask[] = [];
+      for (const task of tasks) {
+          if (task.id === id) {
+              continue;
+          }
+          if (task.children) {
+              task.children = removeRecursively(task.children, id);
+          }
+          newTasks.push(task);
+      }
+      return newTasks;
+    };
     updateProject({
       ...project,
-      subTasks: project.subTasks?.filter((st) => st.id !== subTaskId),
+      subTasks: removeRecursively(project.subTasks || [], subTaskId),
     });
   };
+  
+  const subTaskProgress = useMemo(() => calculateProgress(project.subTasks), [project.subTasks]);
 
-  const subTaskProgress = useMemo(() => {
-    if (!project.subTasks || project.subTasks.length === 0) {
-      return 0;
-    }
-    const completed = project.subTasks.filter((st) => st.completed).length;
-    return (completed / project.subTasks.length) * 100;
-  }, [project.subTasks]);
+  const renderSubtasks = (tasks: SubTask[], level = 0) => (
+    <>
+      {tasks.map(subtask => (
+        <div key={subtask.id} style={{ marginLeft: `${level * 1}rem` }}>
+           <div
+            className="flex items-center gap-2 p-1 rounded-md hover:bg-muted/50"
+          >
+            <Checkbox
+              id={`subtask-${subtask.id}`}
+              checked={subtask.completed}
+              onCheckedChange={() => handleSubTaskToggle(subtask.id)}
+            />
+            <Label
+              htmlFor={`subtask-${subtask.id}`}
+              className={cn(
+                'text-sm flex-grow',
+                subtask.completed && 'line-through text-muted-foreground'
+              )}
+            >
+              {subtask.text}
+            </Label>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => handleRemoveSubtask(subtask.id)}
+            >
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </div>
+          {subtask.children && renderSubtasks(subtask.children, level + 1)}
+        </div>
+      ))}
+    </>
+  );
 
   return (
     <Card
@@ -179,35 +258,7 @@ export function KanbanCard({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-2 mt-4 pt-2 border-t">
-              {project.subTasks.map((subtask) => (
-                <div
-                  key={subtask.id}
-                  className="flex items-center gap-2 p-1 rounded-md hover:bg-muted/50"
-                >
-                  <Checkbox
-                    id={`subtask-${subtask.id}`}
-                    checked={subtask.completed}
-                    onCheckedChange={() => handleSubTaskToggle(subtask.id)}
-                  />
-                  <Label
-                    htmlFor={`subtask-${subtask.id}`}
-                    className={cn(
-                      'text-sm flex-grow',
-                      subtask.completed && 'line-through text-muted-foreground'
-                    )}
-                  >
-                    {subtask.text}
-                  </Label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => handleRemoveSubtask(subtask.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </div>
-              ))}
+              {project.subTasks.length > 0 && renderSubtasks(project.subTasks)}
               <Popover open={isAddSubtaskOpen} onOpenChange={setAddSubtaskOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="w-full mt-2">
