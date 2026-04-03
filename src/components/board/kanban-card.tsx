@@ -256,52 +256,50 @@ export function KanbanCard({
             </div>
           </div>
 
-          {project.subTasks && (
-            <Collapsible open={isSubtasksOpen} onOpenChange={setIsSubtasksOpen}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-start px-0 -mb-2">
-                  <ListTodo className="h-4 w-4 mr-2" />
-                  <span>Sub-tasks</span>
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 ml-auto transition-transform',
-                      isSubtasksOpen && 'rotate-180'
-                    )}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 mt-4 pt-2 border-t">
-                {project.subTasks.length > 0 && renderSubtasks(project.subTasks)}
-                
-                {isAddingSubtask ? (
-                    <div className="flex items-center gap-2">
-                        <Input
-                            placeholder="New sub-task..."
-                            value={newSubtaskText}
-                            onChange={(e) => setNewSubtaskText(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleAddSubtask();
-                                if (e.key === 'Escape') setIsAddingSubtask(false);
-                            }}
-                            autoFocus
-                        />
-                        <Button size="sm" onClick={handleAddSubtask}>Add</Button>
-                    </div>
-                ) : (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setIsAddingSubtask(true)}
-                    >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Add sub-task
-                    </Button>
-                )}
+          <Collapsible open={isSubtasksOpen} onOpenChange={setIsSubtasksOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start px-0 -mb-2">
+                <ListTodo className="h-4 w-4 mr-2" />
+                <span>Sub-tasks</span>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 ml-auto transition-transform',
+                    isSubtasksOpen && 'rotate-180'
+                  )}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 mt-4 pt-2 border-t">
+              {project.subTasks && project.subTasks.length > 0 && renderSubtasks(project.subTasks)}
+              
+              {isAddingSubtask ? (
+                  <div className="flex items-center gap-2">
+                      <Input
+                          placeholder="New sub-task..."
+                          value={newSubtaskText}
+                          onChange={(e) => setNewSubtaskText(e.target.value)}
+                          onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddSubtask();
+                              if (e.key === 'Escape') setIsAddingSubtask(false);
+                          }}
+                          autoFocus
+                      />
+                      <Button size="sm" onClick={handleAddSubtask}>Add</Button>
+                  </div>
+              ) : (
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setIsAddingSubtask(true)}
+                  >
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add sub-task
+                  </Button>
+              )}
 
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
       <DeleteConfirmationDialog
@@ -314,3 +312,5 @@ export function KanbanCard({
     </>
   );
 }
+
+    

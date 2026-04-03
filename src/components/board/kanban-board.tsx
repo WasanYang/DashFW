@@ -129,7 +129,9 @@ export function KanbanBoard({
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [isEditingRevisions, setIsEditingRevisions] = useState(false);
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
   const [editableProject, setEditableProject] = useState<Project | null>(null);
 
 
@@ -187,14 +189,18 @@ export function KanbanBoard({
     setSelectedProject(project);
     setEditableProject({ ...project });
     setIsEditingTitle(false);
-    setIsEditingDetails(false);
+    setIsEditingPrice(false);
+    setIsEditingRevisions(false);
+    setIsEditingDeadline(false);
   };
   
   const handleCloseModal = () => {
     setSelectedProject(null);
     setEditableProject(null);
     setIsEditingTitle(false);
-    setIsEditingDetails(false);
+    setIsEditingPrice(false);
+    setIsEditingRevisions(false);
+    setIsEditingDeadline(false);
   };
 
   const handleValueChange = (key: keyof Project, value: any) => {
@@ -218,19 +224,46 @@ export function KanbanBoard({
       setIsEditingTitle(false);
   };
 
-  const handleSaveDetails = () => {
-      if(editableProject) {
-          updateProject(editableProject);
-          setSelectedProject(editableProject);
-      }
-      setIsEditingDetails(false);
+  const handleSavePrice = () => {
+    if(editableProject) {
+      updateProject(editableProject);
+      setSelectedProject(editableProject);
+    }
+    setIsEditingPrice(false);
+  };
+  const handleCancelPrice = () => {
+    if(selectedProject) {
+      setEditableProject({...selectedProject});
+    }
+    setIsEditingPrice(false);
   };
 
-  const handleCancelDetails = () => {
-      if(selectedProject) {
-          setEditableProject({...selectedProject});
-      }
-      setIsEditingDetails(false);
+  const handleSaveRevisions = () => {
+    if(editableProject) {
+      updateProject(editableProject);
+      setSelectedProject(editableProject);
+    }
+    setIsEditingRevisions(false);
+  };
+  const handleCancelRevisions = () => {
+    if(selectedProject) {
+      setEditableProject({...selectedProject});
+    }
+    setIsEditingRevisions(false);
+  };
+  
+  const handleSaveDeadline = () => {
+    if(editableProject) {
+      updateProject(editableProject);
+      setSelectedProject(editableProject);
+    }
+    setIsEditingDeadline(false);
+  };
+  const handleCancelDeadline = () => {
+    if(selectedProject) {
+      setEditableProject({...selectedProject});
+    }
+    setIsEditingDeadline(false);
   };
 
   const handleSubtaskUpdateInModal = (
@@ -368,88 +401,94 @@ export function KanbanBoard({
               <ScrollArea className="flex-grow pr-6 -mr-6">
                 <div className="space-y-6 pb-6">
                   
-                  <div className='space-y-2'>
-                    <div className='flex justify-end items-center -mb-2'>
-                      {!isEditingDetails ? (
-                          <Button variant="ghost" size="icon" onClick={() => setIsEditingDetails(true)}>
-                              <Pencil className="h-4 w-4" />
-                          </Button>
-                      ) : (
-                          <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="icon" onClick={handleSaveDetails}>
-                                  <Check className="h-5 w-5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={handleCancelDetails}>
-                                  <X className="h-5 w-5" />
-                              </Button>
-                          </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
                         <DollarSign className="h-6 w-6 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Price</p>
-                          {isEditingDetails ? (
-                            <Input type="number" value={editableProject.gross_price} onChange={(e) => handleValueChange('gross_price', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto border-0 bg-transparent focus-visible:ring-0 focus-visible:bg-white -ml-1" />
-                          ) : (
+                        <div className="flex-grow">
+                            <p className="text-sm text-muted-foreground">Price</p>
+                            {isEditingPrice ? (
+                            <Input type="number" value={editableProject.gross_price} onChange={(e) => handleValueChange('gross_price', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto" />
+                            ) : (
                             <p className="font-semibold text-lg">
-                              ${selectedProject.gross_price.toFixed(2)}
+                                ${selectedProject.gross_price.toFixed(2)}
                             </p>
-                          )}
+                            )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                        {isEditingPrice ? (
+                            <div className="flex">
+                                <Button variant="ghost" size="icon" onClick={handleSavePrice}><Check className="h-5 w-5" /></Button>
+                                <Button variant="ghost" size="icon" onClick={handleCancelPrice}><X className="h-5 w-5" /></Button>
+                            </div>
+                        ) : (
+                            <Button variant="ghost" size="icon" onClick={() => setIsEditingPrice(true)}><Pencil className="h-4 w-4" /></Button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
                         <MessageSquare className="h-6 w-6 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Revisions</p>
-                          {isEditingDetails ? (
-                             <Input type="number" value={editableProject.revisions} onChange={(e) => handleValueChange('revisions', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto border-0 bg-transparent focus-visible:ring-0 focus-visible:bg-white -ml-1" />
-                          ) : (
-                            <p className="font-semibold text-lg">
-                              {selectedProject.revisions}
-                            </p>
-                          )}
+                        <div className="flex-grow">
+                            <p className="text-sm text-muted-foreground">Revisions</p>
+                            {isEditingRevisions ? (
+                                <Input type="number" value={editableProject.revisions} onChange={(e) => handleValueChange('revisions', Number(e.target.value))} className="font-semibold text-lg p-1 h-auto" />
+                            ) : (
+                                <p className="font-semibold text-lg">
+                                {selectedProject.revisions}
+                                </p>
+                            )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                        {isEditingRevisions ? (
+                            <div className="flex">
+                                <Button variant="ghost" size="icon" onClick={handleSaveRevisions}><Check className="h-5 w-5" /></Button>
+                                <Button variant="ghost" size="icon" onClick={handleCancelRevisions}><X className="h-5 w-5" /></Button>
+                            </div>
+                        ) : (
+                            <Button variant="ghost" size="icon" onClick={() => setIsEditingRevisions(true)}><Pencil className="h-4 w-4" /></Button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
                         <Clock className="h-6 w-6 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Deadline</p>
-                          {isEditingDetails ? (
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "pl-3 text-left font-normal h-auto py-1",
-                                            !editableProject.deadline && "text-muted-foreground"
-                                        )}
-                                    >
-                                        {editableProject.deadline ? (
-                                            format(new Date(editableProject.deadline), "PPP")
-                                        ) : (
-                                            <span>Pick a date</span>
-                                        )}
-                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={new Date(editableProject.deadline)}
-                                        onSelect={(date) => handleValueChange('deadline', date)}
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                          ) : (
-                            <p className="font-semibold">
-                              {format(new Date(selectedProject.deadline), 'MMM d, yyyy')}
-                            </p>
-                          )}
+                        <div className="flex-grow">
+                            <p className="text-sm text-muted-foreground">Deadline</p>
+                            {isEditingDeadline ? (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "pl-3 text-left font-normal h-auto py-1 w-full justify-start",
+                                                !editableProject.deadline && "text-muted-foreground"
+                                            )}
+                                        >
+                                            {editableProject.deadline ? (
+                                                format(new Date(editableProject.deadline), "PPP")
+                                            ) : (
+                                                <span>Pick a date</span>
+                                            )}
+                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={new Date(editableProject.deadline)}
+                                            onSelect={(date) => handleValueChange('deadline', date)}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            ) : (
+                                <p className="font-semibold">
+                                {format(new Date(selectedProject.deadline), 'MMM d, yyyy')}
+                                </p>
+                            )}
                         </div>
-                      </div>
+                        {isEditingDeadline ? (
+                            <div className="flex">
+                                <Button variant="ghost" size="icon" onClick={handleSaveDeadline}><Check className="h-5 w-5" /></Button>
+                                <Button variant="ghost" size="icon" onClick={handleCancelDeadline}><X className="h-5 w-5" /></Button>
+                            </div>
+                        ) : (
+                            <Button variant="ghost" size="icon" onClick={() => setIsEditingDeadline(true)}><Pencil className="h-4 w-4" /></Button>
+                        )}
                     </div>
                   </div>
 
@@ -540,3 +579,5 @@ export function KanbanBoard({
     </>
   );
 }
+
+    
