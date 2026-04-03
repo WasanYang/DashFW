@@ -7,6 +7,11 @@ export const mockClients: Client[] = [
     fastwork_link: 'https://fastwork.co/user/suanson',
     email: 'contact@suanson.com',
     avatarUrl: 'https://picsum.photos/seed/c1/100/100',
+    socials: [
+      { id: 'soc-1', platform: 'Facebook', value: 'suansonhotel' },
+      { id: 'soc-2', platform: 'Line', value: '@suanson' },
+    ],
+    notes: 'Primary contact is Khun Somchai. Prefers communication via Line.',
   },
   {
     id: 'client-2',
@@ -14,6 +19,10 @@ export const mockClients: Client[] = [
     fastwork_link: 'https://fastwork.co/user/onlyuvilla',
     email: 'manager@onlyuvilla.com',
     avatarUrl: 'https://picsum.photos/seed/c2/100/100',
+    socials: [
+        { id: 'soc-3', platform: 'Phone', value: '081-234-5678' },
+    ],
+    notes: 'Follow up on the SEO package next month.',
   },
   {
     id: 'client-3',
@@ -21,6 +30,8 @@ export const mockClients: Client[] = [
     fastwork_link: 'https://fastwork.co/user/johndoe',
     email: 'johndoe.dev@gmail.com',
     avatarUrl: 'https://picsum.photos/seed/c3/100/100',
+    socials: [],
+    notes: 'Potential client for a full-stack e-commerce project. Wants a quote by the end of the week.',
   },
 ];
 

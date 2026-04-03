@@ -20,12 +20,20 @@ export type Project = {
   subTasks?: SubTask[];
 };
 
+export type Social = {
+  id: string;
+  platform: string;
+  value: string;
+};
+
 export type Client = {
   id: string;
   name: string;
   fastwork_link: string;
   email: string;
   avatarUrl?: string;
+  socials?: Social[];
+  notes?: string;
 };
 
 export type Property = {
