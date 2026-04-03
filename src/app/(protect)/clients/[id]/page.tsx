@@ -41,7 +41,7 @@ export default function EditClientPage() {
           avatarUrl: client.avatarUrl,
         }}
         onSubmit={handleSubmit}
-        submitLabel="บันทึกการแก้ไข"
+        submitLabel="Save Changes"
       />
     </div>
   );

@@ -20,7 +20,7 @@ export default function NewClientPage() {
 
   return (
     <div className="space-y-8 py-4">
-      <ClientForm mode="create" onSubmit={handleSubmit} submitLabel="บันทึก" />
+      <ClientForm mode="create" onSubmit={handleSubmit} submitLabel="Create Client" />
     </div>
   );
 }

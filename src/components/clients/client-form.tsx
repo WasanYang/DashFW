@@ -13,20 +13,18 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import type { Client } from '@/lib/types';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 const schema = z.object({
-  name: z.string().min(1, 'กรุณากรอกชื่อ'),
-  email: z.string().email('อีเมลไม่ถูกต้อง'),
-  fastwork_link: z.string().url('ลิงก์ Fastwork ต้องเป็น URL ที่ถูกต้อง'),
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email address'),
+  fastwork_link: z.string().url('Fastwork link must be a valid URL'),
   avatarUrl: z
     .string()
+    .url('Avatar URL must be a valid URL')
     .optional()
-    .refine((v) => !v || z.string().url().safeParse(v).success, {
-      message: 'URL รูปไม่ถูกต้อง',
-    }),
+    .or(z.literal('')),
 });
 
 export type ClientFormValues = z.infer<typeof schema>;
@@ -36,9 +34,16 @@ type ClientFormProps = {
   defaultValues?: Partial<ClientFormValues>;
   onSubmit: (values: ClientFormValues) => void;
   submitLabel: string;
+  onCancel?: () => void;
 };
 
-export function ClientForm({ mode, defaultValues, onSubmit, submitLabel }: ClientFormProps) {
+export function ClientForm({
+  mode,
+  defaultValues,
+  onSubmit,
+  submitLabel,
+  onCancel,
+}: ClientFormProps) {
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -49,87 +54,104 @@ export function ClientForm({ mode, defaultValues, onSubmit, submitLabel }: Clien
     },
   });
 
+  const formContent = (
+    <>
+      <FormField
+        control={form.control}
+        name="name"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Name</FormLabel>
+            <FormControl>
+              <Input placeholder="Client or business name" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="email"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Email</FormLabel>
+            <FormControl>
+              <Input type="email" placeholder="contact@example.com" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="fastwork_link"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Fastwork Link</FormLabel>
+            <FormControl>
+              <Input type="url" placeholder="https://fastwork.co/user/..." {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="avatarUrl"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Avatar URL</FormLabel>
+            <FormControl>
+              <Input type="url" placeholder="https://..." {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <div className="flex gap-3 pt-2">
+        <Button type="submit">{submitLabel}</Button>
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" asChild>
+            <Link href="/clients">Cancel</Link>
+          </Button>
+        )}
+      </div>
+    </>
+  );
+
+  // If used in a dialog, don't render the title/back button
+  if (onCancel) {
+    return (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {formContent}
+        </form>
+      </Form>
+    );
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="mx-auto max-w-lg space-y-6">
         <div className="flex items-center gap-4">
           <Button type="button" variant="ghost" size="icon" asChild>
-            <Link href="/clients" aria-label="กลับ">
+            <Link href="/clients" aria-label="Back">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">
-            {mode === 'create' ? 'เพิ่มลูกค้า' : 'แก้ไขลูกค้า'}
+            {mode === 'create' ? 'Add Client' : 'Edit Client'}
           </h1>
         </div>
-
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>ชื่อ</FormLabel>
-              <FormControl>
-                <Input placeholder="ชื่อลูกค้าหรือธุรกิจ" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>อีเมล</FormLabel>
-              <FormControl>
-                <Input type="email" placeholder="contact@example.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="fastwork_link"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>ลิงก์ Fastwork</FormLabel>
-              <FormControl>
-                <Input type="url" placeholder="https://fastwork.co/user/..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="avatarUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>รูปโปรไฟล์ (URL)</FormLabel>
-              <FormControl>
-                <Input
-                  type="url"
-                  placeholder="https://..."
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="flex gap-3">
-          <Button type="submit">{submitLabel}</Button>
-          <Button type="button" variant="outline" asChild>
-            <Link href="/clients">ยกเลิก</Link>
-          </Button>
-        </div>
+        {formContent}
       </form>
     </Form>
   );
