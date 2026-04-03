@@ -21,7 +21,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 export default function ProjectDetailsPage({ params }: { params: { id: string } }) {
-  const [project, setProject] = useState<Project | undefined>(() => mockProjects.find(p => p.id === params.id));
+  const [project, setProject] = useState<Project | undefined>(() => {
+    const foundProject = mockProjects.find(p => p.id === params.id);
+    if (foundProject) {
+        return {
+            ...foundProject,
+            deadline: new Date(foundProject.deadline)
+        }
+    }
+    return undefined;
+  });
 
   if (!project) {
     notFound();
