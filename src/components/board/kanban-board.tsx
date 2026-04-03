@@ -560,7 +560,7 @@ export function KanbanBoard({
                 </div>
               </ScrollArea>
             </>
-          )))}
+          ))}
         </DialogContent>
       </Dialog>
 
