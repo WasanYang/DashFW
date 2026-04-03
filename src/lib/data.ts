@@ -2,7 +2,7 @@ import { Project, Client, Snippet, Checklist } from './types';
 
 export const mockClients: Client[] = [
   {
-    id: 'client-1',
+    _id: 'client-1',
     name: 'Suanson Hotel',
     fastwork_link: 'https://fastwork.co/user/suanson',
     email: 'contact@suanson.com',
@@ -14,24 +14,23 @@ export const mockClients: Client[] = [
     notes: 'Primary contact is Khun Somchai. Prefers communication via Line.',
   },
   {
-    id: 'client-2',
+    _id: 'client-2',
     name: 'Only U Villa',
     fastwork_link: 'https://fastwork.co/user/onlyuvilla',
     email: 'manager@onlyuvilla.com',
     avatarUrl: 'https://picsum.photos/seed/c2/100/100',
-    socials: [
-        { id: 'soc-3', platform: 'Phone', value: '081-234-5678' },
-    ],
+    socials: [{ id: 'soc-3', platform: 'Phone', value: '081-234-5678' }],
     notes: 'Follow up on the SEO package next month.',
   },
   {
-    id: 'client-3',
+    _id: 'client-3',
     name: 'John Doe',
     fastwork_link: 'https://fastwork.co/user/johndoe',
     email: 'johndoe.dev@gmail.com',
     avatarUrl: 'https://picsum.photos/seed/c3/100/100',
     socials: [],
-    notes: 'Potential client for a full-stack e-commerce project. Wants a quote by the end of the week.',
+    notes:
+      'Potential client for a full-stack e-commerce project. Wants a quote by the end of the week.',
   },
 ];
 
@@ -45,12 +44,28 @@ export const mockProjects: Project[] = [
     deadline: new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
     revisions: 0,
     subTasks: [
-        { id: 'sub-1-1', text: 'Booking.com', completed: true, description: 'Set up with all photos and link to channel manager.' },
-        { id: 'sub-1-2', text: 'Trip.com', completed: false, description: 'Waiting for client to provide contract details.' },
-        { id: 'sub-1-3', text: 'Agoda', completed: false },
-        { id: 'sub-1-4', text: 'Line OA', completed: true, description: 'Create rich menu and automated reply for booking inquiries.' },
-        { id: 'sub-1-5', text: 'Facebook Page', completed: false },
-    ]
+      {
+        id: 'sub-1-1',
+        text: 'Booking.com',
+        completed: true,
+        description: 'Set up with all photos and link to channel manager.',
+      },
+      {
+        id: 'sub-1-2',
+        text: 'Trip.com',
+        completed: false,
+        description: 'Waiting for client to provide contract details.',
+      },
+      { id: 'sub-1-3', text: 'Agoda', completed: false },
+      {
+        id: 'sub-1-4',
+        text: 'Line OA',
+        completed: true,
+        description:
+          'Create rich menu and automated reply for booking inquiries.',
+      },
+      { id: 'sub-1-5', text: 'Facebook Page', completed: false },
+    ],
   },
   {
     id: 'proj-2',
@@ -61,10 +76,20 @@ export const mockProjects: Project[] = [
     deadline: new Date(new Date().getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
     revisions: 1,
     subTasks: [
-        { id: 'sub-2-1', text: 'Verify business', completed: true },
-        { id: 'sub-2-2', text: 'Optimize description', completed: true, description: 'Include all provided keywords and a link to the website.' },
-        { id: 'sub-2-3', text: 'Upload photos', completed: false, description: 'Need at least 15 high-res photos of the property.' },
-    ]
+      { id: 'sub-2-1', text: 'Verify business', completed: true },
+      {
+        id: 'sub-2-2',
+        text: 'Optimize description',
+        completed: true,
+        description: 'Include all provided keywords and a link to the website.',
+      },
+      {
+        id: 'sub-2-3',
+        text: 'Upload photos',
+        completed: false,
+        description: 'Need at least 15 high-res photos of the property.',
+      },
+    ],
   },
   {
     id: 'proj-3',
@@ -108,45 +133,68 @@ export const mockSnippets: Snippet[] = [
   {
     id: 'snip-1',
     title: 'Opening Pitch',
-    content: "Hello! Thank you for your interest. I've reviewed your request and I'm confident I can deliver great results. Here's how I propose we move forward...",
+    content:
+      "Hello! Thank you for your interest. I've reviewed your request and I'm confident I can deliver great results. Here's how I propose we move forward...",
     tags: ['opening', 'pitch'],
   },
   {
     id: 'snip-2',
     title: 'Requirement Request',
-    content: "To get started, could you please provide the following details? 1. ... 2. ... 3. ... This will help ensure I fully understand your vision.",
+    content:
+      'To get started, could you please provide the following details? 1. ... 2. ... 3. ... This will help ensure I fully understand your vision.',
     tags: ['requirements'],
   },
   {
     id: 'snip-3',
     title: 'Project Update',
-    content: "Here's a quick update on your project. I've completed the initial design phase and will be moving on to development. You can view the progress here: [link]",
+    content:
+      "Here's a quick update on your project. I've completed the initial design phase and will be moving on to development. You can view the progress here: [link]",
     tags: ['update', 'progress'],
   },
 ];
 
 export const mockChecklists: Checklist[] = [
-    {
-      id: 'check-1',
-      title: 'New OTA Listing Setup',
-      items: [
-        { id: 'c1-i1', text: 'Collect property photos and descriptions', completed: true },
-        { id: 'c1-i2', text: 'Create profile on Booking.com', completed: true },
-        { id: 'c1-i3', text: 'Set up pricing and availability calendar', completed: false },
-        { id: 'c1-i4', text: 'Configure payment policies', completed: false },
-        { id: 'c1-i5', text: 'Publish listing and verify', completed: false },
-      ],
-    },
-    {
-      id: 'check-2',
-      title: 'Google Business SEO',
-      items: [
-        { id: 'c2-i1', text: 'Verify business ownership', completed: true },
-        { id: 'c2-i2', text: 'Optimize business description and categories', completed: true },
-        { id: 'c2-i3', text: 'Upload high-quality photos and videos', completed: true },
-        { id: 'c2-i4', text: 'Set up services and product listings', completed: false },
-        { id: 'c2-i5', text: 'Generate initial reviews', completed: false },
-        { id: 'c2-i6', text: 'Create first 4 Google Posts', completed: false },
-      ],
-    },
-  ];
+  {
+    id: 'check-1',
+    title: 'New OTA Listing Setup',
+    items: [
+      {
+        id: 'c1-i1',
+        text: 'Collect property photos and descriptions',
+        completed: true,
+      },
+      { id: 'c1-i2', text: 'Create profile on Booking.com', completed: true },
+      {
+        id: 'c1-i3',
+        text: 'Set up pricing and availability calendar',
+        completed: false,
+      },
+      { id: 'c1-i4', text: 'Configure payment policies', completed: false },
+      { id: 'c1-i5', text: 'Publish listing and verify', completed: false },
+    ],
+  },
+  {
+    id: 'check-2',
+    title: 'Google Business SEO',
+    items: [
+      { id: 'c2-i1', text: 'Verify business ownership', completed: true },
+      {
+        id: 'c2-i2',
+        text: 'Optimize business description and categories',
+        completed: true,
+      },
+      {
+        id: 'c2-i3',
+        text: 'Upload high-quality photos and videos',
+        completed: true,
+      },
+      {
+        id: 'c2-i4',
+        text: 'Set up services and product listings',
+        completed: false,
+      },
+      { id: 'c2-i5', text: 'Generate initial reviews', completed: false },
+      { id: 'c2-i6', text: 'Create first 4 Google Posts', completed: false },
+    ],
+  },
+];

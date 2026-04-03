@@ -7,7 +7,9 @@ export async function POST(request: NextRequest) {
   try {
     const { db } = await connectToDatabase();
     const data: Client = await request.json();
-    const result = await db.collection('clients').insertOne(data);
+    const { _id, ...clientData } = data;
+
+    const result = await db.collection('clients').insertOne(clientData);
     return NextResponse.json(
       { message: 'Client created', id: result.insertedId },
       { status: 201 },

@@ -58,7 +58,7 @@ export function ClientsProvider({
     const newSocials =
       data.socials?.map((s, i) => ({ ...s, id: `soc-${Date.now()}-${i}` })) ||
       [];
-    const created: Client = { ...data, id, socials: newSocials };
+    const created: Client = { ...data, _id: id, socials: newSocials };
     setClients((prev) => {
       const next = [created, ...prev];
       persist(next);
@@ -71,7 +71,7 @@ export function ClientsProvider({
     (id: string, data: Partial<Omit<Client, 'id'>>) => {
       setClients((prev) => {
         const next = prev.map((c) => {
-          if (c.id === id) {
+          if (c._id === id) {
             const updatedClient = { ...c, ...data };
             // Ensure new socials have IDs
             updatedClient.socials = updatedClient.socials?.map((s, i) => ({
@@ -90,7 +90,7 @@ export function ClientsProvider({
   );
 
   const getClient = useCallback(
-    (id: string) => clients.find((c) => c.id === id),
+    (id: string) => clients.find((c) => c._id === id),
     [clients],
   );
 

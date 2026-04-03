@@ -1,12 +1,26 @@
+'use client';
 import { KanbanBoard } from '@/components/board/kanban-board';
-import { mockClients, mockProjects } from '@/lib/data';
+import { useGetProjectsQuery } from '@/services/projectApi';
+import { useGetClientsQuery } from '@/services/clientApi';
 
-export default async function BoardPage() {
+export default function BoardPage() {
+  const {
+    data: projects = [],
+    isLoading: loadingProjects,
+    error: errorProjects,
+  } = useGetProjectsQuery();
+  const {
+    data: clients = [],
+    isLoading: loadingClients,
+    error: errorClients,
+  } = useGetClientsQuery();
+
   const translations = {
     pageTitle: 'Kanban Board',
     newProject: 'New Project',
     createNewProjectTitle: 'Create New Project',
-    createNewProjectDescription: 'Fill in the details below to add a new project to your board.',
+    createNewProjectDescription:
+      'Fill in the details below to add a new project to your board.',
     titleLabel: 'Project Title',
     clientLabel: 'Client',
     selectClientPlaceholder: 'Select a client',
@@ -24,11 +38,23 @@ export default async function BoardPage() {
     deadlineRequired: 'Deadline is required.',
   };
 
+  if (loadingProjects || loadingClients) {
+    return (
+      <div className='flex items-center justify-center h-full'>Loading...</div>
+    );
+  }
+  if (errorProjects || errorClients) {
+    return (
+      <div className='flex items-center justify-center h-full text-destructive'>
+        Error loading data
+      </div>
+    );
+  }
   return (
-    <div className="flex flex-col h-full">
+    <div className='flex flex-col h-full'>
       <KanbanBoard
-        initialProjects={mockProjects}
-        clients={mockClients}
+        initialProjects={projects}
+        clients={clients}
         translations={translations}
       />
     </div>

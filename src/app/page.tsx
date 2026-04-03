@@ -11,8 +11,6 @@ export default function Page() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.replace('/login');
-      } else {
-        router.replace('/dashboard');
       }
     });
     return () => unsubscribe();

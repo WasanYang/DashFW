@@ -97,8 +97,9 @@ export function ClientList({ projects }: ClientListProps) {
     error,
     refetch,
   } = useGetClientsQuery();
-  const [addClient] = useAddClientMutation();
-  const [updateClient] = useUpdateClientMutation();
+  const [addClient, { isLoading: isAddingClient }] = useAddClientMutation();
+  const [updateClient, { isLoading: isUpdatingClient }] =
+    useUpdateClientMutation();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -107,8 +108,8 @@ export function ClientList({ projects }: ClientListProps) {
   // sync selectedClient with clients
   useEffect(() => {
     setSelectedClient((prev) => {
-      if (prev && clients.some((c) => c.id === prev.id)) {
-        return clients.find((c) => c.id === prev.id) || null;
+      if (prev && clients.some((c) => c._id === prev._id)) {
+        return clients.find((c) => c._id === prev._id) || null;
       }
       if (!prev && clients.length > 0) {
         return clients[0];
@@ -118,7 +119,7 @@ export function ClientList({ projects }: ClientListProps) {
   }, [clients]);
 
   const clientProjects = projects.filter(
-    (p) => p.clientId === selectedClient?.id,
+    (p) => p.clientId === selectedClient?._id,
   );
 
   const handleAddClient = async (values: ClientFormValues) => {
@@ -136,9 +137,10 @@ export function ClientList({ projects }: ClientListProps) {
   };
 
   const handleEditClient = async (values: ClientFormValues) => {
-    if (!editingClient || !editingClient.id) return;
+    console.log('handleEditClient', editingClient);
+    if (!editingClient || !editingClient._id) return;
     await updateClient({
-      _id: editingClient.id,
+      _id: editingClient._id,
       data: {
         ...values,
         avatarUrl: values.avatarUrl?.trim() || undefined,
@@ -150,6 +152,7 @@ export function ClientList({ projects }: ClientListProps) {
     });
     await refetch();
     setEditingClient(null);
+    setIsCreateOpen(false);
   };
 
   const renderSocialLink = (social: Social, idx: number) => {
@@ -256,16 +259,16 @@ export function ClientList({ projects }: ClientListProps) {
                     clients.map((client) => {
                       const completedProjectsCount = projects.filter(
                         (p) =>
-                          p.clientId === client.id &&
+                          p.clientId === client._id &&
                           (p.status === 'Completed' || p.status === 'Paid'),
                       ).length;
 
                       return (
                         <TableRow
-                          key={client.id}
+                          key={client._id}
                           onClick={() => setSelectedClient(client)}
                           className={`cursor-pointer ${
-                            selectedClient?.id === client.id
+                            selectedClient?._id === client._id
                               ? 'bg-muted/50'
                               : ''
                           }`}
@@ -487,6 +490,7 @@ export function ClientList({ projects }: ClientListProps) {
               onSubmit={handleEditClient}
               submitLabel='Save Changes'
               onCancel={() => setEditingClient(null)}
+              isLoading={isUpdatingClient || isAddingClient}
             />
           </ScrollArea>
         </DialogContent>

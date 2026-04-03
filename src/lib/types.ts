@@ -6,7 +6,12 @@ export type SubTask = {
   children?: SubTask[];
 };
 
-export type ProjectStatus = 'Backlog' | 'In Progress' | 'Review' | 'Completed' | 'Paid';
+export type ProjectStatus =
+  | 'Backlog'
+  | 'In Progress'
+  | 'Review'
+  | 'Completed'
+  | 'Paid';
 
 export type Project = {
   id: string;
@@ -26,7 +31,7 @@ export type Social = {
 };
 
 export type Client = {
-  id: string;
+  _id: string;
   name: string;
   fastwork_link: string;
   email: string;

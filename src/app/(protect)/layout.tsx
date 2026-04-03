@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/sidebar';
 import { Header } from '@/components/header';
+import { AuthProvider } from '@/components/auth/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'DevFlow Pro',
@@ -17,17 +18,19 @@ export default function RootLayout({
 }>) {
   return (
     <div className='font-body antialiased'>
-      <SidebarProvider>
-        <div className='flex h-screen overflow-hidden bg-background'>
-          <AppSidebar />
-          <div className='flex flex-1 flex-col min-w-0'>
-            <Header />
-            <main className='flex-1 overflow-y-auto bg-muted/40 p-4 sm:p-6 md:p-8'>
-              {children}
-            </main>
+      <AuthProvider>
+        <SidebarProvider>
+          <div className='flex h-screen overflow-hidden bg-background'>
+            <AppSidebar />
+            <div className='flex flex-1 flex-col min-w-0'>
+              <Header />
+              <main className='flex-1 overflow-y-auto bg-muted/40 p-4 sm:p-6 md:p-8'>
+                {children}
+              </main>
+            </div>
           </div>
-        </div>
-      </SidebarProvider>
+        </SidebarProvider>
+      </AuthProvider>
       <Toaster />
     </div>
   );
