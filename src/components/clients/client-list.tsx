@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -24,14 +23,23 @@ import {
   Instagram,
   User,
   Hash,
+  ListTodo,
+  DollarSign,
+  Clock,
+  MessageSquare,
 } from 'lucide-react';
-import { Client, Property, Social, Project } from '@/lib/types';
+import { Client, Property, Social, Project, SubTask } from '@/lib/types';
 import { useClients } from '@/contexts/clients-context';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { ClientForm, ClientFormValues } from './client-form';
 import { Separator } from '../ui/separator';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
+import { format } from 'date-fns';
+import { Progress } from '../ui/progress';
+import { Checkbox } from '../ui/checkbox';
+import { Label } from '../ui/label';
+import { cn } from '@/lib/utils';
 
 interface ClientListProps {
   properties: Property[];
@@ -47,17 +55,44 @@ const socialIcons: { [key: string]: React.ElementType } = {
   Other: Hash,
 };
 
+const calculateProgress = (tasks: SubTask[] | undefined): number => {
+    if (!tasks || tasks.length === 0) {
+        return 0;
+    }
+    
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    const countTasks = (tasks: SubTask[]) => {
+        tasks.forEach(task => {
+            totalTasks++;
+            if (task.completed) {
+                completedTasks++;
+            }
+            if (task.children) {
+                countTasks(task.children);
+            }
+        });
+    };
+    
+    countTasks(tasks);
+
+    if (totalTasks === 0) return 0;
+
+    return (completedTasks / totalTasks) * 100;
+};
+
+
 export function ClientList({ properties, projects }: ClientListProps) {
   const { clients, addClient, updateClient } = useClients();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [projectModal, setProjectModal] = useState<Project | null>(null);
 
   useEffect(() => {
     setSelectedClient((prev) => {
       if (prev && clients.some((c) => c.id === prev.id)) {
-        // If previous selected client still exists, keep it.
-        // This is to refresh its data if it was edited.
         return clients.find(c => c.id === prev.id) || null;
       }
       if (!prev && clients.length > 0) {
@@ -104,6 +139,37 @@ export function ClientList({ properties, projects }: ClientListProps) {
         </div>
     );
   }
+
+  const projectModalProgress = useMemo(() => {
+    if (!projectModal) return 0;
+    return calculateProgress(projectModal.subTasks);
+  }, [projectModal]);
+
+  const renderSubtasksReadOnly = (tasks: SubTask[], level = 0) => (
+    <div className="space-y-1">
+      {tasks.map(subtask => (
+        <div key={subtask.id} style={{ paddingLeft: `${level * 1.5}rem` }}>
+           <div className="flex items-center gap-2">
+            <Checkbox
+              id={`readonly-subtask-${subtask.id}`}
+              checked={subtask.completed}
+              disabled
+            />
+            <Label
+              htmlFor={`readonly-subtask-${subtask.id}`}
+              className={cn(
+                'text-sm',
+                subtask.completed && 'line-through text-muted-foreground'
+              )}
+            >
+              {subtask.text}
+            </Label>
+          </div>
+          {subtask.children && subtask.children.length > 0 && renderSubtasksReadOnly(subtask.children, level + 1)}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <>
@@ -261,9 +327,9 @@ export function ClientList({ properties, projects }: ClientListProps) {
                           clientProjects.map((project) => (
                             <Card key={project.id}>
                               <CardHeader>
-                                  <Link href={`/board/${project.id}`} className="hover:underline">
+                                <button onClick={() => setProjectModal(project)} className="text-left hover:underline w-full">
                                     <CardTitle className="text-base">{project.title}</CardTitle>
-                                  </Link>
+                                </button>
                               </CardHeader>
                               <CardContent className="space-y-2">
                                 <div className="flex items-center justify-between text-sm">
@@ -323,6 +389,71 @@ export function ClientList({ properties, projects }: ClientListProps) {
                 onCancel={() => setEditingClient(null)}
             />
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Project Detail Dialog */}
+      <Dialog open={!!projectModal} onOpenChange={(isOpen) => !isOpen && setProjectModal(null)}>
+        <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col">
+            {projectModal && (
+            <>
+                <DialogHeader>
+                    <DialogTitle className="text-2xl">{projectModal.title}</DialogTitle>
+                    <DialogDescription>
+                        In status{' '}
+                        <span className="font-semibold">{projectModal.status}</span>{' '}
+                        &bull; Due by{' '}
+                        {format(new Date(projectModal.deadline), 'PPP')}
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="flex-grow pr-6 -mr-6">
+                <div className="space-y-6 pb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                            <DollarSign className="h-6 w-6 text-muted-foreground" />
+                            <div>
+                                <p className="text-sm text-muted-foreground">Price</p>
+                                <p className="font-semibold text-lg">${projectModal.gross_price.toFixed(2)}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                            <MessageSquare className="h-6 w-6 text-muted-foreground" />
+                            <div>
+                                <p className="text-sm text-muted-foreground">Revisions</p>
+                                <p className="font-semibold text-lg">{projectModal.revisions}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+                            <Clock className="h-6 w-6 text-muted-foreground" />
+                            <div>
+                                <p className="text-sm text-muted-foreground">Deadline</p>
+                                <p className="font-semibold">{format(new Date(projectModal.deadline), "MMM d, yyyy")}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <Separator />
+
+                    {projectModal.subTasks && projectModal.subTasks.length > 0 && (
+                    <div>
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <ListTodo className="h-5 w-5" />
+                            Sub-tasks
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                                <Progress value={projectModalProgress} className="h-2" />
+                                <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{Math.round(projectModalProgress)}%</span>
+                            </div>
+                            
+                            {renderSubtasksReadOnly(projectModal.subTasks)}
+                        </div>
+                    </div>
+                    )}
+                </div>
+                </ScrollArea>
+            </>
+            )}
         </DialogContent>
       </Dialog>
     </>
