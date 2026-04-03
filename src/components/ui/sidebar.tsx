@@ -1,5 +1,9 @@
 'use client';
 
+import app from '@/lib/firebase';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/router';
 import {
   createContext,
   useContext,
@@ -7,6 +11,7 @@ import {
   ReactNode,
   Dispatch,
   SetStateAction,
+  useEffect,
 } from 'react';
 
 interface SidebarContextType {
@@ -18,6 +23,18 @@ const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const router = useRouter();
+  useEffect(() => {
+    const auth = getAuth(app);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.replace('/login');
+      } else {
+        router.replace('/dashboard');
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
