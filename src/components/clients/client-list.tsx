@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   ExternalLink,
-  Folder,
   Pencil,
   Plus,
   Phone,
@@ -28,7 +27,7 @@ import {
   Clock,
   MessageSquare,
 } from 'lucide-react';
-import { Client, Property, Social, Project, SubTask } from '@/lib/types';
+import { Client, Social, Project, SubTask } from '@/lib/types';
 import { useClients } from '@/contexts/clients-context';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { ClientForm, ClientFormValues } from './client-form';
@@ -42,7 +41,6 @@ import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
 
 interface ClientListProps {
-  properties: Property[];
   projects: Project[];
 }
 
@@ -83,7 +81,7 @@ const calculateProgress = (tasks: SubTask[] | undefined): number => {
 };
 
 
-export function ClientList({ properties, projects }: ClientListProps) {
+export function ClientList({ projects }: ClientListProps) {
   const { clients, addClient, updateClient } = useClients();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -101,10 +99,6 @@ export function ClientList({ properties, projects }: ClientListProps) {
       return prev;
     });
   }, [clients]);
-
-  const clientProperties = properties.filter(
-    (p) => p.clientId === selectedClient?.id
-  );
 
   const clientProjects = projects.filter(
     (p) => p.clientId === selectedClient?.id
@@ -288,32 +282,6 @@ export function ClientList({ properties, projects }: ClientListProps) {
                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedClient.notes}</p>
                         ): (
                             <p className="text-sm text-muted-foreground">No notes for this client.</p>
-                        )}
-                    </div>
-                </div>
-
-                <Separator />
-                
-                <div>
-                    <h4 className="mb-4 text-lg font-semibold">Managed Properties</h4>
-                     <div className="grid gap-4 sm:grid-cols-2">
-                        {clientProperties.length > 0 ? (
-                        clientProperties.map((prop) => (
-                            <Card key={prop.id}>
-                            <CardHeader>
-                                <CardTitle className="text-base">{prop.name}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <Button variant="outline" className="w-full" asChild>
-                                <a href={prop.drive_link} target="_blank" rel="noopener noreferrer">
-                                    <Folder className="mr-2 h-4 w-4" /> Asset Folder
-                                </a>
-                                </Button>
-                            </CardContent>
-                            </Card>
-                        ))
-                        ) : (
-                        <p className="text-sm text-muted-foreground col-span-2">No properties found for this client.</p>
                         )}
                     </div>
                 </div>

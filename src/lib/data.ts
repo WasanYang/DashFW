@@ -1,4 +1,4 @@
-import { Project, Client, Property, Snippet, Checklist } from './types';
+import { Project, Client, Snippet, Checklist } from './types';
 
 export const mockClients: Client[] = [
   {
@@ -35,35 +35,11 @@ export const mockClients: Client[] = [
   },
 ];
 
-export const mockProperties: Property[] = [
-  {
-    id: 'prop-1',
-    clientId: 'client-1',
-    name: 'Suanson Hotel - Main Branch',
-    drive_link: 'https://drive.google.com/link-to-suanson-assets',
-    credentials: {
-      ota: 'Agoda',
-      login: 'suanson_main',
-    },
-  },
-  {
-    id: 'prop-2',
-    clientId: 'client-2',
-    name: 'Only U Villa - Pool Access',
-    drive_link: 'https://drive.google.com/link-to-onlyu-assets',
-    credentials: {
-      ota: 'Booking.com',
-      login: 'onlyu_pool',
-    },
-  },
-];
-
 export const mockProjects: Project[] = [
   {
     id: 'proj-1',
     title: 'New OTA Listing Setup',
     clientId: 'client-1',
-    propertyId: 'prop-1',
     status: 'In Progress',
     gross_price: 500,
     deadline: new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
@@ -80,7 +56,6 @@ export const mockProjects: Project[] = [
     id: 'proj-2',
     title: 'Google Business SEO',
     clientId: 'client-2',
-    propertyId: 'prop-2',
     status: 'In Progress',
     gross_price: 350,
     deadline: new Date(new Date().getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days from now

@@ -12,7 +12,6 @@ export type Project = {
   id: string;
   title: string;
   clientId: string;
-  propertyId?: string;
   status: ProjectStatus;
   gross_price: number;
   deadline: Date;
@@ -34,17 +33,6 @@ export type Client = {
   avatarUrl?: string;
   socials?: Social[];
   notes?: string;
-};
-
-export type Property = {
-  id: string;
-  clientId: string;
-  name: string;
-  drive_link: string;
-  credentials?: {
-    ota: string;
-    login: string;
-  };
 };
 
 export type Snippet = {
