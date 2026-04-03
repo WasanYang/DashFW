@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -24,15 +25,17 @@ import {
   User,
   Hash,
 } from 'lucide-react';
-import { Client, Property, Social } from '@/lib/types';
+import { Client, Property, Social, Project } from '@/lib/types';
 import { useClients } from '@/contexts/clients-context';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { ClientForm, ClientFormValues } from './client-form';
 import { Separator } from '../ui/separator';
 import { ScrollArea } from '../ui/scroll-area';
+import { Badge } from '../ui/badge';
 
 interface ClientListProps {
   properties: Property[];
+  projects: Project[];
 }
 
 const socialIcons: { [key: string]: React.ElementType } = {
@@ -44,7 +47,7 @@ const socialIcons: { [key: string]: React.ElementType } = {
   Other: Hash,
 };
 
-export function ClientList({ properties }: ClientListProps) {
+export function ClientList({ properties, projects }: ClientListProps) {
   const { clients, addClient, updateClient } = useClients();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -57,11 +60,18 @@ export function ClientList({ properties }: ClientListProps) {
         // This is to refresh its data if it was edited.
         return clients.find(c => c.id === prev.id) || null;
       }
-      return clients[0] ?? null;
+      if (!prev && clients.length > 0) {
+        return clients[0];
+      }
+      return prev;
     });
   }, [clients]);
 
   const clientProperties = properties.filter(
+    (p) => p.clientId === selectedClient?.id
+  );
+
+  const clientProjects = projects.filter(
     (p) => p.clientId === selectedClient?.id
   );
 
@@ -112,52 +122,62 @@ export function ClientList({ properties }: ClientListProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Client</TableHead>
+                    <TableHead className="text-center">Projects</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {clients.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={2} className="text-center text-muted-foreground">
+                      <TableCell colSpan={3} className="text-center text-muted-foreground">
                         No clients found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    clients.map((client) => (
-                      <TableRow
-                        key={client.id}
-                        onClick={() => setSelectedClient(client)}
-                        className={`cursor-pointer ${
-                          selectedClient?.id === client.id ? 'bg-muted/50' : ''
-                        }`}
-                      >
-                        <TableCell className="flex items-center gap-3 font-medium">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={client.avatarUrl} alt={client.name} data-ai-hint="portrait person" />
-                            <AvatarFallback>{client.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span className="truncate">{client.name}</span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditingClient(client); }} aria-label="Edit client">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" asChild>
-                              <a
-                                href={client.fastwork_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                aria-label="Fastwork profile"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    clients.map((client) => {
+                      const completedProjectsCount = projects.filter(
+                        (p) => p.clientId === client.id && (p.status === 'Completed' || p.status === 'Paid')
+                      ).length;
+
+                      return (
+                        <TableRow
+                          key={client.id}
+                          onClick={() => setSelectedClient(client)}
+                          className={`cursor-pointer ${
+                            selectedClient?.id === client.id ? 'bg-muted/50' : ''
+                          }`}
+                        >
+                          <TableCell className="flex items-center gap-3 font-medium">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={client.avatarUrl} alt={client.name} data-ai-hint="portrait person" />
+                              <AvatarFallback>{client.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span className="truncate">{client.name}</span>
+                          </TableCell>
+                          <TableCell className="text-center font-medium">{completedProjectsCount}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditingClient(client); }} aria-label="Edit client">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {client.fastwork_link && (
+                                <Button variant="ghost" size="icon" asChild>
+                                  <a
+                                    href={client.fastwork_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    aria-label="Fastwork profile"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -207,7 +227,7 @@ export function ClientList({ properties }: ClientListProps) {
                 </div>
 
                 <Separator />
-
+                
                 <div>
                     <h4 className="mb-4 text-lg font-semibold">Managed Properties</h4>
                      <div className="grid gap-4 sm:grid-cols-2">
@@ -228,6 +248,33 @@ export function ClientList({ properties }: ClientListProps) {
                         ))
                         ) : (
                         <p className="text-sm text-muted-foreground col-span-2">No properties found for this client.</p>
+                        )}
+                    </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                    <h4 className="mb-4 text-lg font-semibold">Client Projects</h4>
+                     <div className="grid gap-4 sm:grid-cols-2">
+                        {clientProjects.length > 0 ? (
+                          clientProjects.map((project) => (
+                            <Card key={project.id}>
+                              <CardHeader>
+                                  <Link href={`/board/${project.id}`} className="hover:underline">
+                                    <CardTitle className="text-base">{project.title}</CardTitle>
+                                  </Link>
+                              </CardHeader>
+                              <CardContent className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <Badge variant={project.status === 'Completed' || project.status === 'Paid' ? 'default' : 'secondary'}>{project.status}</Badge>
+                                  <span className='font-semibold'>${project.gross_price.toFixed(2)}</span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        ) : (
+                        <p className="text-sm text-muted-foreground col-span-2">No projects found for this client.</p>
                         )}
                     </div>
                 </div>
