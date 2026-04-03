@@ -24,8 +24,9 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Input } from '../ui/input';
+import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
+
 
 interface KanbanCardProps {
   project: Project;
@@ -70,7 +71,9 @@ export function KanbanCard({
   const [timeLeft, setTimeLeft] = useState('');
   const [isSubtasksOpen, setIsSubtasksOpen] = useState(false);
   const [newSubtaskText, setNewSubtaskText] = useState('');
-  const [isAddSubtaskOpen, setAddSubtaskOpen] = useState(false);
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [subtaskToDelete, setSubtaskToDelete] = useState<SubTask | null>(null);
+
 
   useEffect(() => {
     const deadlineDate = new Date(project.deadline);
@@ -108,7 +111,10 @@ export function KanbanCard({
   };
 
   const handleAddSubtask = () => {
-    if (newSubtaskText.trim() === '') return;
+    if (newSubtaskText.trim() === '') {
+      setIsAddingSubtask(false);
+      return;
+    }
     const newSubTask: SubTask = {
       id: `sub-${Date.now()}`,
       text: newSubtaskText.trim(),
@@ -119,11 +125,16 @@ export function KanbanCard({
       subTasks: [...(project.subTasks || []), newSubTask],
     });
     setNewSubtaskText('');
-    setAddSubtaskOpen(false);
+    setIsAddingSubtask(false);
   };
 
-  const handleRemoveSubtask = (subTaskId: string) => {
-      const removeRecursively = (tasks: SubTask[], id: string): SubTask[] => {
+  const handleRemoveSubtask = (subtask: SubTask) => {
+    setSubtaskToDelete(subtask);
+  };
+
+  const confirmRemoveSubtask = () => {
+    if (!subtaskToDelete) return;
+    const removeRecursively = (tasks: SubTask[], id: string): SubTask[] => {
       let newTasks: SubTask[] = [];
       for (const task of tasks) {
           if (task.id === id) {
@@ -138,8 +149,9 @@ export function KanbanCard({
     };
     updateProject({
       ...project,
-      subTasks: removeRecursively(project.subTasks || [], subTaskId),
+      subTasks: removeRecursively(project.subTasks || [], subtaskToDelete.id),
     });
+    setSubtaskToDelete(null);
   };
   
   const subTaskProgress = useMemo(() => calculateProgress(project.subTasks), [project.subTasks]);
@@ -169,7 +181,7 @@ export function KanbanCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={() => handleRemoveSubtask(subtask.id)}
+              onClick={() => handleRemoveSubtask(subtask)}
             >
               <Trash2 className="h-4 w-4 text-muted-foreground" />
             </Button>
@@ -181,110 +193,124 @@ export function KanbanCard({
   );
 
   return (
-    <Card
-      draggable
-      onDragStart={(e) => onDragStart(e, project.id)}
-      className="cursor-grab active:cursor-grabbing"
-    >
-      <CardHeader className="p-4">
-        <div
-          onClick={() => onCardClick(project)}
-          className="cursor-pointer hover:underline"
-        >
-          <CardTitle className="text-base">{project.title}</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4 p-4 pt-0">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Clock className="h-4 w-4" />
-            <span
-              className={
-                isPast(new Date(project.deadline)) ? 'text-destructive' : ''
-              }
-            >
-              {timeLeft}
-            </span>
+    <>
+      <Card
+        draggable
+        onDragStart={(e) => onDragStart(e, project.id)}
+        className="cursor-grab active:cursor-grabbing"
+      >
+        <CardHeader className="p-4">
+          <div
+            onClick={() => onCardClick(project)}
+            className="cursor-pointer hover:underline"
+          >
+            <CardTitle className="text-base">{project.title}</CardTitle>
           </div>
-          <Badge variant="outline">${project.gross_price.toFixed(2)}</Badge>
-        </div>
-
-        {project.subTasks && project.subTasks.length > 0 && (
-          <div>
-            <Progress value={subTaskProgress} className="h-2" />
-            <p className="text-xs text-muted-foreground mt-1">
-              {Math.round(subTaskProgress)}% complete
-            </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 p-4 pt-0">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span
+                className={
+                  isPast(new Date(project.deadline)) ? 'text-destructive' : ''
+                }
+              >
+                {timeLeft}
+              </span>
+            </div>
+            <Badge variant="outline">${project.gross_price.toFixed(2)}</Badge>
           </div>
-        )}
 
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Revisions:</span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => handleRevisionChange(-1)}
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <span className="w-6 text-center font-semibold">
-              {project.revisions}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => handleRevisionChange(1)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+          {project.subTasks && project.subTasks.length > 0 && (
+            <div>
+              <Progress value={subTaskProgress} className="h-2" />
+              <p className="text-xs text-muted-foreground mt-1">
+                {Math.round(subTaskProgress)}% complete
+              </p>
+            </div>
+          )}
 
-        {project.subTasks && (
-          <Collapsible open={isSubtasksOpen} onOpenChange={setIsSubtasksOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start px-0 -mb-2">
-                <ListTodo className="h-4 w-4 mr-2" />
-                <span>Sub-tasks</span>
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 ml-auto transition-transform',
-                    isSubtasksOpen && 'rotate-180'
-                  )}
-                />
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Revisions:</span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleRevisionChange(-1)}
+              >
+                <Minus className="h-4 w-4" />
               </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 mt-4 pt-2 border-t">
-              {project.subTasks.length > 0 && renderSubtasks(project.subTasks)}
-              <Popover open={isAddSubtaskOpen} onOpenChange={setAddSubtaskOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full mt-2">
-                    <PlusCircle className="h-4 w-4 mr-2" /> Add sub-task
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-60 p-2">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="New sub-task..."
-                      value={newSubtaskText}
-                      onChange={(e) => setNewSubtaskText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAddSubtask();
-                      }}
-                    />
-                    <Button size="sm" onClick={handleAddSubtask}>
-                      Add
+              <span className="w-6 text-center font-semibold">
+                {project.revisions}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleRevisionChange(1)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {project.subTasks && (
+            <Collapsible open={isSubtasksOpen} onOpenChange={setIsSubtasksOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-start px-0 -mb-2">
+                  <ListTodo className="h-4 w-4 mr-2" />
+                  <span>Sub-tasks</span>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 ml-auto transition-transform',
+                      isSubtasksOpen && 'rotate-180'
+                    )}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 mt-4 pt-2 border-t">
+                {project.subTasks.length > 0 && renderSubtasks(project.subTasks)}
+                
+                {isAddingSubtask ? (
+                    <div className="flex items-center gap-2">
+                        <Input
+                            placeholder="New sub-task..."
+                            value={newSubtaskText}
+                            onChange={(e) => setNewSubtaskText(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleAddSubtask();
+                                if (e.key === 'Escape') setIsAddingSubtask(false);
+                            }}
+                            autoFocus
+                        />
+                        <Button size="sm" onClick={handleAddSubtask}>Add</Button>
+                    </div>
+                ) : (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setIsAddingSubtask(true)}
+                    >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Add sub-task
                     </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-      </CardContent>
-    </Card>
+                )}
+
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </CardContent>
+      </Card>
+      <DeleteConfirmationDialog
+        open={!!subtaskToDelete}
+        onOpenChange={(open) => !open && setSubtaskToDelete(null)}
+        onConfirm={confirmRemoveSubtask}
+        title="Delete Sub-task?"
+        description={`Are you sure you want to delete "${subtaskToDelete?.text}"? This will also delete any nested tasks.`}
+      />
+    </>
   );
 }
