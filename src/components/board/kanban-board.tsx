@@ -30,7 +30,12 @@ import { format } from 'date-fns';
 import { Separator } from '../ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import { Progress } from '../ui/progress';
-import { Accordion } from '../ui/accordion';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '../ui/accordion';
 import { SubtaskItem } from './subtask-item';
 import { Input } from '../ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -40,11 +45,11 @@ import {
   useAddProjectMutation,
   useUpdateProjectMutation,
 } from '@/services/projectApi';
+import { EditableQuillField } from '../ui/editable-quill-field';
 
 interface KanbanBoardProps {
   initialProjects: Project[];
   clients: Client[];
-  translations: Record<string, string>;
 }
 
 const columns: ProjectStatus[] = [
@@ -145,17 +150,106 @@ const calculateProgress = (tasks: SubTask[] | undefined): number => {
   return (completedTasks / totalTasks) * 100;
 };
 
+// --- Task ID auto-increment logic ---
+let lastTaskNumber = 0;
+
+const getTodayYMD = () => {
+  const date = new Date();
+  return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+};
+
+const generateTaskId = () => {
+  // Example: TASK-20260404-0001
+  const ymd = getTodayYMD();
+  // If the day changes, reset the counter
+  if (typeof window !== 'undefined') {
+    const stored = window.sessionStorage.getItem('lastTaskNumber-' + ymd);
+    lastTaskNumber = stored ? parseInt(stored, 10) : 0;
+    lastTaskNumber++;
+    window.sessionStorage.setItem(
+      'lastTaskNumber-' + ymd,
+      lastTaskNumber.toString(),
+    );
+  } else {
+    lastTaskNumber++;
+  }
+  return `TASK-${ymd}-${lastTaskNumber.toString().padStart(4, '0')}`;
+};
+// --- End Task ID logic ---
+
+const generateSubTaskId = (parentTaskId: string, idx: number) => {
+  // Example: TASK-20260404-xxxx-SUB-1
+  return `${parentTaskId}-SUB-${idx + 1}`;
+};
+
 export function KanbanBoard({
   initialProjects,
   clients,
-  translations,
-}: KanbanBoardProps) {
+}: Omit<KanbanBoardProps, 'translations'>) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [modalContent, setModalContent] = useState<Project | 'create' | null>(
     null,
   );
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingSubtitle, setIsEditingSubtitle] = useState(false);
+  const handleSaveSubtitle = () => {
+    if (editableProject) {
+      updateProject(editableProject);
+      setModalContent(editableProject);
+    }
+    setIsEditingSubtitle(false);
+  };
+
+  const handleCancelSubtitle = () => {
+    if (modalContent && typeof modalContent === 'object') {
+      setEditableProject({ ...modalContent });
+    }
+    setIsEditingSubtitle(false);
+  };
+  const countAllSubtasks = (subtasks: SubTask[] | undefined): number => {
+    if (!Array.isArray(subtasks)) return 0;
+    let count = 0;
+    for (const st of subtasks) {
+      count++;
+      if (Array.isArray(st.children)) {
+        count += countAllSubtasks(st.children);
+      }
+    }
+    return count;
+  };
+
+  const countAll = (subtasks: SubTask[] | undefined): [number, number] => {
+    let total = 0,
+      done = 0;
+    if (!Array.isArray(subtasks)) return [0, 0];
+    for (const st of subtasks) {
+      total++;
+      if (st.completed) done++;
+      if (Array.isArray(st.children)) {
+        const [t, d] = countAll(st.children);
+        total += t;
+        done += d;
+      }
+    }
+    return [total, done];
+  };
+
+  const [isEditingOrderNo, setIsEditingOrderNo] = useState(false);
+  const handleSaveOrderNo = () => {
+    if (editableProject) {
+      updateProject(editableProject);
+      setModalContent(editableProject);
+    }
+    setIsEditingOrderNo(false);
+  };
+
+  const handleCancelOrderNo = () => {
+    if (modalContent && typeof modalContent === 'object') {
+      setEditableProject({ ...modalContent });
+    }
+    setIsEditingOrderNo(false);
+  };
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [isEditingRevisions, setIsEditingRevisions] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -178,18 +272,30 @@ export function KanbanBoard({
     e.dataTransfer.setData('projectId', projectId);
   };
 
-  const handleDrop = (
+  const handleDrop = async (
     e: DragEvent<HTMLDivElement>,
     newStatus: ProjectStatus,
   ) => {
     e.preventDefault();
     const projectId = e.dataTransfer.getData('projectId');
-
-    setProjects((prevProjects) =>
-      prevProjects.map((p) =>
+    setProjects((prevProjects) => {
+      const updated = prevProjects.map((p) =>
         p.id === projectId ? { ...p, status: newStatus } : p,
-      ),
-    );
+      );
+      return updated;
+    });
+    // Find the project to update
+    const projectToUpdate = projects.find((p) => p.id === projectId);
+    if (projectToUpdate && projectToUpdate.status !== newStatus) {
+      try {
+        await updateProjectMutation({
+          id: projectToUpdate.id,
+          data: { ...projectToUpdate, status: newStatus },
+        }).unwrap();
+      } catch (err) {
+        alert('Failed to update project status');
+      }
+    }
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -200,13 +306,20 @@ export function KanbanBoard({
     newProjectData: Omit<Project, 'id' | 'status' | 'revisions'>,
   ) => {
     try {
+      // Do not generate id, let MongoDB handle it
+      let subTasks = (newProjectData.subTasks || []).map((st, idx) => ({
+        ...st,
+        // Optionally: remove id for subtask as well if Mongo should handle
+        completed: false,
+      }));
       const res = await addProjectMutation({
         ...newProjectData,
         status: 'Backlog',
         revisions: 0,
+        subTasks,
       }).unwrap();
       setProjects((prev) => [
-        { ...newProjectData, id: res.id, status: 'Backlog', revisions: 0 },
+        res, // Use the response from API (should include Mongo _id)
         ...prev,
       ]);
       setModalContent(null);
@@ -405,10 +518,10 @@ export function KanbanBoard({
   return (
     <>
       <div className='flex-shrink-0 flex items-center justify-between mb-4'>
-        <h1 className='text-3xl font-bold'>{translations.pageTitle}</h1>
+        <h1 className='text-3xl font-bold'>Kanban Board</h1>
         <Button onClick={() => setModalContent('create')}>
           <Plus className='mr-2 h-4 w-4' />
-          {translations.newProject}
+          New Project
         </Button>
       </div>
 
@@ -420,15 +533,31 @@ export function KanbanBoard({
           {modalContent === 'create' ? (
             <>
               <DialogHeader>
-                <DialogTitle>{translations.createNewProjectTitle}</DialogTitle>
+                <DialogTitle>Create New Project</DialogTitle>
                 <DialogDescription>
-                  {translations.createNewProjectDescription}
+                  Fill in the details below to add a new project to your board.
                 </DialogDescription>
               </DialogHeader>
               <CreateProjectForm
                 clients={clients}
                 onSubmit={addProject}
-                translations={translations}
+                translations={{
+                  titleLabel: 'Project Title',
+                  clientLabel: 'Client',
+                  selectClientPlaceholder: 'Select a client',
+                  priceLabel: 'Gross Price',
+                  deadlineLabel: 'Deadline',
+                  pickDatePlaceholder: 'Pick a date',
+                  subtasksLabel: 'Sub-tasks',
+                  addSubtask: 'Add Sub-task',
+                  removeSubtask: 'Remove',
+                  createProjectButton: 'Create Project',
+                  creatingProjectButton: 'Creating...',
+                  titleRequired: 'Project title is required.',
+                  clientRequired: 'Please select a client.',
+                  priceRequired: 'Price must be a positive number.',
+                  deadlineRequired: 'Deadline is required.',
+                }}
               />
             </>
           ) : (
@@ -437,58 +566,241 @@ export function KanbanBoard({
             editableProject && (
               <>
                 <DialogHeader>
-                  <div className='flex items-center gap-2 pr-12'>
-                    {!isEditingTitle ? (
-                      <>
-                        <DialogTitle className='flex-grow text-2xl'>
-                          <Link
-                            href={`/board/${modalContent.id}`}
-                            className='hover:underline'
+                  <div className='flex flex-col gap-1 pr-12'>
+                    <div className='flex items-center gap-2'>
+                      {!isEditingTitle ? (
+                        <>
+                          <DialogTitle className='flex-grow text-2xl'>
+                            <Link
+                              href={`/board/${modalContent.id}`}
+                              className='hover:underline'
+                            >
+                              {modalContent.title}
+                            </Link>
+                          </DialogTitle>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            onClick={() => setIsEditingTitle(true)}
                           >
-                            {modalContent.title}
-                          </Link>
-                        </DialogTitle>
-                        <Button
-                          variant='ghost'
-                          size='icon'
-                          onClick={() => setIsEditingTitle(true)}
-                        >
-                          <Pencil className='h-5 w-5' />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Input
-                          value={editableProject.title}
-                          onChange={(e) =>
-                            handleValueChange('title', e.target.value)
-                          }
-                          className='text-2xl font-semibold flex-grow h-auto py-1'
-                          autoFocus
-                        />
-                        <Button
-                          variant='ghost'
-                          size='icon'
-                          onClick={handleSaveTitle}
-                        >
-                          <Check className='h-5 w-5' />
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='icon'
-                          onClick={handleCancelTitle}
-                        >
-                          <X className='h-5 w-5' />
-                        </Button>
-                      </>
-                    )}
+                            <Pencil className='h-5 w-5' />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Input
+                            value={editableProject.title}
+                            onChange={(e) =>
+                              handleValueChange('title', e.target.value)
+                            }
+                            className='text-2xl font-semibold flex-grow h-auto py-1'
+                            autoFocus
+                          />
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            onClick={handleSaveTitle}
+                          >
+                            <Check className='h-5 w-5' />
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            onClick={handleCancelTitle}
+                          >
+                            <X className='h-5 w-5' />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      {!isEditingSubtitle ? (
+                        <>
+                          <span className='text-muted-foreground text-sm'>
+                            {modalContent.subtitle || (
+                              <span className='italic text-xs'>
+                                No description
+                              </span>
+                            )}
+                          </span>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            onClick={() => setIsEditingSubtitle(true)}
+                          >
+                            <Pencil className='h-4 w-4' />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Input
+                            value={editableProject.subtitle || ''}
+                            onChange={(e) =>
+                              handleValueChange('subtitle', e.target.value)
+                            }
+                            className='text-sm flex-grow h-auto py-1'
+                            autoFocus
+                          />
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            onClick={handleSaveSubtitle}
+                          >
+                            <Check className='h-4 w-4' />
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            onClick={handleCancelSubtitle}
+                          >
+                            <X className='h-4 w-4' />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <DialogDescription>
-                    In status{' '}
-                    <span className='font-semibold'>{modalContent.status}</span>{' '}
-                    &bull; Due by{' '}
-                    {format(new Date(modalContent.deadline), 'PPP')}
-                  </DialogDescription>
+                  {selectedClient && (
+                    <div className='flex items-center gap-2 text-xs text-muted-foreground'>
+                      Client:{' '}
+                      <span className='font-medium'>{selectedClient.name}</span>
+                    </div>
+                  )}
+                  {/* Order No. and Client info together */}
+                  <div className='flex items-center gap-6 mt-1 mb-2'>
+                    <div className='text-xs text-muted-foreground flex items-center gap-2'>
+                      Order No.:
+                      {!isEditingOrderNo ? (
+                        <>
+                          <span className='font-mono'>
+                            {modalContent.orderNo || '-'}
+                          </span>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={() => setIsEditingOrderNo(true)}
+                            aria-label='Edit order number'
+                          >
+                            <Pencil className='h-4 w-4' />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Input
+                            value={editableProject.orderNo || ''}
+                            onChange={(e) =>
+                              handleValueChange('orderNo', e.target.value)
+                            }
+                            className='font-mono h-6 py-0 text-xs w-36'
+                            autoFocus
+                          />
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={handleSaveOrderNo}
+                            aria-label='Save order number'
+                          >
+                            <Check className='h-4 w-4' />
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={handleCancelOrderNo}
+                            aria-label='Cancel edit order number'
+                          >
+                            <X className='h-4 w-4' />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Project details section */}
+                  <div className='mb-2 text-xs text-muted-foreground flex items-center gap-4'>
+                    <span className='mr-4'>
+                      Status:{' '}
+                      <span className='font-semibold'>
+                        {modalContent.status}
+                      </span>
+                    </span>
+                    <span className='flex items-center gap-1'>
+                      Due:
+                      {!isEditingDeadline ? (
+                        <>
+                          <span>
+                            {format(new Date(modalContent.deadline), 'PPP')}
+                          </span>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={() => setIsEditingDeadline(true)}
+                            aria-label='Edit due date'
+                          >
+                            <Pencil className='h-4 w-4' />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={'outline'}
+                                className={cn(
+                                  'pl-3 text-left font-normal h-auto py-1 w-36 justify-start',
+                                  !editableProject.deadline &&
+                                    'text-muted-foreground',
+                                )}
+                              >
+                                {editableProject.deadline ? (
+                                  format(
+                                    new Date(editableProject.deadline),
+                                    'PPP',
+                                  )
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className='ml-auto h-4 w-4 opacity-50' />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className='w-auto p-0'
+                              align='start'
+                            >
+                              <Calendar
+                                mode='single'
+                                selected={new Date(editableProject.deadline)}
+                                onSelect={(date) =>
+                                  handleValueChange('deadline', date)
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={handleSaveDeadline}
+                            aria-label='Save due date'
+                          >
+                            <Check className='h-4 w-4' />
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={handleCancelDeadline}
+                            aria-label='Cancel edit due date'
+                          >
+                            <X className='h-4 w-4' />
+                          </Button>
+                        </>
+                      )}
+                    </span>
+                  </div>
                 </DialogHeader>
 
                 <ScrollArea className='flex-grow pr-6 -mr-6'>
@@ -512,7 +824,7 @@ export function KanbanBoard({
                             />
                           ) : (
                             <p className='font-semibold text-lg'>
-                              ${modalContent.gross_price.toFixed(2)}
+                              {modalContent.gross_price.toFixed(2)}
                             </p>
                           )}
                         </div>
@@ -673,37 +985,40 @@ export function KanbanBoard({
                         )}
                       </div>
                     </div>
-
                     <Separator />
-
-                    {selectedClient && (
-                      <div>
-                        <h3 className='text-lg font-semibold mb-2'>Client</h3>
-                        <div className='flex items-center gap-3'>
-                          <Avatar>
-                            <AvatarImage
-                              src={selectedClient.avatarUrl}
-                              data-ai-hint='portrait person'
+                    {/* Project Details Section: Rich Text Editor */}
+                    <div className='mb-6'>
+                      <Accordion type='single' collapsible>
+                        <AccordionItem value='details'>
+                          <AccordionTrigger>
+                            <span className='text-lg font-semibold mb-2'>
+                              Project Details
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <EditableQuillField
+                              value={editableProject.details || ''}
+                              onChange={(val) =>
+                                handleValueChange('details', val)
+                              }
+                              placeholder='Enter project details, user info, requirements, etc.'
                             />
-                            <AvatarFallback>
-                              {selectedClient.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className='font-medium'>{selectedClient.name}</p>
-                            <p className='text-sm text-muted-foreground'>
-                              {selectedClient.email}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
                     {modalContent.subTasks !== undefined && (
                       <div>
                         <h3 className='text-lg font-semibold mb-4 flex items-center gap-2'>
                           <ListTodo className='h-5 w-5' />
                           Sub-tasks
+                          <span className='ml-2 text-xs text-muted-foreground'>
+                            {(() => {
+                              return (
+                                countAllSubtasks(modalContent.subTasks) || 0
+                              );
+                            })()}
+                          </span>
                         </h3>
                         <div className='space-y-4'>
                           <div className='flex items-center gap-4'>
@@ -713,6 +1028,15 @@ export function KanbanBoard({
                             />
                             <span className='text-sm font-medium text-muted-foreground whitespace-nowrap'>
                               {Math.round(modalSubTaskProgress)}%
+                            </span>
+                            <span className='text-xs text-muted-foreground'>
+                              {(() => {
+                                // Recursively count all subtasks and completed subtasks
+                                const [total, done] = countAll(
+                                  modalContent.subTasks,
+                                );
+                                return `${done}/${total}`;
+                              })()}
                             </span>
                           </div>
 

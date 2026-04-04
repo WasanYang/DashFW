@@ -28,13 +28,26 @@ export async function GET() {
   try {
     const { db } = await connectToDatabase();
     const projects = await db.collection('projects').find().toArray();
-    // Map _id to id and convert deadline to Date
-    const mapped = projects.map((p: any) => ({
-      ...p,
-      id: p._id?.toString(),
-      _id: undefined,
-      deadline: p.deadline ? new Date(p.deadline) : undefined,
-    }));
+    // Fetch all clients and build a map for quick lookup
+    const clientsArr = await db.collection('clients').find().toArray();
+    const clientMap = new Map(
+      clientsArr.map((c: any) => [
+        c._id?.toString(),
+        { ...c, id: c._id?.toString(), _id: undefined },
+      ]),
+    );
+    // Map _id to id, convert deadline, and attach client info
+    const mapped = projects.map((p: any) => {
+      const clientId = p.clientId?.toString();
+      const client = clientId ? clientMap.get(clientId) : undefined;
+      return {
+        ...p,
+        id: p._id?.toString(),
+        _id: undefined,
+        deadline: p.deadline ? new Date(p.deadline) : undefined,
+        client: client || null,
+      };
+    });
     return NextResponse.json(mapped);
   } catch (error) {
     return NextResponse.json(

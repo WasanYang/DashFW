@@ -15,13 +15,17 @@ export type ProjectStatus =
 
 export type Project = {
   id: string;
+  orderNo?: string;
   title: string;
+  subtitle?: string;
   clientId: string;
   status: ProjectStatus;
   gross_price: number;
   deadline: Date;
   revisions: number;
   subTasks?: SubTask[];
+  client?: Client | null;
+  details?: string;
 };
 
 export type Social = {
