@@ -26,6 +26,7 @@ import { useSidebar } from '@/components/ui/sidebar';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { href: '/job-types', label: 'Job Types', icon: LayoutGrid },
   { href: '/board', label: 'Kanban Board', icon: Columns3 },
   { href: '/clients', label: 'Clients & CRM', icon: Users },
   { href: '/financials', label: 'Financials', icon: Wallet },

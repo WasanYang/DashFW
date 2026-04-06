@@ -27,7 +27,8 @@ export function KanbanColumn({
     <div
       onDrop={(e) => onDrop(e, status)}
       onDragOver={onDragOver}
-      className="w-72 flex-shrink-0 rounded-lg bg-card p-2"
+      className="w-72 flex-shrink-0 rounded-lg bg-card p-2 min-h-[60px] flex flex-col"
+      style={{ overflow: 'visible' }}
     >
       <div className="mb-4 flex items-center justify-between p-2">
         <h3 className="font-semibold text-foreground">{status}</h3>
@@ -35,7 +36,7 @@ export function KanbanColumn({
           {projects.length}
         </span>
       </div>
-      <div className="flex h-full flex-col gap-3 overflow-y-auto">
+      <div className="flex flex-col gap-3 flex-1">
         {projects.map((project) => (
           <KanbanCard
             key={project.id}

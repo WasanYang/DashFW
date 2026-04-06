@@ -10,6 +10,8 @@ export async function POST(request: NextRequest) {
     const data: Project = await request.json();
     // Remove id if present
     const { id, ...projectData } = data;
+    // Ensure jobTypeId is string or undefined
+    if (projectData.jobTypeId === '') delete projectData.jobTypeId;
     const result = await db.collection('projects').insertOne(projectData);
     return NextResponse.json(
       { message: 'Project created', id: result.insertedId },
@@ -46,6 +48,7 @@ export async function GET() {
         _id: undefined,
         deadline: p.deadline ? new Date(p.deadline) : undefined,
         client: client || null,
+        jobTypeId: p.jobTypeId ? p.jobTypeId.toString() : undefined,
       };
     });
     return NextResponse.json(mapped);
@@ -65,6 +68,7 @@ export async function PUT(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
     // Remove id from updateData
     delete updateData.id;
+    if (updateData.jobTypeId === '') delete updateData.jobTypeId;
     const result = await db
       .collection('projects')
       .updateOne({ _id: new ObjectId(id) }, { $set: updateData });

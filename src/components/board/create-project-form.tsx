@@ -30,7 +30,9 @@ import { Client, Project, SubTask } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchJobTypes } from '@/services/jobTypeClient';
+import type { JobType } from '@/app/(protect)/job-types/page';
 
 interface CreateProjectFormProps {
   clients: Client[];
@@ -48,6 +50,7 @@ export function CreateProjectForm({
   const FormSchema = z.object({
     title: z.string().min(1, translations.titleRequired),
     clientId: z.string().min(1, translations.clientRequired),
+    jobTypeId: z.string().min(1, 'กรุณาเลือกประเภทของงาน'),
     gross_price: z.coerce
       .number()
       .positive({ message: translations.priceRequired }),
@@ -63,11 +66,18 @@ export function CreateProjectForm({
 
   type FormValues = z.infer<typeof FormSchema>;
 
+  const [jobTypes, setJobTypes] = useState<JobType[]>([]);
+
+  useEffect(() => {
+    fetchJobTypes().then(setJobTypes);
+  }, []);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       title: '',
       clientId: '',
+      jobTypeId: '',
       gross_price: undefined,
       subTasks: [],
     },
@@ -89,6 +99,7 @@ export function CreateProjectForm({
     onSubmit({
       title: data.title,
       clientId: data.clientId,
+      jobTypeId: data.jobTypeId,
       gross_price: data.gross_price,
       deadline: data.deadline,
       subTasks: subTasks,
@@ -132,6 +143,30 @@ export function CreateProjectForm({
                   {clients.map((client) => (
                     <SelectItem key={client._id} value={client._id}>
                       {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name='jobTypeId'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>ประเภทของงาน</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder='เลือกประเภทของงาน' />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {jobTypes.map((jt) => (
+                    <SelectItem key={jt._id} value={jt._id!}>
+                      {jt.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

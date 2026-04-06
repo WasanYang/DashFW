@@ -19,6 +19,7 @@ export type Project = {
   title: string;
   subtitle?: string;
   clientId: string;
+  jobTypeId?: string; // เพิ่มฟิลด์ประเภทของงาน
   status: ProjectStatus;
   gross_price: number;
   deadline: Date;

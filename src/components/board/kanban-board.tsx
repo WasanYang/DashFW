@@ -84,17 +84,13 @@ const removeSubtaskRecursively = (
   tasks: SubTask[],
   taskId: string,
 ): SubTask[] => {
-  let newTasks: SubTask[] = [];
-  for (const task of tasks) {
-    if (task.id === taskId) {
-      continue;
-    }
-    if (task.children) {
-      task.children = removeSubtaskRecursively(task.children, taskId);
-    }
-    newTasks.push(task);
-  }
-  return newTasks;
+  return tasks
+    .filter((task) => task.id !== taskId)
+    .map((task) =>
+      task.children
+        ? { ...task, children: removeSubtaskRecursively(task.children, taskId) }
+        : task
+    );
 };
 
 const addChildToSubtaskRecursively = (
@@ -1071,7 +1067,7 @@ export function KanbanBoard({
         </DialogContent>
       </Dialog>
 
-      <div className='flex flex-grow w-full gap-4 overflow-x-auto pb-4'>
+      <div className='flex w-full gap-4 overflow-x-auto pb-4'>
         {columns.map((status) => (
           <KanbanColumn
             key={status}

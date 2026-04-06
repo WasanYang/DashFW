@@ -255,7 +255,7 @@ export function KanbanCard({
             </div>
           )}
 
-          <div className='flex items-center justify-between'>
+          <div className='flex items-center justify-between hidden'>
             <span className='text-sm font-medium'>Revisions:</span>
             <div className='flex items-center gap-1'>
               <Button
