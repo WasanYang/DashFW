@@ -105,16 +105,18 @@ export const SubtaskItem: React.FC<SubtaskItemProps> = ({
               <h4 className='text-sm font-semibold'>Sub-tasks</h4>
               <div className='pl-4 space-y-2'>
                 <Accordion type='multiple' className='w-full space-y-2'>
-                  {subtask.children?.map((child) => (
-                    <SubtaskItem
-                      key={child.id}
-                      subtask={child}
-                      onUpdate={onUpdate}
-                      onRemove={onRemove}
-                      onAddChild={onAddChild}
-                      idPrefix={idPrefix}
-                    />
-                  ))}
+                  {[...(subtask.children || [])]
+                    ?.sort((a, b) => Number(a.completed) - Number(b.completed))
+                    .map((child) => (
+                      <SubtaskItem
+                        key={child.id}
+                        subtask={child}
+                        onUpdate={onUpdate}
+                        onRemove={onRemove}
+                        onAddChild={onAddChild}
+                        idPrefix={idPrefix}
+                      />
+                    ))}
                 </Accordion>
               </div>
               <Button

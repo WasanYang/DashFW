@@ -89,7 +89,7 @@ const removeSubtaskRecursively = (
     .map((task) =>
       task.children
         ? { ...task, children: removeSubtaskRecursively(task.children, taskId) }
-        : task
+        : task,
     );
 };
 
@@ -144,38 +144,6 @@ const calculateProgress = (tasks: SubTask[] | undefined): number => {
   if (totalTasks === 0) return 0;
 
   return (completedTasks / totalTasks) * 100;
-};
-
-// --- Task ID auto-increment logic ---
-let lastTaskNumber = 0;
-
-const getTodayYMD = () => {
-  const date = new Date();
-  return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
-};
-
-const generateTaskId = () => {
-  // Example: TASK-20260404-0001
-  const ymd = getTodayYMD();
-  // If the day changes, reset the counter
-  if (typeof window !== 'undefined') {
-    const stored = window.sessionStorage.getItem('lastTaskNumber-' + ymd);
-    lastTaskNumber = stored ? parseInt(stored, 10) : 0;
-    lastTaskNumber++;
-    window.sessionStorage.setItem(
-      'lastTaskNumber-' + ymd,
-      lastTaskNumber.toString(),
-    );
-  } else {
-    lastTaskNumber++;
-  }
-  return `TASK-${ymd}-${lastTaskNumber.toString().padStart(4, '0')}`;
-};
-// --- End Task ID logic ---
-
-const generateSubTaskId = (parentTaskId: string, idx: number) => {
-  // Example: TASK-20260404-xxxx-SUB-1
-  return `${parentTaskId}-SUB-${idx + 1}`;
 };
 
 export function KanbanBoard({
@@ -1040,16 +1008,21 @@ export function KanbanBoard({
                             type='multiple'
                             className='w-full space-y-2'
                           >
-                            {modalContent.subTasks.map((subtask) => (
-                              <SubtaskItem
-                                key={subtask.id}
-                                subtask={subtask}
-                                onUpdate={handleSubtaskUpdateInModal}
-                                onRemove={removeSubtaskInModal}
-                                onAddChild={addChildSubtaskInModal}
-                                idPrefix='modal-'
-                              />
-                            ))}
+                            {[...(modalContent.subTasks || [])]
+                              .sort(
+                                (a, b) =>
+                                  Number(a.completed) - Number(b.completed),
+                              )
+                              .map((subtask) => (
+                                <SubtaskItem
+                                  key={subtask.id}
+                                  subtask={subtask}
+                                  onUpdate={handleSubtaskUpdateInModal}
+                                  onRemove={removeSubtaskInModal}
+                                  onAddChild={addChildSubtaskInModal}
+                                  idPrefix='modal-'
+                                />
+                              ))}
                           </Accordion>
 
                           <Button onClick={addSubtaskInModal} variant='outline'>
@@ -1067,7 +1040,7 @@ export function KanbanBoard({
         </DialogContent>
       </Dialog>
 
-      <div className='flex w-full gap-4 overflow-x-auto pb-4'>
+      <div className='flex w-full gap-4 overflow-x-auto pb-4 min-h-screen'>
         {columns.map((status) => (
           <KanbanColumn
             key={status}

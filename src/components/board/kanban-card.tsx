@@ -5,26 +5,12 @@ import { Project, SubTask } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Clock,
-  Minus,
-  Plus,
-  ChevronDown,
-  ListTodo,
-  Trash2,
-  PlusCircle,
-} from 'lucide-react';
+import { Clock, Minus, Plus, ChevronDown } from 'lucide-react';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { Input } from '../ui/input';
 import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
 
 interface KanbanCardProps {
@@ -52,10 +38,10 @@ export function KanbanCard({
   onCardClick,
 }: KanbanCardProps) {
   const [timeLeft, setTimeLeft] = useState('');
-  const [isSubtasksOpen, setIsSubtasksOpen] = useState(false);
   const [newSubtaskText, setNewSubtaskText] = useState('');
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [subtaskToDelete, setSubtaskToDelete] = useState<SubTask | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   useEffect(() => {
     const deadlineDate = new Date(project.deadline);
@@ -74,44 +60,6 @@ export function KanbanCard({
   const handleRevisionChange = (increment: number) => {
     const newRevisions = Math.max(0, project.revisions + increment);
     updateProject({ ...project, revisions: newRevisions });
-  };
-
-  const handleSubTaskToggle = (subTaskId: string) => {
-    const toggleRecursively = (tasks: SubTask[]): SubTask[] => {
-      return tasks.map((st) => {
-        if (st.id === subTaskId) {
-          return { ...st, completed: !st.completed };
-        }
-        if (st.children) {
-          return { ...st, children: toggleRecursively(st.children) };
-        }
-        return st;
-      });
-    };
-    const newSubTasks = toggleRecursively(project.subTasks || []);
-    updateProject({ ...project, subTasks: newSubTasks });
-  };
-
-  const handleAddSubtask = () => {
-    if (newSubtaskText.trim() === '') {
-      setIsAddingSubtask(false);
-      return;
-    }
-    const newSubTask: SubTask = {
-      id: `sub-${Date.now()}`,
-      text: newSubtaskText.trim(),
-      completed: false,
-    };
-    updateProject({
-      ...project,
-      subTasks: [...(project.subTasks || []), newSubTask],
-    });
-    setNewSubtaskText('');
-    setIsAddingSubtask(false);
-  };
-
-  const handleRemoveSubtask = (subtask: SubTask) => {
-    setSubtaskToDelete(subtask);
   };
 
   const confirmRemoveSubtask = () => {
@@ -207,10 +155,10 @@ export function KanbanCard({
         onDragStart={(e) => onDragStart(e, project.id)}
         className='cursor-grab active:cursor-grabbing'
       >
-        <CardHeader className='p-4'>
+        <CardHeader className='p-4 flex flex-row items-center justify-between'>
           <div
             onClick={() => onCardClick(project)}
-            className='cursor-pointer hover:underline'
+            className='cursor-pointer hover:underline flex-1 min-w-0'
           >
             <CardTitle
               className='text-base truncate max-w-full'
@@ -224,62 +172,76 @@ export function KanbanCard({
               </div>
             )}
           </div>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='ml-2 h-6 w-6 flex-shrink-0'
+            aria-label={isCollapsed ? 'Show details' : 'Hide details'}
+            onClick={() => setIsCollapsed((prev) => !prev)}
+            tabIndex={0}
+          >
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}
+            />
+          </Button>
         </CardHeader>
-        <CardContent className='flex flex-col gap-4 p-4 pt-0'>
-          <div className='flex items-center justify-between text-sm text-muted-foreground'>
-            <div className='flex items-center gap-1'>
-              <Clock className='h-4 w-4' />
-              <span
-                className={
-                  isPast(new Date(project.deadline)) ? 'text-destructive' : ''
-                }
-              >
-                {timeLeft}
-              </span>
+        {!isCollapsed && (
+          <CardContent className='flex flex-col gap-4 p-4 pt-0'>
+            <div className='flex items-center justify-between text-sm text-muted-foreground'>
+              <div className='flex items-center gap-1'>
+                <Clock className='h-4 w-4' />
+                <span
+                  className={
+                    isPast(new Date(project.deadline)) ? 'text-destructive' : ''
+                  }
+                >
+                  {timeLeft}
+                </span>
+              </div>
+              <Badge variant='outline'>
+                {project.gross_price.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </Badge>
             </div>
-            <Badge variant='outline'>
-              {project.gross_price.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </Badge>
-          </div>
 
-          {project.subTasks && project.subTasks.length > 0 && (
-            <div>
-              {renderSubtasksPreview(project.subTasks)}
-              <Progress value={subTaskProgress} className='h-2 mt-2' />
-              <p className='text-xs text-muted-foreground mt-1'>
-                {Math.round(subTaskProgress)}% complete
-              </p>
-            </div>
-          )}
+            {project.subTasks && project.subTasks.length > 0 && (
+              <div>
+                {renderSubtasksPreview(project.subTasks)}
+                <Progress value={subTaskProgress} className='h-2 mt-2' />
+                <p className='text-xs text-muted-foreground mt-1'>
+                  {Math.round(subTaskProgress)}% complete
+                </p>
+              </div>
+            )}
 
-          <div className='flex items-center justify-between hidden'>
-            <span className='text-sm font-medium'>Revisions:</span>
-            <div className='flex items-center gap-1'>
-              <Button
-                variant='outline'
-                size='icon'
-                className='h-6 w-6'
-                onClick={() => handleRevisionChange(-1)}
-              >
-                <Minus className='h-4 w-4' />
-              </Button>
-              <span className='w-6 text-center font-semibold'>
-                {project.revisions}
-              </span>
-              <Button
-                variant='outline'
-                size='icon'
-                className='h-6 w-6'
-                onClick={() => handleRevisionChange(1)}
-              >
-                <Plus className='h-4 w-4' />
-              </Button>
+            <div className='items-center justify-between hidden'>
+              <span className='text-sm font-medium'>Revisions:</span>
+              <div className='flex items-center gap-1'>
+                <Button
+                  variant='outline'
+                  size='icon'
+                  className='h-6 w-6'
+                  onClick={() => handleRevisionChange(-1)}
+                >
+                  <Minus className='h-4 w-4' />
+                </Button>
+                <span className='w-6 text-center font-semibold'>
+                  {project.revisions}
+                </span>
+                <Button
+                  variant='outline'
+                  size='icon'
+                  className='h-6 w-6'
+                  onClick={() => handleRevisionChange(1)}
+                >
+                  <Plus className='h-4 w-4' />
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
       <DeleteConfirmationDialog
         open={!!subtaskToDelete}

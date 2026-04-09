@@ -302,15 +302,17 @@ export default function ProjectDetailsPage({
                 </div>
 
                 <Accordion type='multiple' className='w-full space-y-2'>
-                  {project.subTasks.map((subtask) => (
-                    <SubtaskItem
-                      key={subtask.id}
-                      subtask={subtask}
-                      onUpdate={handleSubtaskUpdate}
-                      onRemove={removeSubtask}
-                      onAddChild={addChildSubtask}
-                    />
-                  ))}
+                  {[...(project.subTasks || [])]
+                    .sort((a, b) => Number(a.completed) - Number(b.completed))
+                    .map((subtask) => (
+                      <SubtaskItem
+                        key={subtask.id}
+                        subtask={subtask}
+                        onUpdate={handleSubtaskUpdate}
+                        onRemove={removeSubtask}
+                        onAddChild={addChildSubtask}
+                      />
+                    ))}
                 </Accordion>
 
                 <Button onClick={addSubtask} variant='outline'>
