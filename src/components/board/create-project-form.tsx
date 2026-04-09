@@ -103,6 +103,7 @@ export function CreateProjectForm({
       gross_price: data.gross_price,
       deadline: data.deadline,
       subTasks: subTasks,
+      order: 0,
     });
   };
 

@@ -3,6 +3,8 @@
 import { useState, useEffect, DragEvent, useMemo } from 'react';
 import { Project, SubTask } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { JobType } from '@/app/(protect)/job-types/page';
+import { useGetJobTypesQuery } from '@/services/jobTypeApiSlice';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, Minus, Plus, ChevronDown } from 'lucide-react';
@@ -12,8 +14,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
+import { formatNumber } from '@/lib/number-format';
 
-interface KanbanCardProps {
+export interface KanbanCardProps {
   project: Project;
   onDragStart: (
     e: DragEvent<HTMLDivElement>,
@@ -58,6 +61,7 @@ export function KanbanCard({
   onCardClick,
   status,
 }: KanbanCardProps) {
+  const { data: jobTypes = [] } = useGetJobTypesQuery();
   const [newSubtaskText, setNewSubtaskText] = useState('');
   const [subtaskToDelete, setSubtaskToDelete] = useState<SubTask | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -166,6 +170,9 @@ export function KanbanCard({
     );
   };
 
+  // หา jobType name จาก jobTypes
+  const jobTypeName = jobTypes.find((jt) => jt._id === project.jobTypeId)?.name;
+
   return (
     <>
       <Card
@@ -188,11 +195,18 @@ export function KanbanCard({
             >
               {project.title}
             </CardTitle>
-            {project.client?.name && (
-              <div className='text-xs text-muted-foreground mt-1 truncate'>
-                {project.client.name.trim()}
-              </div>
-            )}
+            <div className='flex flex-row gap-2 items-center mt-1'>
+              {project.client?.name && (
+                <div className='text-xs text-muted-foreground truncate'>
+                  {project.client.name.trim()}
+                </div>
+              )}
+              {jobTypeName && (
+                <div className='text-xs text-primary-foreground bg-primary rounded px-2 py-0.5 truncate'>
+                  {jobTypeName}
+                </div>
+              )}
+            </div>
           </div>
           <Button
             variant='ghost'
@@ -221,10 +235,7 @@ export function KanbanCard({
                 </span>
               </div>
               <Badge variant='outline'>
-                {project.gross_price.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {formatNumber(project.gross_price)}
               </Badge>
             </div>
 

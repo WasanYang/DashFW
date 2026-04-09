@@ -63,7 +63,11 @@ export function KanbanColumn({
             project={project}
             index={idx}
             status={status}
-            onDragStart={(e, projectId, fromIdx) => {
+            onDragStart={(
+              e: DragEvent<HTMLDivElement>,
+              projectId: string,
+              fromIdx: number,
+            ) => {
               e.dataTransfer.setData('projectId', projectId);
               e.dataTransfer.setData('fromIndex', String(fromIdx));
               e.dataTransfer.setData('fromStatus', status);
@@ -71,11 +75,19 @@ export function KanbanColumn({
                 onDragStart(e, projectId, fromIdx);
               }
             }}
-            onDragOver={(e, overIdx, overStatus) => {
+            onDragOver={(
+              e: DragEvent<HTMLDivElement>,
+              overIdx: number,
+              overStatus: string,
+            ) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
             }}
-            onDrop={(e, toIdx, toStatus) => {
+            onDrop={(
+              e: DragEvent<HTMLDivElement>,
+              toIdx: number,
+              toStatus: string,
+            ) => {
               e.preventDefault();
               const fromIdx = Number(e.dataTransfer.getData('fromIndex'));
               const fromStatus = e.dataTransfer.getData('fromStatus');

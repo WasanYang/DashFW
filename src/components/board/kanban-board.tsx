@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, DragEvent } from 'react';
+import { useState, useMemo, useEffect, DragEvent } from 'react';
 import Link from 'next/link';
 import { Project, ProjectStatus, Client, SubTask } from '@/lib/types';
 import { KanbanColumn } from './kanban-column';
@@ -46,6 +46,9 @@ import {
   useUpdateProjectMutation,
 } from '@/services/projectApi';
 import { EditableQuillField } from '../ui/editable-quill-field';
+import { formatNumber } from '@/lib/number-format';
+import { fetchJobTypes } from '@/services/jobTypeClient';
+import type { JobType } from '@/app/(protect)/job-types/page';
 
 interface KanbanBoardProps {
   initialProjects: Project[];
@@ -200,6 +203,24 @@ export function KanbanBoard({
   };
 
   const [isEditingOrderNo, setIsEditingOrderNo] = useState(false);
+  const [isEditingType, setIsEditingType] = useState(false);
+  const [jobTypes, setJobTypes] = useState<JobType[]>([]);
+  useEffect(() => {
+    fetchJobTypes().then(setJobTypes);
+  }, []);
+  const handleSaveType = () => {
+    if (editableProject) {
+      updateProject(editableProject);
+      setModalContent(editableProject);
+    }
+    setIsEditingType(false);
+  };
+  const handleCancelType = () => {
+    if (modalContent && typeof modalContent === 'object') {
+      setEditableProject({ ...modalContent });
+    }
+    setIsEditingType(false);
+  };
   const handleSaveOrderNo = () => {
     if (editableProject) {
       updateProject(editableProject);
@@ -732,7 +753,7 @@ export function KanbanBoard({
                       <span className='font-medium'>{selectedClient.name}</span>
                     </div>
                   )}
-                  {/* Order No. and Client info together */}
+                  {/* Order No. and Project Type together */}
                   <div className='flex items-center gap-6 mt-1 mb-2'>
                     <div className='text-xs text-muted-foreground flex items-center gap-2'>
                       Order No.:
@@ -776,6 +797,65 @@ export function KanbanBoard({
                             className='h-5 w-5 p-0'
                             onClick={handleCancelOrderNo}
                             aria-label='Cancel edit order number'
+                          >
+                            <X className='h-4 w-4' />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <div className='text-xs text-muted-foreground flex items-center gap-2'>
+                      ประเภทงาน:
+                      {!isEditingType ? (
+                        <>
+                          <span className='font-mono'>
+                            {jobTypes.find(
+                              (jt) => jt._id === modalContent.jobTypeId,
+                            )?.name || '-'}
+                          </span>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={() => setIsEditingType(true)}
+                            aria-label='Edit project type'
+                          >
+                            <Pencil className='h-4 w-4' />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <select
+                            value={editableProject.jobTypeId || ''}
+                            onChange={(e) =>
+                              handleValueChange('jobTypeId', e.target.value)
+                            }
+                            className='font-mono h-6 py-0 text-xs w-36 border rounded px-2'
+                            autoFocus
+                          >
+                            <option value='' disabled>
+                              เลือกประเภทงาน
+                            </option>
+                            {jobTypes.map((jt) => (
+                              <option key={jt._id} value={jt._id}>
+                                {jt.name}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={handleSaveType}
+                            aria-label='Save project type'
+                          >
+                            <Check className='h-4 w-4' />
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-5 w-5 p-0'
+                            onClick={handleCancelType}
+                            aria-label='Cancel edit project type'
                           >
                             <X className='h-4 w-4' />
                           </Button>
@@ -874,7 +954,7 @@ export function KanbanBoard({
                   <div className='space-y-6 pb-6'>
                     <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                       <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
-                        <DollarSign className='h-6 w-6 text-muted-foreground' />
+                        {/* <DollarSign className='h-6 w-6 text-muted-foreground' /> */}
                         <div className='flex-grow'>
                           <p className='text-sm text-muted-foreground'>Price</p>
                           {isEditingPrice ? (
@@ -891,7 +971,7 @@ export function KanbanBoard({
                             />
                           ) : (
                             <p className='font-semibold text-lg'>
-                              {modalContent.gross_price.toFixed(2)}
+                              {formatNumber(modalContent.gross_price)}
                             </p>
                           )}
                         </div>

@@ -28,6 +28,7 @@ import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Accordion } from '@/components/ui/accordion';
 import { SubtaskItem } from '@/components/board/subtask-item';
+import { formatNumber } from '@/lib/number-format';
 
 const updateSubtaskRecursively = (
   tasks: SubTask[],
@@ -238,11 +239,11 @@ export default function ProjectDetailsPage({
         <CardContent className='space-y-6'>
           <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
             <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
-              <DollarSign className='h-6 w-6 text-muted-foreground' />
+              {/* <DollarSign className='h-6 w-6 text-muted-foreground' /> */}
               <div>
                 <p className='text-sm text-muted-foreground'>Price</p>
                 <p className='font-semibold text-lg'>
-                  ${project.gross_price.toFixed(2)}
+                  {formatNumber(project.gross_price)}
                 </p>
               </div>
             </div>

@@ -49,6 +49,7 @@ import { Progress } from '../ui/progress';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
+import { formatNumber } from '@/lib/number-format';
 
 interface ClientListProps {
   projects: Project[];
@@ -426,7 +427,7 @@ export function ClientList({ projects }: ClientListProps) {
                                 {project.status}
                               </Badge>
                               <span className='font-semibold'>
-                                ${project.gross_price.toFixed(2)}
+                                {formatNumber(project.gross_price)}
                               </span>
                             </div>
                           </CardContent>
@@ -518,11 +519,11 @@ export function ClientList({ projects }: ClientListProps) {
                 <div className='space-y-6 pb-6'>
                   <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                     <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
-                      <DollarSign className='h-6 w-6 text-muted-foreground' />
+                      {/* <DollarSign className='h-6 w-6 text-muted-foreground' /> */}
                       <div>
                         <p className='text-sm text-muted-foreground'>Price</p>
                         <p className='font-semibold text-lg'>
-                          ${projectModal.gross_price.toFixed(2)}
+                          {formatNumber(projectModal.gross_price)}
                         </p>
                       </div>
                     </div>
