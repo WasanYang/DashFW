@@ -15,9 +15,26 @@ import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
 
 interface KanbanCardProps {
   project: Project;
-  onDragStart: (e: DragEvent<HTMLDivElement>, projectId: string) => void;
+  onDragStart: (
+    e: DragEvent<HTMLDivElement>,
+    projectId: string,
+    index: number,
+    status: string,
+  ) => void;
+  onDragOver?: (
+    e: DragEvent<HTMLDivElement>,
+    index: number,
+    status: string,
+  ) => void;
+  onDrop?: (
+    e: DragEvent<HTMLDivElement>,
+    index: number,
+    status: string,
+  ) => void;
+  index: number;
   updateProject: (project: Project) => void;
   onCardClick: (project: Project) => void;
+  status: string;
 }
 
 // Only count root sub-tasks for progress
@@ -34,14 +51,21 @@ const calculateProgress = (tasks: SubTask[] | undefined): number => {
 export function KanbanCard({
   project,
   onDragStart,
+  onDragOver,
+  onDrop,
+  index,
   updateProject,
   onCardClick,
+  status,
 }: KanbanCardProps) {
-  const [timeLeft, setTimeLeft] = useState('');
   const [newSubtaskText, setNewSubtaskText] = useState('');
-  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [subtaskToDelete, setSubtaskToDelete] = useState<SubTask | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [timeLeft, setTimeLeft] = useState('');
+  const subTaskProgress = useMemo(
+    () => calculateProgress(project.subTasks),
+    [project.subTasks],
+  );
 
   useEffect(() => {
     const deadlineDate = new Date(project.deadline);
@@ -83,12 +107,6 @@ export function KanbanCard({
     });
     setSubtaskToDelete(null);
   };
-
-  const subTaskProgress = useMemo(
-    () => calculateProgress(project.subTasks),
-    [project.subTasks],
-  );
-
   // Count all subtasks recursively
   const countAllSubtasks = (tasks: SubTask[]): number => {
     let count = 0;
@@ -152,7 +170,11 @@ export function KanbanCard({
     <>
       <Card
         draggable
-        onDragStart={(e) => onDragStart(e, project.id)}
+        onDragStart={(e) => onDragStart(e, project.id, index, status)}
+        onDragOver={
+          onDragOver ? (e) => onDragOver(e, index, status) : undefined
+        }
+        onDrop={onDrop ? (e) => onDrop(e, index, status) : undefined}
         className='cursor-grab active:cursor-grabbing'
       >
         <CardHeader className='p-4 flex flex-row items-center justify-between'>

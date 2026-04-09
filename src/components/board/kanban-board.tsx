@@ -225,41 +225,141 @@ export function KanbanBoard({
   const groupedProjects = useMemo(() => {
     return columns.reduce(
       (acc, status) => {
-        acc[status] = projects.filter((p) => p.status === status);
+        acc[status] = projects
+          .filter((p) => p.status === status)
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         return acc;
       },
       {} as Record<ProjectStatus, Project[]>,
     );
   }, [projects]);
 
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, projectId: string) => {
+  const handleDragStart = (
+    e: DragEvent<HTMLDivElement>,
+    projectId: string,
+    index: number,
+  ) => {
     e.dataTransfer.setData('projectId', projectId);
+    e.dataTransfer.setData('fromIndex', String(index));
+  };
+
+  // Removed duplicate handleCardDrop declaration
+  const handleCardDrop = async (
+    fromIndex: number,
+    toIndex: number,
+    fromStatus: string,
+    toStatus: string,
+  ) => {
+    setProjects((prev) => {
+      // หา project ใน column ต้นทางและปลายทาง
+      const fromCol = prev
+        .filter((p) => p.status === fromStatus)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const toCol = prev
+        .filter((p) => p.status === toStatus)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const fromId = fromCol[fromIndex]?.id;
+      if (!fromId) return prev;
+      let newProjects = [...prev];
+      let updated: Project[] = [];
+      if (fromStatus === toStatus) {
+        // reorder ใน column เดียวกัน
+        const col = [...fromCol];
+        const [moved] = col.splice(fromIndex, 1);
+        col.splice(toIndex, 0, moved);
+        // อัปเดต order ใหม่ (immutable)
+        const colWithOrder = col.map((p, idx) => ({ ...p, order: idx }));
+        newProjects = newProjects.map((p) =>
+          p.status === fromStatus
+            ? colWithOrder.find((c) => c.id === p.id) || p
+            : p,
+        );
+        updated = colWithOrder;
+      } else {
+        // ข้าม column: เปลี่ยน status และแทรกที่ตำแหน่งใหม่
+        let fromColCopy = [...fromCol];
+        let toColCopy = [...toCol];
+        const [moved] = fromColCopy.splice(fromIndex, 1);
+        const movedWithStatus = { ...moved, status: toStatus as ProjectStatus };
+        toColCopy.splice(toIndex, 0, movedWithStatus);
+        // อัปเดต order ใหม่ทั้งสอง column (immutable)
+        const fromColWithOrder = fromColCopy.map((p, idx) => ({
+          ...p,
+          order: idx,
+        }));
+        const toColWithOrder = toColCopy.map((p, idx) => ({
+          ...p,
+          order: idx,
+        }));
+        newProjects = newProjects.map((p) => {
+          if (p.id === movedWithStatus.id) return movedWithStatus;
+          if (p.status === fromStatus)
+            return fromColWithOrder.find((c) => c.id === p.id) || p;
+          if (p.status === toStatus)
+            return toColWithOrder.find((c) => c.id === p.id) || p;
+          return p;
+        });
+        updated = [movedWithStatus, ...fromColWithOrder, ...toColWithOrder];
+      }
+      // Sync เฉพาะ status/order ไป backend
+      updated.forEach((proj) => {
+        updateProjectMutation({
+          id: proj.id,
+          data: {
+            status: proj.status,
+            order: proj.order,
+          },
+        });
+      });
+      return newProjects;
+    });
   };
 
   const handleDrop = async (
     e: DragEvent<HTMLDivElement>,
     newStatus: ProjectStatus,
   ) => {
+    console.log('handleDrop', { newStatus });
     e.preventDefault();
     const projectId = e.dataTransfer.getData('projectId');
-    setProjects((prevProjects) => {
-      const updated = prevProjects.map((p) =>
-        p.id === projectId ? { ...p, status: newStatus } : p,
-      );
-      return updated;
-    });
-    // Find the project to update
-    const projectToUpdate = projects.find((p) => p.id === projectId);
-    if (projectToUpdate && projectToUpdate.status !== newStatus) {
-      try {
-        await updateProjectMutation({
-          id: projectToUpdate.id,
-          data: { ...projectToUpdate, status: newStatus },
-        }).unwrap();
-      } catch (err) {
-        alert('Failed to update project status');
-      }
+    // ถ้า fromIndex เป็นตัวเลข (reorder ใน column เดียวกัน) ให้ return; ถ้า undefined/ว่าง ให้เปลี่ยนสถานะ
+    const fromIndex = Number(e.dataTransfer.getData('fromIndex'));
+    if (isNaN(fromIndex)) {
+      return;
     }
+    setProjects((prevProjects) => {
+      // หา project ที่จะย้าย
+      const projectToMove = prevProjects.find((p) => p.id === projectId);
+      if (!projectToMove) return prevProjects;
+      // หา project ใน column ปลายทาง
+      const destCol = prevProjects
+        .filter((p) => p.status === newStatus)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      // กำหนด order ใหม่เป็นลำดับสุดท้าย
+      const newOrder =
+        destCol.length > 0
+          ? Math.max(...destCol.map((p) => p.order ?? 0)) + 1
+          : 0;
+      // อัปเดต project ที่ย้าย
+      const updatedProject = {
+        ...projectToMove,
+        status: newStatus,
+        order: newOrder,
+      };
+      // รวม project ใหม่เข้าไปใน state
+      const newProjects = prevProjects.map((p) =>
+        p.id === projectId ? updatedProject : p,
+      );
+      // sync เฉพาะ status/order ไป backend
+      updateProjectMutation({
+        id: updatedProject.id,
+        data: {
+          status: updatedProject.status,
+          order: updatedProject.order,
+        },
+      });
+      return newProjects;
+    });
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -267,25 +367,28 @@ export function KanbanBoard({
   };
 
   const addProject = async (
-    newProjectData: Omit<Project, 'id' | 'status' | 'revisions'>,
+    newProjectData: Omit<Project, 'id' | 'status' | 'revisions' | 'order'>,
   ) => {
     try {
       // Do not generate id, let MongoDB handle it
       let subTasks = (newProjectData.subTasks || []).map((st, idx) => ({
         ...st,
-        // Optionally: remove id for subtask as well if Mongo should handle
         completed: false,
       }));
+      // หา order ล่าสุดใน column Backlog
+      const backlogProjects = projects.filter((p) => p.status === 'Backlog');
+      const maxOrder =
+        backlogProjects.length > 0
+          ? Math.max(...backlogProjects.map((p) => p.order ?? 0))
+          : -1;
       const res = await addProjectMutation({
         ...newProjectData,
         status: 'Backlog',
         revisions: 0,
         subTasks,
+        order: maxOrder + 1,
       }).unwrap();
-      setProjects((prev) => [
-        res, // Use the response from API (should include Mongo _id)
-        ...prev,
-      ]);
+      setProjects((prev) => [res, ...prev]);
       setModalContent(null);
     } catch (err) {
       alert('Failed to add project');
@@ -1047,8 +1150,14 @@ export function KanbanBoard({
             status={status}
             projects={groupedProjects[status]}
             onDrop={handleDrop}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
+            onDragStart={(e, projectId, index) => {
+              e.dataTransfer.setData('projectId', projectId);
+              e.dataTransfer.setData('fromIndex', String(index));
+              e.dataTransfer.setData('fromStatus', status);
+            }}
+            onCardDrop={(fromIdx, toIdx) =>
+              handleCardDrop(fromIdx, toIdx, status, status)
+            }
             updateProject={updateProject}
             onCardClick={handleCardClick}
           />

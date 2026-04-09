@@ -15,6 +15,7 @@ export type ProjectStatus =
 
 export type Project = {
   id: string;
+  order: number; // ลำดับใน column
   orderNo?: string;
   title: string;
   subtitle?: string;
