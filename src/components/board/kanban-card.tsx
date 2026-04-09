@@ -62,7 +62,6 @@ export function KanbanCard({
   status,
 }: KanbanCardProps) {
   const { data: jobTypes = [] } = useGetJobTypesQuery();
-  const [newSubtaskText, setNewSubtaskText] = useState('');
   const [subtaskToDelete, setSubtaskToDelete] = useState<SubTask | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [timeLeft, setTimeLeft] = useState('');
@@ -187,10 +186,10 @@ export function KanbanCard({
         <CardHeader className='p-4 flex flex-row items-center justify-between'>
           <div
             onClick={() => onCardClick(project)}
-            className='cursor-pointer hover:underline flex-1 min-w-0'
+            className='cursor-pointer  flex-1 min-w-0'
           >
             <CardTitle
-              className='text-base truncate max-w-full'
+              className='text-base truncate max-w-full hover:underline'
               title={project.title}
             >
               {project.title}
@@ -202,7 +201,7 @@ export function KanbanCard({
                 </div>
               )}
               {jobTypeName && (
-                <div className='text-xs text-primary-foreground bg-primary rounded px-2 py-0.5 truncate'>
+                <div className='text-[11px] text-muted-foreground bg-transparent px-1 py-0.5 truncate font-normal'>
                   {jobTypeName}
                 </div>
               )}
