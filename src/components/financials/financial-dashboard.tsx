@@ -4,7 +4,8 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DollarSign, TrendingUp } from 'lucide-react';
+import { useGetProjectsQuery } from '@/services/projectApi';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import {
   BarChart,
   Bar,
@@ -18,6 +19,7 @@ import {
 const FASTWORK_FEE_RATE = 0.1; // 10%
 
 export function FinancialDashboard() {
+  const { data: projects = [], isLoading } = useGetProjectsQuery();
   const [grossPrice, setGrossPrice] = useState<number | string>('');
 
   const netProfit = useMemo(() => {
@@ -32,47 +34,90 @@ export function FinancialDashboard() {
     return price * FASTWORK_FEE_RATE;
   }, [grossPrice]);
 
-  const monthlyData = [
-    { month: 'Jan', pipeline: 1200, withdrawn: 900 },
-    { month: 'Feb', pipeline: 1800, withdrawn: 1500 },
-    { month: 'Mar', pipeline: 1500, withdrawn: 1600 },
-    { month: 'Apr', pipeline: 2200, withdrawn: 1800 },
-    { month: 'May', pipeline: 2500, withdrawn: 2100 },
-    { month: 'Jun', pipeline: 1900, withdrawn: 2200 },
-  ];
+  // Dynamically calculate Pipeline and Withdrawn Earnings from DB
+  const pipelineTotal = useMemo(() => {
+    return projects
+      .filter((p) => p.status !== 'Completed' && p.status !== 'Paid')
+      .reduce((sum, p) => sum + (p.gross_price || 0), 0);
+  }, [projects]);
+
+  const withdrawnTotal = useMemo(() => {
+    return projects
+      .filter((p) => p.status === 'Paid')
+      .reduce((sum, p) => sum + (p.gross_price || 0) * (1 - FASTWORK_FEE_RATE), 0);
+  }, [projects]);
+
+  const monthlyData = useMemo(() => {
+    // Generate the last 6 months dynamically (including the current month)
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      months.push(subMonths(new Date(), i));
+    }
+
+    return months.map((monthDate) => {
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const label = format(monthDate, 'MMM');
+
+      // Filter projects that have deadline in this month
+      const monthProjects = projects.filter((p) => {
+        if (!p.deadline) return false;
+        const d = new Date(p.deadline);
+        return d >= monthStart && d <= monthEnd;
+      });
+
+      const pipeline = monthProjects
+        .filter((p) => p.status !== 'Completed' && p.status !== 'Paid')
+        .reduce((sum, p) => sum + (p.gross_price || 0), 0);
+
+      const withdrawn = monthProjects
+        .filter((p) => p.status === 'Paid')
+        .reduce((sum, p) => sum + (p.gross_price || 0) * (1 - FASTWORK_FEE_RATE), 0);
+
+      return {
+        month: label,
+        pipeline,
+        withdrawn,
+      };
+    });
+  }, [projects]);
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-muted-foreground">Loading financials...</div>;
+  }
 
   return (
     <div className='grid grid-cols-1 gap-8 lg:grid-cols-3'>
       <div className='lg:col-span-1 space-y-8'>
         <Card>
           <CardHeader>
-            <CardTitle>Auto-Fee Calculator</CardTitle>
+            <CardTitle>Auto-Fee Calculator (เครื่องคำนวณหักค่าธรรมเนียม)</CardTitle>
           </CardHeader>
           <CardContent className='space-y-4'>
             <div>
-              <Label htmlFor='gross-price'>Gross Price</Label>
+              <Label htmlFor='gross-price'>Gross Price (ยอดเงินเสนอราคา)</Label>
               <div className='relative'>
-                {/* <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /> */}
                 <Input
                   id='gross-price'
                   type='number'
-                  placeholder='e.g., 500'
+                  placeholder='เช่น 5000'
                   value={grossPrice}
                   onChange={(e) => setGrossPrice(e.target.value)}
-                  className='pl-8'
+                  className='pl-8 font-semibold'
                 />
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">฿</span>
               </div>
             </div>
             <div className='space-y-2 rounded-lg bg-muted p-4'>
               <div className='flex justify-between text-sm'>
                 <span className='text-muted-foreground'>
-                  Fastwork Fee (10%)
+                  Fastwork Fee (ค่าธรรมเนียมหัก 10%)
                 </span>
-                <span>${fee.toFixed(2)}</span>
+                <span className="font-medium">฿{fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className='flex justify-between font-semibold text-lg'>
-                <span>Net Profit</span>
-                <span className='text-primary'>${netProfit.toFixed(2)}</span>
+                <span>Net Profit (รายได้สุทธิ)</span>
+                <span className='text-primary'>฿{netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           </CardContent>
@@ -82,23 +127,23 @@ export function FinancialDashboard() {
       <div className='lg:col-span-2'>
         <Card>
           <CardHeader>
-            <CardTitle>Income Summary (Weekly/Monthly)</CardTitle>
+            <CardTitle>Income Summary (สรุปรายได้หมุนเวียน)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className='grid grid-cols-2 gap-4 mb-8'>
               <div className='p-4 rounded-lg bg-primary/5'>
                 <p className='text-sm text-muted-foreground'>
-                  Money in Pipeline
+                  Money in Pipeline (ยอดเงินที่อยู่ระหว่างดำเนินงาน)
                 </p>
-                <p className='text-2xl font-bold'>$3,750.00</p>
+                <p className='text-2xl font-bold text-primary'>฿{pipelineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
               <div className='p-4 rounded-lg bg-chart-2/10 text-chart-2'>
-                <p className='text-sm'>Withdrawn Earnings</p>
-                <p className='text-2xl font-bold'>$8,100.00</p>
+                <p className='text-sm font-semibold'>Withdrawn Earnings (รายได้สุทธิที่ได้รับจริง)</p>
+                <p className='text-2xl font-bold'>฿{withdrawnTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             </div>
 
-            <h4 className='font-semibold mb-4'>Monthly Performance</h4>
+            <h4 className='font-semibold mb-4'>Monthly Performance (เปรียบเทียบผลประกอบการรายเดือน)</h4>
             <div className='h-[300px]'>
               <ResponsiveContainer width='100%' height='100%'>
                 <BarChart data={monthlyData}>
@@ -110,9 +155,10 @@ export function FinancialDashboard() {
                   <YAxis
                     stroke='hsl(var(--muted-foreground))'
                     fontSize={12}
-                    tickFormatter={(value) => `$${value}`}
+                    tickFormatter={(value) => `฿${value}`}
                   />
                   <Tooltip
+                    formatter={(value) => [`฿${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, '']}
                     contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
                       border: '1px solid hsl(var(--border))',
@@ -122,13 +168,13 @@ export function FinancialDashboard() {
                   <Bar
                     dataKey='pipeline'
                     fill='hsl(var(--primary))'
-                    name='In Pipeline'
+                    name='In Pipeline (ระหว่างทำ)'
                     radius={[4, 4, 0, 0]}
                   />
                   <Bar
                     dataKey='withdrawn'
                     fill='hsl(var(--accent))'
-                    name='Withdrawn'
+                    name='Withdrawn (จ่ายแล้ว)'
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
@@ -140,3 +186,4 @@ export function FinancialDashboard() {
     </div>
   );
 }
+

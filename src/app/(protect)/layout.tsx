@@ -24,7 +24,7 @@ export default function RootLayout({
             <AppSidebar />
             <div className='flex flex-1 flex-col min-w-0'>
               <Header />
-              <main className='flex-1 overflow-y-auto bg-muted/40 p-4 sm:p-6 md:p-8'>
+              <main className='flex-1 overflow-y-auto bg-[#f4f3f9] p-4 sm:p-6 md:p-8'>
                 {children}
               </main>
             </div>

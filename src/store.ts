@@ -2,20 +2,33 @@ import { configureStore } from '@reduxjs/toolkit';
 import { clientApi } from './services/clientApi';
 import { projectApi } from './services/projectApi';
 import { jobTypeApi } from './services/jobTypeApiSlice';
+import { snippetApi } from './services/snippetApiSlice';
+import { timeLogApi } from './services/timeLogApi';
+import { invoiceApi } from './services/invoiceApi';
+import { proposalApi } from './services/proposalApi';
 
 export const store = configureStore({
   reducer: {
     [clientApi.reducerPath]: clientApi.reducer,
     [jobTypeApi.reducerPath]: jobTypeApi.reducer,
     [projectApi.reducerPath]: projectApi.reducer,
+    [snippetApi.reducerPath]: snippetApi.reducer,
+    [timeLogApi.reducerPath]: timeLogApi.reducer,
+    [invoiceApi.reducerPath]: invoiceApi.reducer,
+    [proposalApi.reducerPath]: proposalApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
       clientApi.middleware,
       jobTypeApi.middleware,
       projectApi.middleware,
+      snippetApi.middleware,
+      timeLogApi.middleware,
+      invoiceApi.middleware,
+      proposalApi.middleware,
     ),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
+

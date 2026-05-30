@@ -1,135 +1,737 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, ListTodo, Package, Wallet } from 'lucide-react';
+'use client';
 
-export default async function DashboardPage() {
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  Sparkles,
+  Play,
+  Square,
+  Trash2,
+  Clock,
+  FileText
+} from 'lucide-react';
+import { useGetProjectsQuery } from '@/services/projectApi';
+import { useGetClientsQuery } from '@/services/clientApi';
+import { useGetInvoicesQuery } from '@/services/invoiceApi';
+import { useGetProposalsQuery } from '@/services/proposalApi';
+import {
+  useGetTimeLogsQuery,
+  useAddTimeLogMutation,
+  useDeleteTimeLogMutation
+} from '@/services/timeLogApi';
+import {
+  format,
+  startOfWeek,
+  addDays,
+  isSameDay,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+} from 'date-fns';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line,
+} from 'recharts';
+
+const CHART_COLORS = ['#f87171', '#c084fc', '#4ade80', '#60a5fa', '#fbbf24'];
+const PIE_COLORS = ['#3b82f6', '#f472b6'];
+
+export default function DashboardPage() {
+  const { data: projects = [], isLoading: loadingProjects } = useGetProjectsQuery();
+  const { data: clients = [], isLoading: loadingClients } = useGetClientsQuery();
+  const { data: invoices = [], isLoading: loadingInvoices } = useGetInvoicesQuery();
+  const { data: proposals = [], isLoading: loadingProposals } = useGetProposalsQuery();
+  const { data: timeLogs = [], isLoading: loadingTimeLogs } = useGetTimeLogsQuery();
+
+  const [addTimeLog] = useAddTimeLogMutation();
+  const [deleteTimeLog] = useDeleteTimeLogMutation();
+
+  // Calendar state
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Time Tracker state
+  const [isTracking, setIsTracking] = useState(false);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [trackerTaskName, setTrackerTaskName] = useState('');
+  const [trackerProjectId, setTrackerProjectId] = useState('none');
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load active timer from localStorage if page refreshes
+  useEffect(() => {
+    const savedStartTime = localStorage.getItem('dashfw_timer_start');
+    const savedTaskName = localStorage.getItem('dashfw_timer_task');
+    const savedProjectId = localStorage.getItem('dashfw_timer_project');
+    
+    if (savedStartTime) {
+      const parsedStart = new Date(savedStartTime);
+      setStartTime(parsedStart);
+      setTrackerTaskName(savedTaskName || '');
+      setTrackerProjectId(savedProjectId || 'none');
+      setIsTracking(true);
+      
+      const secondsDiff = Math.floor((new Date().getTime() - parsedStart.getTime()) / 1000);
+      setElapsedSeconds(secondsDiff > 0 ? secondsDiff : 0);
+    }
+  }, []);
+
+  // Handle ticking
+  useEffect(() => {
+    if (isTracking && startTime) {
+      timerRef.current = setInterval(() => {
+        const diff = Math.floor((new Date().getTime() - startTime.getTime()) / 1000);
+        setElapsedSeconds(diff > 0 ? diff : 0);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isTracking, startTime]);
+
+  const handleStartTimer = () => {
+    const now = new Date();
+    setIsTracking(true);
+    setStartTime(now);
+    setElapsedSeconds(0);
+    
+    localStorage.setItem('dashfw_timer_start', now.toISOString());
+    localStorage.setItem('dashfw_timer_task', trackerTaskName);
+    localStorage.setItem('dashfw_timer_project', trackerProjectId);
+  };
+
+  const handleStopTimer = async () => {
+    if (!startTime) return;
+    setIsTracking(false);
+    const endTime = new Date();
+    
+    // Save to MongoDB
+    await addTimeLog({
+      projectId: trackerProjectId !== 'none' ? trackerProjectId : undefined,
+      taskName: trackerTaskName.trim() || 'General Work',
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      duration: elapsedSeconds,
+      note: ''
+    });
+    
+    // Clear localStorage
+    localStorage.removeItem('dashfw_timer_start');
+    localStorage.removeItem('dashfw_timer_task');
+    localStorage.removeItem('dashfw_timer_project');
+    
+    // Reset states
+    setTrackerTaskName('');
+    setTrackerProjectId('none');
+    setElapsedSeconds(0);
+    setStartTime(null);
+  };
+
+  const formatDuration = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return [
+      hours.toString().padStart(2, '0'),
+      minutes.toString().padStart(2, '0'),
+      seconds.toString().padStart(2, '0')
+    ].join(':');
+  };
+
+  // Week days calculation
+  const startOfCurrentWeek = useMemo(() => {
+    return startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
+  }, [currentDate]);
+
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => addDays(startOfCurrentWeek, i));
+  }, [startOfCurrentWeek]);
+
+  // Navigate calendar
+  const handlePrevWeek = () => setCurrentDate((prev) => subDays(prev, 7));
+  const handleNextWeek = () => setCurrentDate((prev) => addDays(prev, 7));
+  const handleToday = () => setCurrentDate(new Date());
+
+  // Find projects due on each day of the current week
+  const projectsByDay = useMemo(() => {
+    const map: { [key: string]: typeof projects } = {};
+    weekDays.forEach((day) => {
+      const dayKey = format(day, 'yyyy-MM-dd');
+      map[dayKey] = projects.filter((p) => {
+        if (!p.deadline) return false;
+        return isSameDay(new Date(p.deadline), day);
+      });
+    });
+    return map;
+  }, [weekDays, projects]);
+
+  // --- DATA PROCESSING FOR CHARTS ---
+
+  const clientMap = useMemo(() => {
+    return new Map(clients.map((c) => [c._id, c.name]));
+  }, [clients]);
+
+  // Proposals: real proposals value grouped by client
+  const proposalsData = useMemo(() => {
+    const groups: { [key: string]: number } = {};
+    proposals.forEach((p) => {
+      const clientName = p.client?.name || clientMap.get(p.clientId) || 'ทั่วไป';
+      groups[clientName] = (groups[clientName] || 0) + (p.total || 0);
+    });
+
+    const data = Object.keys(groups).map((key) => ({
+      name: key,
+      value: groups[key],
+    }));
+
+    if (data.length === 0) {
+      return [
+        { name: 'Sample A', value: 45000 },
+        { name: 'Sample B', value: 23000 },
+        { name: 'Sample C', value: 12000 },
+      ];
+    }
+    return data.slice(0, 4);
+  }, [proposals, clientMap]);
+
+  // Invoices: Paid invoices value grouped by client
+  const invoicesData = useMemo(() => {
+    const groups: { [key: string]: number } = {};
+    invoices
+      .filter((inv) => inv.status === 'Paid')
+      .forEach((inv) => {
+        const clientName = inv.client?.name || clientMap.get(inv.clientId) || 'ทั่วไป';
+        groups[clientName] = (groups[clientName] || 0) + (inv.total || 0);
+      });
+
+    const data = Object.keys(groups).map((key) => ({
+      name: key,
+      value: groups[key],
+    }));
+
+    if (data.length === 0) {
+      return [
+        { name: 'Sample A', value: 30000 },
+        { name: 'Sample B', value: 18000 },
+        { name: 'Sample C', value: 15000 },
+      ];
+    }
+    return data.slice(0, 4);
+  }, [invoices, clientMap]);
+
+  // Contracts: Project count grouped by status
+  const contractsData = useMemo(() => {
+    const counts: { [key: string]: number } = {
+      'Backlog': 0,
+      'In Progress': 0,
+      'Review': 0,
+      'Completed': 0,
+      'Paid': 0,
+    };
+    projects.forEach((p) => {
+      if (counts[p.status] !== undefined) {
+        counts[p.status]++;
+      }
+    });
+
+    return Object.keys(counts).map((key) => ({
+      name: key,
+      value: counts[key] * 100, // scaled for chart aesthetics
+    }));
+  }, [projects]);
+
+  // Projects status distribution (Donut)
+  const projectsStatusData = useMemo(() => {
+    const statusCounts: { [key: string]: number } = {};
+    projects.forEach((p) => {
+      statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
+    });
+
+    const data = Object.keys(statusCounts).map((status) => ({
+      name: status,
+      value: statusCounts[status],
+    }));
+
+    if (data.length === 0) {
+      return [
+        { name: 'In Progress', value: 3 },
+        { name: 'Review', value: 1 },
+        { name: 'Backlog', value: 2 },
+      ];
+    }
+    return data;
+  }, [projects]);
+
+  // Tasks Completion rate (Pie)
+  const tasksProgressData = useMemo(() => {
+    let completed = 0;
+    let total = 0;
+    projects.forEach((p) => {
+      if (p.subTasks) {
+        p.subTasks.forEach((t) => {
+          total++;
+          if (t.completed) completed++;
+        });
+      }
+    });
+
+    if (total === 0) {
+      return [
+        { name: 'Completed', value: 10 },
+        { name: 'Remaining', value: 5 },
+      ];
+    }
+    return [
+      { name: 'Completed', value: completed },
+      { name: 'Remaining', value: total - completed },
+    ];
+  }, [projects]);
+
+  // Timesheet: Completed projects value over the last 6 months
+  const timesheetData = useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      months.push(subMonths(new Date(), i));
+    }
+
+    return months.map((m) => {
+      const monthStart = startOfMonth(m);
+      const monthEnd = endOfMonth(m);
+      const label = format(m, 'MMM');
+
+      const completedVal = projects
+        .filter((p) => {
+          if (!p.deadline) return false;
+          const d = new Date(p.deadline);
+          return d >= monthStart && d <= monthEnd && (p.status === 'Completed' || p.status === 'Paid');
+        })
+        .reduce((sum, p) => sum + (p.gross_price || 0), 0);
+
+      return {
+        name: label,
+        value: completedVal,
+      };
+    });
+  }, [projects]);
+
+  const hasRealData = projects.length > 0;
+
+  if (
+    loadingProjects ||
+    loadingClients ||
+    loadingInvoices ||
+    loadingProposals ||
+    loadingTimeLogs
+  ) {
+    return <div className="p-8 text-center text-muted-foreground">Loading dashboard data...</div>;
+  }
+
   return (
-    <div className='flex flex-col gap-8'>
-      <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>
-              Active Projects
-            </CardTitle>
-            <Package className='h-4 w-4 text-muted-foreground' />
+    <div className='flex flex-col gap-6 p-1'>
+      {/* TIME TRACKER WIDGET */}
+      <Card className="border border-border/80 shadow-sm overflow-hidden bg-gradient-to-r from-card to-[#eae8f3]/25">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto flex-1">
+              <div className="flex items-center gap-2 shrink-0">
+                <Clock className={`w-5 h-5 text-primary shrink-0 ${isTracking ? 'animate-pulse' : ''}`} />
+                <span className="font-semibold text-sm text-foreground">Time Tracker</span>
+              </div>
+              <Input
+                type="text"
+                placeholder="What are you working on?"
+                value={trackerTaskName}
+                onChange={(e) => setTrackerTaskName(e.target.value)}
+                disabled={isTracking}
+                className="bg-background border-border/60 focus-visible:ring-primary w-full md:max-w-md h-10 rounded-xl"
+              />
+              <Select
+                value={trackerProjectId}
+                onValueChange={setTrackerProjectId}
+                disabled={isTracking}
+              >
+                <SelectTrigger className="w-full sm:w-[220px] bg-background border-border/60 h-10 rounded-xl">
+                  <SelectValue placeholder="Select Project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">General Time</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end shrink-0 border-t md:border-t-0 pt-3 md:pt-0">
+              <span className="font-mono text-2xl font-bold tracking-wider text-foreground select-none">
+                {formatDuration(elapsedSeconds)}
+              </span>
+              {isTracking ? (
+                <Button
+                  onClick={handleStopTimer}
+                  variant="destructive"
+                  className="w-28 h-10 rounded-xl font-semibold gap-2 shadow-sm shrink-0"
+                >
+                  <Square className="w-4 h-4 fill-current" /> Stop
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleStartTimer}
+                  className="w-28 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold gap-2 shadow-sm shrink-0"
+                >
+                  <Play className="w-4 h-4 fill-current" /> Start
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SECTION 1: WEEKLY CALENDAR (Top) */}
+      <Card className="border border-border/80 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+          <div className="flex items-center gap-3">
+            <CalendarIcon className="w-5 h-5 text-primary" />
+            <span className="text-xl font-bold tracking-tight">
+              {format(currentDate, 'MMMM yyyy')}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-lg">
+            <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs rounded-md" onClick={handleToday}>
+              Today
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={handlePrevWeek}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={handleNextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <div className="min-w-[800px] border-t grid grid-cols-8 divide-x text-sm">
+            {/* Hour labels column */}
+            <div className="flex flex-col divide-y bg-muted/20">
+              <div className="h-10 flex items-center justify-center font-semibold text-xs border-b bg-muted/40">Time</div>
+              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">All-day</div>
+              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">3:00 PM</div>
+              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">4:00 PM</div>
+              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">5:00 PM</div>
+              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">6:00 PM</div>
+            </div>
+
+            {/* Days columns */}
+            {weekDays.map((day) => {
+              const dayKey = format(day, 'yyyy-MM-dd');
+              const dayProjects = projectsByDay[dayKey] || [];
+              const isToday = isSameDay(day, new Date());
+
+              return (
+                <div key={dayKey} className="flex flex-col divide-y min-h-[300px]">
+                  {/* Day Header */}
+                  <div className={`h-10 flex flex-col items-center justify-center border-b ${isToday ? 'bg-primary/10 font-bold' : 'bg-muted/5'}`}>
+                    <span className="text-[10px] text-muted-foreground uppercase">{format(day, 'EEE')}</span>
+                    <span className={`text-sm ${isToday ? 'text-primary font-bold' : ''}`}>{format(day, 'd')}</span>
+                  </div>
+
+                  {/* All-day slot */}
+                  <div className="h-16 p-1 relative bg-background/50">
+                    {dayProjects.filter(p => p.status === 'Completed' || p.status === 'Paid').map(p => (
+                      <div key={p.id} className="text-[10px] p-1 mb-1 rounded bg-green-500/10 text-green-700 border border-green-500/20 truncate font-semibold">
+                        ✓ {p.title}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 3 PM slot */}
+                  <div className="h-16 p-1 relative bg-background/50">
+                    {dayProjects.filter(p => p.status === 'Review').map(p => (
+                      <div key={p.id} className="text-[10px] p-1.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/20 truncate font-semibold">
+                        ⌛ {p.title}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 4 PM slot */}
+                  <div className="h-16 p-1 relative bg-background/50">
+                    {dayProjects.filter(p => p.status === 'In Progress').map(p => (
+                      <div key={p.id} className="absolute inset-x-1 top-1 h-[68px] z-10 p-1.5 rounded bg-primary/95 text-primary-foreground border shadow-sm truncate font-semibold flex flex-col justify-between">
+                        <span className="text-[11px] leading-tight block">{p.title}</span>
+                        <span className="text-[9px] opacity-80 block font-normal">฿{p.gross_price?.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 5 PM slot */}
+                  <div className="h-16 p-1 relative bg-background/50" />
+
+                  {/* 6 PM slot */}
+                  <div className="h-16 p-1 relative bg-background/50">
+                    {dayProjects.filter(p => p.status === 'Backlog').map(p => (
+                      <div key={p.id} className="text-[10px] p-1.5 rounded bg-muted text-muted-foreground border truncate">
+                        💤 {p.title}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SECTION 2: 3-COLUMN BAR CHARTS GRID (Middle) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Proposals */}
+        <Card className="border border-border/80 shadow-sm relative">
+          {proposals.length === 0 && (
+            <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-[1px] flex flex-col items-center justify-center">
+              <Sparkles className="w-5 h-5 text-muted-foreground mb-1" />
+              <span className="text-xs font-semibold text-muted-foreground">⚠️ No real proposals yet</span>
+            </div>
+          )}
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">Proposals</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>5</div>
-            <p className='text-xs text-muted-foreground'>
-              2 in review, 3 in progress
-            </p>
+          <CardContent className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={proposalsData}>
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
+                  {proposalsData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>
-              Money in Pipeline
-            </CardTitle>
-            <DollarSign className='h-4 w-4 text-muted-foreground' />
+
+        {/* Invoices */}
+        <Card className="border border-border/80 shadow-sm relative">
+          {invoices.length === 0 && (
+            <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-[1px] flex flex-col items-center justify-center">
+              <Sparkles className="w-5 h-5 text-muted-foreground mb-1" />
+              <span className="text-xs font-semibold text-muted-foreground">⚠️ No paid invoices yet</span>
+            </div>
+          )}
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">Invoices</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>$1,850.00</div>
-            <p className='text-xs text-muted-foreground'>
-              From 5 active projects
-            </p>
+          <CardContent className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={invoicesData}>
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]}>
+                  {invoicesData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[(index + 1) % CHART_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>
-              Earnings this Month
-            </CardTitle>
-            <Wallet className='h-4 w-4 text-muted-foreground' />
+
+        {/* Contracts */}
+        <Card className="border border-border/80 shadow-sm relative">
+          {!hasRealData && (
+            <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-[1px] flex flex-col items-center justify-center">
+              <Sparkles className="w-5 h-5 text-muted-foreground mb-1" />
+              <span className="text-xs font-semibold text-muted-foreground">⚠️ No active projects yet</span>
+            </div>
+          )}
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">Contracts (Project Flow)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>$2,320.50</div>
-            <p className='text-xs text-muted-foreground'>
-              +15.2% from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>Open Tasks</CardTitle>
-            <ListTodo className='h-4 w-4 text-muted-foreground' />
-          </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>28</div>
-            <p className='text-xs text-muted-foreground'>Across all projects</p>
+          <CardContent className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={contractsData}>
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {contractsData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      <div className='grid grid-cols-1 gap-8 lg:grid-cols-2'>
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+      {/* SECTION 3: 3-COLUMN DETAIL CHARTS GRID (Bottom) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Projects status (Donut) */}
+        <Card className="border border-border/80 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">Projects Status</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ul className='space-y-4'>
-              <li className='flex items-center gap-4'>
-                <div className='rounded-full bg-primary/10 p-2 text-primary'>
-                  <Package className='h-4 w-4' />
-                </div>
-                <p className='text-sm'>
-                  <span className='font-semibold'>Suanson Hotel</span> project
-                  moved to 'Completed'.
-                </p>
-                <time className='ml-auto text-xs text-muted-foreground'>
-                  2h ago
-                </time>
-              </li>
-              <li className='flex items-center gap-4'>
-                <div className='rounded-full bg-accent/10 p-2 text-accent'>
-                  <DollarSign className='h-4 w-4' />
-                </div>
-                <p className='text-sm'>
-                  Received payment for{' '}
-                  <span className='font-semibold'>Only U Villa</span> project.
-                </p>
-                <time className='ml-auto text-xs text-muted-foreground'>
-                  1 day ago
-                </time>
-              </li>
-              <li className='flex items-center gap-4'>
-                <div className='rounded-full bg-primary/10 p-2 text-primary'>
-                  <ListTodo className='h-4 w-4' />
-                </div>
-                <p className='text-sm'>
-                  New revision requested for{' '}
-                  <span className='font-semibold'>
-                    "Digital Marketer Portfolio"
-                  </span>
-                  .
-                </p>
-                <time className='ml-auto text-xs text-muted-foreground'>
-                  3 days ago
-                </time>
-              </li>
-            </ul>
+          <CardContent className="h-[220px] flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={projectsStatusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {projectsStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend iconSize={8} layout="horizontal" align="center" verticalAlign="bottom" />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Upcoming Deadlines</CardTitle>
+        {/* Tasks status (Pie) */}
+        <Card className="border border-border/80 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">Tasks Progress</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ul className='space-y-4'>
-              <li className='flex items-center gap-4'>
-                <p className='text-sm font-semibold'>"Google Business SEO"</p>
-                <p className='text-sm text-destructive'>in 2 days</p>
-              </li>
-              <li className='flex items-center gap-4'>
-                <p className='text-sm font-semibold'>"New OTA Listing Setup"</p>
-                <p className='text-sm text-muted-foreground'>in 5 days</p>
-              </li>
-              <li className='flex items-center gap-4'>
-                <p className='text-sm font-semibold'>
-                  "E-commerce Site" final review
+          <CardContent className="h-[220px] flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={tasksProgressData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                  dataKey="value"
+                >
+                  {tasksProgressData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Timesheet (Line) */}
+        <Card className="border border-border/80 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">Timesheet (Monthly Velocity)</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={timesheetData}>
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* SECTION 4: RECENT TIME LOGS & BILLING OVERVIEW */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 border border-border/80 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary animate-spin-[20s]" /> Recent Time Logs
+            </CardTitle>
+            <CardDescription>Records of your tracked freelance hours</CardDescription>
+          </CardHeader>
+          <CardContent className="max-h-[300px] overflow-y-auto pr-1">
+            {timeLogs.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No time logs recorded yet. Start tracking above!
+              </div>
+            ) : (
+              <div className="divide-y divide-border/40">
+                {timeLogs.map((log) => (
+                  <div key={log.id} className="py-3 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{log.taskName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {log.projectTitle || 'General Time'} &bull; {format(new Date(log.startTime), 'MMM d, h:mm a')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs font-mono font-semibold bg-[#eae8f3] text-primary px-2.5 py-1 rounded-md">
+                        {formatDuration(log.duration)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => deleteTimeLog({ id: log.id! })}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card className="lg:col-span-1 border border-border/80 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" /> Billing Overview
+            </CardTitle>
+            <CardDescription>Quick summary of invoices & proposals</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3.5 bg-green-500/5 border border-green-500/10 rounded-2xl">
+              <div>
+                <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">PAID INVOICES</p>
+                <p className="text-xl font-bold text-green-700 mt-0.5">
+                  ฿{invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.total, 0).toLocaleString()}
                 </p>
-                <p className='text-sm text-muted-foreground'>in 1 week</p>
-              </li>
-            </ul>
+              </div>
+              <FileText className="w-8 h-8 text-green-600 opacity-60" />
+            </div>
+            
+            <div className="flex items-center justify-between p-3.5 bg-primary/5 border border-primary/10 rounded-2xl">
+              <div>
+                <p className="text-[10px] text-primary font-bold uppercase tracking-wider">SENT PROPOSALS</p>
+                <p className="text-xl font-bold text-primary mt-0.5">
+                  ฿{proposals.filter(p => p.status === 'Sent').reduce((sum, p) => sum + p.total, 0).toLocaleString()}
+                </p>
+              </div>
+              <FileText className="w-8 h-8 text-primary opacity-60" />
+            </div>
           </CardContent>
         </Card>
       </div>

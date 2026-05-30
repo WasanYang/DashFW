@@ -13,6 +13,8 @@ import {
   Wallet,
   BotMessageSquare,
   ListChecks,
+  FileText,
+  Settings,
 } from 'lucide-react';
 import {
   Sheet,
@@ -46,22 +48,23 @@ import { logout } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/job-types', label: 'Job Types', icon: LayoutGrid },
-  { href: '/board', label: 'Kanban Board', icon: Columns3 },
-  { href: '/clients', label: 'Clients & CRM', icon: Users },
-  { href: '/financials', label: 'Financials', icon: Wallet },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { href: '/board', label: 'Projects', icon: Columns3 },
+  { href: '/clients', label: 'Clients', icon: Users },
+  { href: '/invoices', label: 'Invoices & Proposals', icon: FileText },
+  { href: '/job-types', label: 'Job Templates', icon: Settings },
   { href: '/snippets', label: 'AI Snippets', icon: BotMessageSquare },
   { href: '/checklists', label: 'AI Checklists', icon: ListChecks },
 ];
 
 const breadcrumbLabels: { [key: string]: string } = {
   dashboard: 'Dashboard',
-  board: 'Board',
+  board: 'Projects',
   clients: 'Clients',
-  financials: 'Financials',
-  snippets: 'Snippets',
-  checklists: 'Checklists',
+  invoices: 'Invoices & Proposals',
+  'job-types': 'Job Templates',
+  snippets: 'AI Snippets',
+  checklists: 'AI Checklists',
 };
 
 export function Header() {
@@ -89,7 +92,7 @@ export function Header() {
   };
 
   return (
-    <header className='sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6'>
+    <header className='sticky top-0 z-30 flex h-16 items-center gap-4 bg-transparent px-4 sm:px-6'>
       <Sheet>
         <SheetTrigger asChild>
           <Button size='icon' variant='outline' className='sm:hidden'>
@@ -127,7 +130,7 @@ export function Header() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href='/'>Dashboard</Link>
+              <Link href='/dashboard'>Dashboard</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           {segments.map((segment, index) => {

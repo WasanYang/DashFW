@@ -1,14 +1,6 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -219,111 +211,92 @@ export function ClientList({ projects }: ClientListProps) {
                 Add Client
               </Button>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Client</TableHead>
-                    <TableHead className='text-center'>Projects</TableHead>
-                    <TableHead className='text-right'>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow key='loading'>
-                      <TableCell
-                        colSpan={3}
-                        className='text-center text-muted-foreground'
-                      >
-                        Loading...
-                      </TableCell>
-                    </TableRow>
-                  ) : error ? (
-                    <TableRow key='error'>
-                      <TableCell
-                        colSpan={3}
-                        className='text-center text-destructive'
-                      >
-                        Error loading clients
-                      </TableCell>
-                    </TableRow>
-                  ) : clients.length === 0 ? (
-                    <TableRow key='no-clients'>
-                      <TableCell
-                        colSpan={3}
-                        className='text-center text-muted-foreground'
-                      >
-                        No clients found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    clients.map((client) => {
-                      const completedProjectsCount = projects.filter(
-                        (p) =>
-                          p.clientId === client._id &&
-                          (p.status === 'Completed' || p.status === 'Paid'),
-                      ).length;
+            <CardContent className="px-2 sm:px-4">
+              {isLoading ? (
+                <div className='py-8 text-center text-sm text-muted-foreground'>
+                  Loading...
+                </div>
+              ) : error ? (
+                <div className='py-8 text-center text-sm text-destructive'>
+                  Error loading clients
+                </div>
+              ) : clients.length === 0 ? (
+                <div className='py-8 text-center text-sm text-muted-foreground'>
+                  No clients found.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                  {clients.map((client) => {
+                    const completedProjectsCount = projects.filter(
+                      (p) =>
+                        p.clientId === client._id &&
+                        (p.status === 'Completed' || p.status === 'Paid'),
+                    ).length;
+                    const isSelected = selectedClient?._id === client._id;
 
-                      return (
-                        <TableRow
-                          key={client._id}
-                          onClick={() => setSelectedClient(client)}
-                          className={`cursor-pointer ${
-                            selectedClient?._id === client._id
-                              ? 'bg-muted/50'
-                              : ''
-                          }`}
-                        >
-                          <TableCell className='flex items-center gap-3 font-medium'>
-                            <Avatar className='h-8 w-8'>
-                              <AvatarImage
-                                src={client.avatarUrl}
-                                alt={client.name}
-                                data-ai-hint='portrait person'
-                              />
-                              <AvatarFallback>
-                                {client.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className='truncate'>{client.name}</span>
-                          </TableCell>
-                          <TableCell className='text-center font-medium'>
-                            {completedProjectsCount}
-                          </TableCell>
-                          <TableCell>
-                            <div className='flex items-center justify-end gap-1'>
-                              <Button
-                                variant='ghost'
-                                size='icon'
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingClient(client);
-                                }}
-                                aria-label='Edit client'
+                    return (
+                      <div
+                        key={client._id}
+                        onClick={() => setSelectedClient(client)}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer",
+                          isSelected
+                            ? "border-primary/40 bg-[#eae8f3] text-primary shadow-sm"
+                            : "border-border/60 bg-card hover:bg-muted/40 text-foreground"
+                        )}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="h-9 w-9 shrink-0 border border-border/40">
+                            <AvatarImage
+                              src={client.avatarUrl}
+                              alt={client.name}
+                              data-ai-hint="portrait person"
+                            />
+                            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                              {client.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold text-sm truncate">{client.name}</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {completedProjectsCount} {completedProjectsCount === 1 ? 'project' : 'projects'} completed
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                            onClick={() => setEditingClient(client)}
+                            aria-label="Edit client"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {client.fastwork_link && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                              asChild
+                            >
+                              <a
+                                href={client.fastwork_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Fastwork profile"
                               >
-                                <Pencil className='h-4 w-4' />
-                              </Button>
-                              {client.fastwork_link && (
-                                <Button variant='ghost' size='icon' asChild>
-                                  <a
-                                    href={client.fastwork_link}
-                                    target='_blank'
-                                    rel='noopener noreferrer'
-                                    onClick={(e) => e.stopPropagation()}
-                                    aria-label='Fastwork profile'
-                                  >
-                                    <ExternalLink className='h-4 w-4' />
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

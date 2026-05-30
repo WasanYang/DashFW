@@ -1,11 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '../lib/mongodb';
-
-export type JobType = {
-  _id?: string;
-  name: string;
-  description?: string;
-};
+import type { JobType } from '@/lib/types';
 
 const COLLECTION = 'job_types';
 

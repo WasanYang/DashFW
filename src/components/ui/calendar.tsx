@@ -54,12 +54,10 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn('h-4 w-4', className)} {...props} />
-        ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn('h-4 w-4', className)} {...props} />
-        ),
+        Chevron: ({ orientation, className, ...props }: any) => {
+          const Component = orientation === 'left' ? ChevronLeft : ChevronRight;
+          return <Component className={cn('h-4 w-4', className)} {...props} />;
+        },
       }}
       // No disabled days, allow all dates to be picked
       {...props}

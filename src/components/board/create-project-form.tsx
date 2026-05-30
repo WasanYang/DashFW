@@ -26,13 +26,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Client, Project, SubTask } from '@/lib/types';
+import { Client, Project, SubTask, JobType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
 import { fetchJobTypes } from '@/services/jobTypeClient';
-import type { JobType } from '@/app/(protect)/job-types/page';
 
 interface CreateProjectFormProps {
   clients: Client[];
@@ -83,7 +82,7 @@ export function CreateProjectForm({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: 'subTasks',
   });
@@ -158,7 +157,18 @@ export function CreateProjectForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>ประเภทของงาน</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select
+                onValueChange={(val) => {
+                  field.onChange(val);
+                  const selectedJt = jobTypes.find((jt) => jt._id === val);
+                  if (selectedJt?.checklists) {
+                    replace(selectedJt.checklists.map((c) => ({ text: c.text })));
+                  } else {
+                    replace([]);
+                  }
+                }}
+                defaultValue={field.value}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder='เลือกประเภทของงาน' />
