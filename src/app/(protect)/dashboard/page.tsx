@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,7 +17,8 @@ import {
   Square,
   Trash2,
   Clock,
-  FileText
+  FileText,
+  Globe,
 } from 'lucide-react';
 import { useGetProjectsQuery } from '@/services/projectApi';
 import { useGetClientsQuery } from '@/services/clientApi';
@@ -27,14 +31,11 @@ import {
 } from '@/services/timeLogApi';
 import {
   format,
-  startOfWeek,
-  addDays,
-  isSameDay,
-  subDays,
   startOfMonth,
   endOfMonth,
   subMonths,
 } from 'date-fns';
+import { DashboardCalendar } from '@/components/dashboard/dashboard-calendar';
 import {
   BarChart,
   Bar,
@@ -63,8 +64,7 @@ export default function DashboardPage() {
   const [addTimeLog] = useAddTimeLogMutation();
   const [deleteTimeLog] = useDeleteTimeLogMutation();
 
-  // Calendar state
-  const [currentDate, setCurrentDate] = useState(new Date());
+
 
   // Time Tracker state
   const [isTracking, setIsTracking] = useState(false);
@@ -73,6 +73,37 @@ export default function DashboardPage() {
   const [trackerTaskName, setTrackerTaskName] = useState('');
   const [trackerProjectId, setTrackerProjectId] = useState('none');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Google Calendar Integration states
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+
+  useEffect(() => {
+    // Check connection status
+    fetch('/api/auth/google/status')
+      .then(res => res.json())
+      .then(data => setCalendarConnected(!!data.connected))
+      .catch(err => console.error('Error fetching calendar status:', err));
+  }, []);
+
+  const handleConnectCalendar = () => {
+    setIsSyncingCalendar(true);
+    window.location.href = '/api/auth/google';
+  };
+
+  const handleDisconnectCalendar = async () => {
+    setIsSyncingCalendar(true);
+    try {
+      const res = await fetch('/api/auth/google/status', { method: 'DELETE' });
+      if (res.ok) {
+        setCalendarConnected(false);
+      }
+    } catch (err) {
+      console.error('Error disconnecting calendar:', err);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
 
   // Load active timer from localStorage if page refreshes
   useEffect(() => {
@@ -158,32 +189,7 @@ export default function DashboardPage() {
     ].join(':');
   };
 
-  // Week days calculation
-  const startOfCurrentWeek = useMemo(() => {
-    return startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
-  }, [currentDate]);
 
-  const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(startOfCurrentWeek, i));
-  }, [startOfCurrentWeek]);
-
-  // Navigate calendar
-  const handlePrevWeek = () => setCurrentDate((prev) => subDays(prev, 7));
-  const handleNextWeek = () => setCurrentDate((prev) => addDays(prev, 7));
-  const handleToday = () => setCurrentDate(new Date());
-
-  // Find projects due on each day of the current week
-  const projectsByDay = useMemo(() => {
-    const map: { [key: string]: typeof projects } = {};
-    weekDays.forEach((day) => {
-      const dayKey = format(day, 'yyyy-MM-dd');
-      map[dayKey] = projects.filter((p) => {
-        if (!p.deadline) return false;
-        return isSameDay(new Date(p.deadline), day);
-      });
-    });
-    return map;
-  }, [weekDays, projects]);
 
   // --- DATA PROCESSING FOR CHARTS ---
 
@@ -349,7 +355,7 @@ export default function DashboardPage() {
   return (
     <div className='flex flex-col gap-6 p-1'>
       {/* TIME TRACKER WIDGET */}
-      <Card className="border border-border/80 shadow-sm overflow-hidden bg-gradient-to-r from-card to-[#eae8f3]/25">
+      <Card className="border border-border/80 shadow-sm overflow-hidden bg-gradient-to-r from-card to-primary/5">
         <CardContent className="p-4 sm:p-5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto flex-1">
@@ -409,98 +415,8 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* SECTION 1: WEEKLY CALENDAR (Top) */}
-      <Card className="border border-border/80 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-          <div className="flex items-center gap-3">
-            <CalendarIcon className="w-5 h-5 text-primary" />
-            <span className="text-xl font-bold tracking-tight">
-              {format(currentDate, 'MMMM yyyy')}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-lg">
-            <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs rounded-md" onClick={handleToday}>
-              Today
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={handlePrevWeek}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={handleNextWeek}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          <div className="min-w-[800px] border-t grid grid-cols-8 divide-x text-sm">
-            {/* Hour labels column */}
-            <div className="flex flex-col divide-y bg-muted/20">
-              <div className="h-10 flex items-center justify-center font-semibold text-xs border-b bg-muted/40">Time</div>
-              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">All-day</div>
-              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">3:00 PM</div>
-              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">4:00 PM</div>
-              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">5:00 PM</div>
-              <div className="h-16 px-2 py-1 text-xs text-muted-foreground">6:00 PM</div>
-            </div>
-
-            {/* Days columns */}
-            {weekDays.map((day) => {
-              const dayKey = format(day, 'yyyy-MM-dd');
-              const dayProjects = projectsByDay[dayKey] || [];
-              const isToday = isSameDay(day, new Date());
-
-              return (
-                <div key={dayKey} className="flex flex-col divide-y min-h-[300px]">
-                  {/* Day Header */}
-                  <div className={`h-10 flex flex-col items-center justify-center border-b ${isToday ? 'bg-primary/10 font-bold' : 'bg-muted/5'}`}>
-                    <span className="text-[10px] text-muted-foreground uppercase">{format(day, 'EEE')}</span>
-                    <span className={`text-sm ${isToday ? 'text-primary font-bold' : ''}`}>{format(day, 'd')}</span>
-                  </div>
-
-                  {/* All-day slot */}
-                  <div className="h-16 p-1 relative bg-background/50">
-                    {dayProjects.filter(p => p.status === 'Completed' || p.status === 'Paid').map(p => (
-                      <div key={p.id} className="text-[10px] p-1 mb-1 rounded bg-green-500/10 text-green-700 border border-green-500/20 truncate font-semibold">
-                        ✓ {p.title}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 3 PM slot */}
-                  <div className="h-16 p-1 relative bg-background/50">
-                    {dayProjects.filter(p => p.status === 'Review').map(p => (
-                      <div key={p.id} className="text-[10px] p-1.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/20 truncate font-semibold">
-                        ⌛ {p.title}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 4 PM slot */}
-                  <div className="h-16 p-1 relative bg-background/50">
-                    {dayProjects.filter(p => p.status === 'In Progress').map(p => (
-                      <div key={p.id} className="absolute inset-x-1 top-1 h-[68px] z-10 p-1.5 rounded bg-primary/95 text-primary-foreground border shadow-sm truncate font-semibold flex flex-col justify-between">
-                        <span className="text-[11px] leading-tight block">{p.title}</span>
-                        <span className="text-[9px] opacity-80 block font-normal">฿{p.gross_price?.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 5 PM slot */}
-                  <div className="h-16 p-1 relative bg-background/50" />
-
-                  {/* 6 PM slot */}
-                  <div className="h-16 p-1 relative bg-background/50">
-                    {dayProjects.filter(p => p.status === 'Backlog').map(p => (
-                      <div key={p.id} className="text-[10px] p-1.5 rounded bg-muted text-muted-foreground border truncate">
-                        💤 {p.title}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {/* SECTION 1: CALENDAR (Top) */}
+      <DashboardCalendar projects={projects} />
 
       {/* SECTION 2: 3-COLUMN BAR CHARTS GRID (Middle) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -686,7 +602,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs font-mono font-semibold bg-[#eae8f3] text-primary px-2.5 py-1 rounded-md">
+                      <span className="text-xs font-mono font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-md">
                         {formatDuration(log.duration)}
                       </span>
                       <Button
@@ -731,6 +647,39 @@ export default function DashboardPage() {
                 </p>
               </div>
               <FileText className="w-8 h-8 text-primary opacity-60" />
+            </div>
+
+            {/* Google Calendar Connection Widget */}
+            <Separator className="my-3" />
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Google Calendar</span>
+                <Badge variant="outline" className={cn("text-[9px] font-bold px-2 py-0.5 border-0 rounded-full",
+                  calendarConnected ? "bg-green-500/10 text-green-700" : "bg-muted text-muted-foreground"
+                )}>
+                  {calendarConnected ? 'Connected' : 'Not Connected'}
+                </Badge>
+              </div>
+              
+              {calendarConnected ? (
+                <Button
+                  onClick={handleDisconnectCalendar}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs text-destructive hover:text-destructive hover:bg-destructive/5 rounded-xl border-dashed h-9"
+                  disabled={isSyncingCalendar}
+                >
+                  {isSyncingCalendar ? 'Disconnecting...' : 'Disconnect Calendar'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleConnectCalendar}
+                  className="w-full text-xs bg-[#4285F4] hover:bg-[#4285F4]/90 text-white font-semibold rounded-xl h-9 flex items-center justify-center gap-1.5 shadow-sm"
+                  disabled={isSyncingCalendar}
+                >
+                  <Globe className="w-3.5 h-3.5" /> Connect Google Calendar
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

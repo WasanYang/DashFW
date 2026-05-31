@@ -274,7 +274,7 @@ export default function InvoicesProposalsPage() {
                           onClick={() => setSelectedInvoiceId(inv.id!)}
                           className={cn(
                             "p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
-                            isSel ? "bg-[#eae8f3] border-primary/45 text-primary shadow-sm" : "bg-card border-border/60 hover:bg-muted/40"
+                            isSel ? "bg-primary/10 border-primary/45 text-primary shadow-sm" : "bg-card border-border/60 hover:bg-muted/40"
                           )}
                         >
                           <div className="min-w-0">
@@ -311,7 +311,7 @@ export default function InvoicesProposalsPage() {
                           onClick={() => setSelectedProposalId(prop.id!)}
                           className={cn(
                             "p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
-                            isSel ? "bg-[#eae8f3] border-primary/45 text-primary shadow-sm" : "bg-card border-border/60 hover:bg-muted/40"
+                            isSel ? "bg-primary/10 border-primary/45 text-primary shadow-sm" : "bg-card border-border/60 hover:bg-muted/40"
                           )}
                         >
                           <div className="min-w-0">

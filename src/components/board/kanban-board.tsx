@@ -5,6 +5,14 @@ import Link from 'next/link';
 import { Project, ProjectStatus, Client, SubTask } from '@/lib/types';
 import { KanbanColumn } from './kanban-column';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Plus,
   DollarSign,
@@ -16,6 +24,9 @@ import {
   Check,
   X,
   CalendarIcon,
+  Search,
+  Table,
+  LayoutGrid,
 } from 'lucide-react';
 import {
   Dialog,
@@ -157,6 +168,8 @@ export function KanbanBoard({
   const [modalContent, setModalContent] = useState<Project | 'create' | null>(
     null,
   );
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingSubtitle, setIsEditingSubtitle] = useState(false);
@@ -243,16 +256,44 @@ export function KanbanBoard({
   const [addProjectMutation] = useAddProjectMutation();
   const [updateProjectMutation] = useUpdateProjectMutation();
 
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return projects;
+    const query = searchQuery.toLowerCase();
+    return projects.filter((p) => {
+      const titleMatch = p.title.toLowerCase().includes(query);
+      const clientName = clients.find((c) => c._id === p.clientId)?.name || '';
+      const clientMatch = clientName.toLowerCase().includes(query);
+      return titleMatch || clientMatch;
+    });
+  }, [projects, searchQuery, clients]);
+
   const groupedProjects = useMemo(() => {
     return columns.reduce(
       (acc, status) => {
-        acc[status] = projects
+        acc[status] = filteredProjects
           .filter((p) => p.status === status)
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         return acc;
       },
       {} as Record<ProjectStatus, Project[]>,
     );
+  }, [filteredProjects]);
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      Total: projects.length,
+      Backlog: 0,
+      'In Progress': 0,
+      Review: 0,
+      Completed: 0,
+      Paid: 0,
+    };
+    projects.forEach((p) => {
+      if (counts[p.status] !== undefined) {
+        counts[p.status]++;
+      }
+    });
+    return counts;
   }, [projects]);
 
   const handleDragStart = (
@@ -605,12 +646,96 @@ export function KanbanBoard({
 
   return (
     <>
-      <div className='flex-shrink-0 flex items-center justify-between mb-4'>
-        <h1 className='text-3xl font-bold'>Kanban Board</h1>
-        <Button onClick={() => setModalContent('create')}>
-          <Plus className='mr-2 h-4 w-4' />
-          New Project
-        </Button>
+      {/* HEADER CONTROLS */}
+      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 mt-2">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-foreground/90">Projects</h1>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Search bar */}
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/75" />
+            <Input
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 rounded-xl border-border/70 focus-visible:ring-primary w-full bg-background/50 shadow-2xs"
+            />
+          </div>
+
+          {/* View switcher */}
+          <div className="flex bg-muted p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs">
+            <Button
+              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+              size="sm"
+              className={cn(
+                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
+                viewMode === 'kanban'
+                  ? "bg-background text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setViewMode('kanban')}
+            >
+              <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> Kanban
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              className={cn(
+                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
+                viewMode === 'table'
+                  ? "bg-background text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setViewMode('table')}
+            >
+              <Table className="mr-1.5 h-3.5 w-3.5" /> Table
+            </Button>
+          </div>
+
+          {/* Static decoration buttons to match Plutio style header */}
+          <div className="hidden lg:flex items-center gap-1 bg-muted p-1 rounded-xl border border-border/40 shrink-0 shadow-2xs">
+            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Edit view</Button>
+            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Filter</Button>
+            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Group</Button>
+            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Order</Button>
+          </div>
+
+          <Button
+            onClick={() => setModalContent('create')}
+            className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-sm shrink-0"
+          >
+            <Plus className="mr-1.5 h-4 w-4" /> New Project
+          </Button>
+        </div>
+      </div>
+
+      {/* STATUS SUMMARY BAR - SOFT AND PREMIUM PILLS */}
+      <div className="flex-shrink-0 flex items-center gap-2.5 mb-6 flex-wrap select-none">
+        <div className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-slate-500" />
+          <span>{statusCounts.Total} Projects</span>
+        </div>
+        <div className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          <span>{statusCounts.Backlog} Backlog</span>
+        </div>
+        <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span>{statusCounts['In Progress']} In progress</span>
+        </div>
+        <div className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-orange-500" />
+          <span>{statusCounts.Review} Review</span>
+        </div>
+        <div className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-purple-500" />
+          <span>{statusCounts.Completed} Completed</span>
+        </div>
+        <div className="bg-slate-500/10 text-slate-700 dark:text-slate-400 border border-slate-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
+          <span>{statusCounts.Paid} Paid</span>
+        </div>
       </div>
 
       <Dialog
@@ -1223,26 +1348,156 @@ export function KanbanBoard({
         </DialogContent>
       </Dialog>
 
-      <div className='flex w-full gap-4 overflow-x-auto pb-4 min-h-screen'>
-        {columns.map((status) => (
-          <KanbanColumn
-            key={status}
-            status={status}
-            projects={groupedProjects[status]}
-            onDrop={handleDrop}
-            onDragStart={(e, projectId, index) => {
-              e.dataTransfer.setData('projectId', projectId);
-              e.dataTransfer.setData('fromIndex', String(index));
-              e.dataTransfer.setData('fromStatus', status);
-            }}
-            onCardDrop={(fromIdx, toIdx) =>
-              handleCardDrop(fromIdx, toIdx, status, status)
-            }
-            updateProject={updateProject}
-            onCardClick={handleCardClick}
-          />
-        ))}
-      </div>
+      {viewMode === 'table' ? (
+        <Card className="border border-border/50 shadow-sm overflow-hidden bg-card rounded-2xl mb-8">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-border/30 bg-muted/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80 text-left">
+                  <th className="py-3 px-5 w-12 text-center"></th>
+                  <th className="py-3 px-5">Project</th>
+                  <th className="py-3 px-5">Project Client</th>
+                  <th className="py-3 px-5 w-44">Status</th>
+                  <th className="py-3 px-5 w-20">Members</th>
+                  <th className="py-3 px-5 w-48">Progress</th>
+                  <th className="py-3 px-5 w-36 text-right pr-8">Budget</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {filteredProjects.map((project) => {
+                  const client = clients.find((c) => c._id === project.clientId);
+                  const progress = calculateProgress(project.subTasks);
+                  const [totalTasks, doneTasks] = countAll(project.subTasks);
+
+                  return (
+                    <tr
+                      key={project.id}
+                      className="hover:bg-muted/15 transition-all duration-150 group"
+                    >
+                      {/* Checkbox circle */}
+                      <td className="py-4 px-5 text-center align-middle">
+                        <div className="w-4 h-4 rounded-full border border-muted-foreground/25 hover:border-primary/80 hover:bg-primary/5 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-105" />
+                      </td>
+
+                      {/* Project Title */}
+                      <td className="py-4 px-5 font-bold text-foreground/90 align-middle">
+                        <span
+                          onClick={() => handleCardClick(project)}
+                          className="cursor-pointer hover:text-primary hover:underline transition-all"
+                        >
+                          {project.title}
+                        </span>
+                      </td>
+
+                      {/* Project Client */}
+                      <td className="py-4 px-5 text-muted-foreground align-middle">
+                        {client ? (
+                          <span className="inline-flex items-center bg-primary/5 text-primary border border-primary/10 font-bold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                            {client.name}
+                          </span>
+                        ) : (
+                          <span className="italic text-xs opacity-60">No client</span>
+                        )}
+                      </td>
+
+                      {/* Status Dropdown - Pill badge select */}
+                      <td className="py-4 px-5 align-middle">
+                        <Select
+                          value={project.status}
+                          onValueChange={(val) =>
+                            updateProject({ ...project, status: val as ProjectStatus })
+                          }
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              "h-7 w-32 font-bold text-[10px] rounded-full border border-transparent shadow-3xs uppercase tracking-wider transition-all duration-200 focus:ring-0 focus-visible:ring-0",
+                              project.status === "Completed" || project.status === "Paid"
+                                ? "bg-green-500/10 text-green-700 hover:bg-green-500/15"
+                                : project.status === "Review"
+                                ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/15"
+                                : project.status === "In Progress"
+                                ? "bg-primary/10 text-primary hover:bg-primary/15"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            )}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="Backlog">Backlog</SelectItem>
+                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            <SelectItem value="Review">Review</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="Paid">Paid</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+
+                      {/* Members */}
+                      <td className="py-4 px-5 align-middle">
+                        <Avatar className="h-6.5 w-6.5 border border-primary/10 shadow-3xs">
+                          <AvatarFallback className="bg-primary/5 text-primary font-bold text-[10px]">
+                            W
+                          </AvatarFallback>
+                        </Avatar>
+                      </td>
+
+                      {/* Progress */}
+                      <td className="py-4 px-5 align-middle">
+                        <div className="flex items-center gap-3">
+                          <Progress value={progress} className="h-1.5 w-24 bg-muted/80" />
+                          <span className="text-[10px] font-bold text-muted-foreground/85 whitespace-nowrap">
+                            {totalTasks > 0 ? `${doneTasks}/${totalTasks} tasks` : "No tasks"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Budget (Price) */}
+                      <td className="py-4 px-5 text-right font-black text-foreground/80 align-middle pr-8">
+                        {project.gross_price > 0
+                          ? `฿${project.gross_price.toLocaleString()}`
+                          : "฿0"}
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {/* Footer row: Create project */}
+                <tr className="bg-muted/5 hover:bg-muted/10 transition-colors">
+                  <td colSpan={7} className="p-0">
+                    <div
+                      onClick={() => setModalContent("create")}
+                      className="px-8 py-4 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
+                    >
+                      <Plus className="h-4 w-4" /> Create new project
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : (
+        <div className="flex w-full gap-4 overflow-x-auto pb-4 min-h-screen">
+          {columns.map((status) => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              projects={groupedProjects[status]}
+              onDrop={handleDrop}
+              onDragStart={(e, projectId, index) => {
+                e.dataTransfer.setData('projectId', projectId);
+                e.dataTransfer.setData('fromIndex', String(index));
+                e.dataTransfer.setData('fromStatus', status);
+              }}
+              onCardDrop={(fromIdx, toIdx) =>
+                handleCardDrop(fromIdx, toIdx, status, status)
+              }
+              updateProject={updateProject}
+              onCardClick={handleCardClick}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }

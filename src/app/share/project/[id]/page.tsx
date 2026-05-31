@@ -123,7 +123,7 @@ export default function PublicProjectSharePage() {
 
         {/* MAIN PROGRESS CARD */}
         <Card className="border-0 shadow-md bg-card overflow-hidden rounded-2xl">
-          <div className="bg-gradient-to-r from-primary/10 to-[#eae8f3]/20 p-6 sm:p-8 border-b border-border/40">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-6 sm:p-8 border-b border-border/40">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
