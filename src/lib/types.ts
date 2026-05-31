@@ -44,6 +44,16 @@ export type Client = {
   avatarUrl?: string;
   socials?: Social[];
   notes?: string;
+  firstName?: string;
+  lastName?: string;
+  userRole?: string;
+  phone?: string;
+  companyName?: string;
+  role?: string;
+  isCompany?: boolean;
+  manager?: boolean;
+  inviteToWorkspace?: boolean;
+  customFields?: { label: string; value: string }[];
 };
 
 export type Snippet = {

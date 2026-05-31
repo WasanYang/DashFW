@@ -1,19 +1,11 @@
 'use client';
 
+import React from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
+import { Form, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import {
   Select,
   SelectContent,
@@ -21,51 +13,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PlusCircle, Trash2 } from 'lucide-react';
-import { Social } from '@/lib/types';
+import { Trash2, HelpCircle } from 'lucide-react';
+import { Client, Social } from '@/lib/types';
 
-const socialSchema = z.object({
-  id: z.string().optional(),
-  platform: z.string().min(1, 'Platform is required'),
-  value: z.string().min(1, 'Value is required'),
-});
-
+// Zod validation schema
 const schema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().optional(),
+  userRole: z.string().default('Client'),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
-  fastwork_link: z
-    .string()
-    .url('Fastwork link must be a valid URL')
-    .optional()
-    .or(z.literal('')),
-  avatarUrl: z
-    .string()
-    .url('Avatar URL must be a valid URL')
-    .optional()
-    .or(z.literal('')),
-  notes: z.string().optional(),
-  socials: z.array(socialSchema).optional(),
+  phone: z.string().optional(),
+  companyName: z.string().optional(),
+  role: z.string().optional(),
+  manager: z.boolean().default(false),
+  inviteToWorkspace: z.boolean().default(false),
+  customFields: z
+    .array(
+      z.object({
+        label: z.string().min(1, 'Field name is required'),
+        value: z.string().min(1, 'Field value is required'),
+      })
+    )
+    .optional(),
 });
 
 export type ClientFormValues = z.infer<typeof schema>;
 
 type ClientFormProps = {
   mode: 'create' | 'edit';
-  defaultValues?: Partial<ClientFormValues>;
-  onSubmit: (values: ClientFormValues) => void;
+  defaultValues?: Partial<Client>;
+  onSubmit: (values: Client & { firstName: string; lastName: string }) => void;
   submitLabel: string;
   onCancel: () => void;
   isLoading?: boolean;
 };
 
-const socialPlatforms = [
-  'Facebook',
-  'Instagram',
-  'Line',
-  'Phone',
-  'Website',
-  'Other',
-];
+// Plutio visual style helper classes
+const stackedInputClass =
+  'flex flex-col border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 rounded-[14px] focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all';
+const labelClass =
+  'text-[10px] font-bold text-[#8b8ba9] dark:text-slate-400 uppercase tracking-wider select-none mb-0.5';
+const inputClass =
+  'bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 w-full h-5';
 
 export function ClientForm({
   mode,
@@ -75,185 +64,485 @@ export function ClientForm({
   onCancel,
   isLoading,
 }: ClientFormProps) {
+  // Parsing defaults from the unstructured client notes field for backwards compatibility
+  const fullName = defaultValues?.name || '';
+  const firstSpaceIdx = fullName.indexOf(' ');
+  let defaultFirstName = defaultValues?.firstName || '';
+  let defaultLastName = defaultValues?.lastName || '';
+  if (!defaultFirstName && fullName) {
+    if (firstSpaceIdx === -1) {
+      defaultFirstName = fullName;
+    } else {
+      defaultFirstName = fullName.substring(0, firstSpaceIdx);
+      defaultLastName = fullName.substring(firstSpaceIdx + 1);
+    }
+  }
+
+  const defaultPhone =
+    defaultValues?.phone ||
+    defaultValues?.socials?.find((s) => s.platform === 'Phone')?.value ||
+    '';
+
+  let defaultCompany = defaultValues?.companyName || '';
+  let defaultRole = defaultValues?.role || '';
+  let defaultUserRole = defaultValues?.userRole || 'Client';
+  let defaultManager = defaultValues?.manager || false;
+  let defaultInvite = defaultValues?.inviteToWorkspace || false;
+  const defaultCustomFields: { label: string; value: string }[] =
+    defaultValues?.customFields || [];
+
+  // If missing structured properties, attempt parsing notes
+  if (defaultValues?.notes) {
+    const lines = defaultValues.notes.split('\n');
+    lines.forEach((line) => {
+      const lower = line.toLowerCase();
+      if (lower.startsWith('company:') && !defaultCompany) {
+        defaultCompany = line.substring(8).trim();
+      } else if (lower.startsWith('role:') && !defaultRole) {
+        defaultRole = line.substring(5).trim();
+      } else if (lower.startsWith('user_role:') && defaultUserRole === 'Client') {
+        defaultUserRole = line.substring(10).trim();
+      } else if (lower.startsWith('manager:')) {
+        defaultManager = line.substring(8).trim() === 'true';
+      } else if (lower.startsWith('invite_to_workspace:')) {
+        defaultInvite = line.substring(20).trim() === 'true';
+      } else if (lower.startsWith('custom_field:')) {
+        const parts = line.substring(13).split(':');
+        if (parts.length >= 2 && defaultCustomFields.length === 0) {
+          defaultCustomFields.push({
+            label: parts[0],
+            value: parts.slice(1).join(':'),
+          });
+        }
+      }
+    });
+  }
+
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      name: defaultValues?.name ?? '',
-      email: defaultValues?.email ?? '',
-      fastwork_link: defaultValues?.fastwork_link ?? '',
-      avatarUrl: defaultValues?.avatarUrl ?? '',
-      notes: defaultValues?.notes ?? '',
-      socials: defaultValues?.socials ?? [],
+      firstName: defaultFirstName,
+      lastName: defaultLastName,
+      userRole: defaultUserRole,
+      email: defaultValues?.email || '',
+      phone: defaultPhone,
+      companyName: defaultCompany,
+      role: defaultRole,
+      manager: defaultManager,
+      inviteToWorkspace: defaultInvite,
+      customFields: defaultCustomFields,
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const {
+    fields: customFields,
+    append: appendCustomField,
+    remove: removeCustomField,
+  } = useFieldArray({
     control: form.control,
-    name: 'socials',
+    name: 'customFields',
   });
+
+  const handleFormSubmit = (formValues: ClientFormValues) => {
+    // Reconstruct name and compatibility fields
+    const newName = `${formValues.firstName} ${formValues.lastName || ''}`.trim();
+
+    // Prepare socials (ensure Phone is added or updated)
+    const updatedSocials: Social[] = [...(defaultValues?.socials || [])];
+    const phoneIdx = updatedSocials.findIndex((s) => s.platform === 'Phone');
+    if (formValues.phone) {
+      if (phoneIdx > -1) {
+        updatedSocials[phoneIdx] = {
+          ...updatedSocials[phoneIdx],
+          value: formValues.phone,
+        };
+      } else {
+        updatedSocials.push({
+          id: `soc-phone-${Date.now()}`,
+          platform: 'Phone',
+          value: formValues.phone,
+        });
+      }
+    } else if (phoneIdx > -1) {
+      updatedSocials.splice(phoneIdx, 1);
+    }
+
+    // Compile compatibility notes block
+    const notesLines: string[] = [];
+    if (formValues.companyName) {
+      notesLines.push(`company: ${formValues.companyName}`);
+    }
+    if (formValues.role) {
+      notesLines.push(`role: ${formValues.role}`);
+    }
+    if (formValues.userRole) {
+      notesLines.push(`user_role: ${formValues.userRole}`);
+    }
+    if (formValues.phone) {
+      notesLines.push(`phone: ${formValues.phone}`);
+    }
+    notesLines.push(`manager: ${formValues.manager ? 'true' : 'false'}`);
+    notesLines.push(
+      `invite_to_workspace: ${formValues.inviteToWorkspace ? 'true' : 'false'}`
+    );
+
+    if (formValues.customFields && formValues.customFields.length > 0) {
+      formValues.customFields.forEach((cf) => {
+        notesLines.push(`custom_field:${cf.label}:${cf.value}`);
+      });
+    }
+
+    // Append original notes (filtering auto-generated fields to prevent duplicates)
+    if (defaultValues?.notes) {
+      const originalNotes = defaultValues.notes
+        .split('\n')
+        .filter((line) => {
+          const lower = line.toLowerCase();
+          return (
+            !lower.startsWith('company:') &&
+            !lower.startsWith('role:') &&
+            !lower.startsWith('user_role:') &&
+            !lower.startsWith('phone:') &&
+            !lower.startsWith('manager:') &&
+            !lower.startsWith('invite_to_workspace:') &&
+            !lower.startsWith('custom_field:')
+          );
+        })
+        .join('\n');
+      if (originalNotes.trim()) {
+        notesLines.push(originalNotes.trim());
+      }
+    }
+
+    // Submit object
+    const submitPayload: Client & { firstName: string; lastName: string } = {
+      _id: defaultValues?._id || '',
+      name: newName,
+      fastwork_link: defaultValues?.fastwork_link || '',
+      avatarUrl: defaultValues?.avatarUrl || '',
+      email: formValues.email || '',
+      socials: updatedSocials,
+      notes: notesLines.join('\n'),
+      firstName: formValues.firstName,
+      lastName: formValues.lastName || '',
+      userRole: formValues.userRole,
+      phone: formValues.phone || '',
+      companyName: formValues.companyName || '',
+      role: formValues.role || '',
+      manager: formValues.manager,
+      inviteToWorkspace: formValues.inviteToWorkspace,
+      customFields: formValues.customFields || [],
+    };
+
+    onSubmit(submitPayload);
+  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+      <form
+        onSubmit={form.handleSubmit(handleFormSubmit)}
+        className="space-y-4"
+      >
+        {/* Name Fields (Side by Side) */}
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="firstName"
+            render={({ field }) => (
+              <FormItem className="space-y-0">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>First name*</span>
+                  <input
+                    className={inputClass}
+                    placeholder="Enter first name"
+                    {...field}
+                  />
+                </div>
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="lastName"
+            render={({ field }) => (
+              <FormItem className="space-y-0">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>Last name</span>
+                  <input
+                    className={inputClass}
+                    placeholder="Enter last name"
+                    {...field}
+                  />
+                </div>
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* User Role (Select Dropdown) */}
         <FormField
           control={form.control}
-          name='name'
+          name="userRole"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input placeholder='Client or business name' {...field} />
-              </FormControl>
-              <FormMessage />
+            <FormItem className="space-y-0">
+              <div className={`${stackedInputClass} relative pr-10`}>
+                <span className={labelClass}>User role</span>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value || 'Client'}
+                >
+                  <SelectTrigger className="border-none p-0 h-auto bg-transparent focus:ring-0 text-[13px] text-foreground shadow-none">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="Client">Client</SelectItem>
+                    <SelectItem value="Collaborator">Collaborator</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                  </SelectContent>
+                </Select>
+                <HelpCircle className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 cursor-help" />
+              </div>
+              <FormMessage className="text-[11px] mt-1 text-destructive" />
             </FormItem>
           )}
         />
 
+        {/* Email Address */}
         <FormField
           control={form.control}
-          name='email'
+          name="email"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input
-                  type='email'
-                  placeholder='contact@example.com'
+            <FormItem className="space-y-0">
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Email address</span>
+                <input
+                  className={inputClass}
+                  type="email"
+                  placeholder="name@domain.com"
                   {...field}
                 />
-              </FormControl>
-              <FormMessage />
+              </div>
+              <FormMessage className="text-[11px] mt-1 text-destructive" />
             </FormItem>
           )}
         />
 
+        {/* Phone Number */}
         <FormField
           control={form.control}
-          name='fastwork_link'
+          name="phone"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Fastwork Link</FormLabel>
-              <FormControl>
-                <Input
-                  type='url'
-                  placeholder='https://fastwork.co/user/...'
+            <FormItem className="space-y-0">
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Phone number</span>
+                <input
+                  className={inputClass}
+                  placeholder="Enter phone number"
                   {...field}
                 />
-              </FormControl>
-              <FormMessage />
+              </div>
+              <FormMessage className="text-[11px] mt-1 text-destructive" />
             </FormItem>
           )}
         />
 
-        <FormField
-          control={form.control}
-          name='avatarUrl'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Avatar URL</FormLabel>
-              <FormControl>
-                <Input type='url' placeholder='https://...' {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div>
-          <FormLabel>Socials</FormLabel>
-          <div className='space-y-2 mt-2'>
-            {fields.map((field, index) => (
-              <div key={field.id} className='flex items-center gap-2'>
-                <FormField
-                  control={form.control}
-                  name={`socials.${index}.platform`}
-                  render={({ field }) => (
-                    <FormItem className='w-1/3'>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder='Platform' />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {socialPlatforms.map((platform) => (
-                            <SelectItem key={platform} value={platform}>
-                              {platform}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+        {/* Company & Role (Combined) */}
+        <div className="grid grid-cols-[2fr_1fr] border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 rounded-[14px] divide-x divide-[#d0d0eb] dark:divide-slate-700 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all overflow-hidden">
+          <FormField
+            control={form.control}
+            name="companyName"
+            render={({ field }) => (
+              <FormItem className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                <span className={labelClass}>Company name</span>
+                <input
+                  className={inputClass}
+                  placeholder="Company name"
+                  {...field}
                 />
-                <FormField
-                  control={form.control}
-                  name={`socials.${index}.value`}
-                  render={({ field }) => (
-                    <FormItem className='flex-grow'>
-                      <FormControl>
-                        <Input
-                          placeholder='Username, ID, or Phone'
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                <span className={labelClass}>Role</span>
+                <input className={inputClass} placeholder="Role" {...field} />
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Dynamic Custom Fields */}
+        {customFields.length > 0 && (
+          <div className="space-y-3">
+            {customFields.map((item, index) => (
+              <div key={item.id} className="flex items-center gap-2">
+                <div className="flex-1 grid grid-cols-[1fr_2fr] border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 rounded-[14px] divide-x divide-[#d0d0eb] dark:divide-slate-700 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all overflow-hidden">
+                  <FormField
+                    control={form.control}
+                    name={`customFields.${index}.label`}
+                    render={({ field }) => (
+                      <FormItem className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                        <span className={labelClass}>Field Label</span>
+                        <input
+                          className={inputClass}
+                          placeholder="e.g. Birthday"
                           {...field}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`customFields.${index}.value`}
+                    render={({ field }) => (
+                      <FormItem className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                        <span className={labelClass}>Field Value</span>
+                        <input
+                          className={inputClass}
+                          placeholder="e.g. 12 May"
+                          {...field}
+                        />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  onClick={() => remove(index)}
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-[14px] border border-dashed border-[#d0d0eb] dark:border-slate-700 shrink-0"
+                  onClick={() => removeCustomField(index)}
                 >
-                  <Trash2 className='h-4 w-4' />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Add Custom Field Button */}
+        <button
+          type="button"
+          onClick={() => appendCustomField({ label: '', value: '' })}
+          className="w-full flex items-center justify-between border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-muted/50 rounded-[14px] p-3 text-muted-foreground transition-all"
+        >
+          <div className="flex items-center gap-3 font-semibold text-xs text-[#8b8ba9] dark:text-slate-300">
+            <div className="h-4 w-4 rounded-md border border-current flex items-center justify-center text-[10px] font-bold">
+              +
+            </div>
+            <span>Add custom field</span>
+          </div>
+          <HelpCircle className="h-4 w-4 text-muted-foreground/40" />
+        </button>
+
+        {/* Separator - More Options */}
+        <div className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-dashed border-[#d0d0eb] dark:border-slate-700"></div>
+          <span className="flex-shrink mx-4 text-[10px] font-bold text-[#8b8ba9] dark:text-slate-400 select-none uppercase tracking-widest">
+            More options
+          </span>
+          <div className="flex-grow border-t border-dashed border-[#d0d0eb] dark:border-slate-700"></div>
+        </div>
+
+        {/* Toggle Controls */}
+        <div className="space-y-3 px-1">
+          {/* Manager Toggle */}
+          <FormField
+            control={form.control}
+            name="manager"
+            render={({ field }) => (
+              <FormItem className="space-y-0 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={field.value || false}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-6 bg-[#d0d0eb]/50 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                  <span className="text-[13px] font-semibold text-[#2c2c54] dark:text-slate-200">
+                    Manager
+                  </span>
+                </div>
+                <HelpCircle className="h-4 w-4 text-muted-foreground/40 cursor-help" />
+              </FormItem>
+            )}
+          />
+
+          {/* Invite Toggle */}
+          <FormField
+            control={form.control}
+            name="inviteToWorkspace"
+            render={({ field }) => (
+              <FormItem className="space-y-0 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={field.value || false}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-6 bg-[#d0d0eb]/50 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                  <span className="text-[13px] font-semibold text-[#2c2c54] dark:text-slate-200">
+                    Invite to workspace
+                  </span>
+                </div>
+                <HelpCircle className="h-4 w-4 text-muted-foreground/40 cursor-help" />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Submit Actions (only rendered if needed inside modal context) */}
+        {mode === 'edit' && (
+          <div className="flex gap-3 pt-4 border-t border-border/20">
             <Button
-              type='button'
-              variant='outline'
-              size='sm'
-              className='mt-2'
-              onClick={() => append({ platform: '', value: '' })}
+              type="submit"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl"
+              disabled={isLoading}
             >
-              <PlusCircle className='mr-2 h-4 w-4' />
-              Add Social
+              {isLoading ? 'Loading...' : submitLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="flex-1 rounded-xl"
+            >
+              Cancel
             </Button>
           </div>
-        </div>
-
-        <FormField
-          control={form.control}
-          name='notes'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder='Additional details or notes about the client...'
-                  rows={5}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className='flex gap-3 pt-2'>
-          <Button type='submit' disabled={isLoading}>
-            {isLoading ? 'Loading...' : submitLabel}
-          </Button>
-          <Button type='button' variant='outline' onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
+        )}
+        {mode === 'create' && (
+          <div className="flex gap-3 pt-4 border-t border-border/20">
+            <Button
+              type="submit"
+              className="flex-1 bg-[#47c947] hover:bg-[#3fb33f] text-white font-bold rounded-xl"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Creating...' : submitLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="flex-1 rounded-xl"
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
       </form>
     </Form>
   );

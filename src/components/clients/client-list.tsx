@@ -23,6 +23,8 @@ import {
   LayoutGrid,
   Building2,
   FolderKanban,
+  Trash2,
+  HelpCircle,
 } from 'lucide-react';
 import { Client, Project, Social, SubTask } from '@/lib/types';
 import {
@@ -96,6 +98,7 @@ const calculateProgress = (tasks: SubTask[] | undefined): number => {
 };
 
 const getClientCompany = (client: Client): string => {
+  if (client.companyName) return client.companyName;
   if (client.notes) {
     const lines = client.notes.split('\n');
     for (const line of lines) {
@@ -139,6 +142,27 @@ export function ClientList({ projects }: ClientListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'people' | 'companies'>('people');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+
+  // States for Company Creation / Edit (Plutio redesign)
+  const [isCompanyCreateOpen, setIsCompanyCreateOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<{
+    name: string;
+    clients: Client[];
+    status: 'Active' | 'Pending' | 'Inactive';
+    projectsCount: number;
+  } | null>(null);
+  const [compFormName, setCompFormName] = useState('');
+  const [compFormEmail, setCompFormEmail] = useState('');
+  const [compFormPhone, setCompFormPhone] = useState('');
+  const [compFormCustomFields, setCompFormCustomFields] = useState<{ label: string; value: string }[]>([]);
+
+  // Style constants for stacked inputs
+  const stackedInputClass =
+    'flex flex-col border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 rounded-[14px] focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all';
+  const labelClass =
+    'text-[10px] font-bold text-[#8b8ba9] dark:text-slate-400 uppercase tracking-wider select-none mb-0.5';
+  const inputClass =
+    'bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 w-full h-5';
 
   // Dynamic client statuses and projects
   const clientStatusMap = useMemo(() => {
@@ -246,9 +270,10 @@ export function ClientList({ projects }: ClientListProps) {
   }, [clients, clientStatusMap, activeTab, companiesList]);
 
   const filteredClients = useMemo(() => {
-    if (!searchQuery.trim()) return clients;
+    const actualPeople = clients.filter(c => !c.isCompany);
+    if (!searchQuery.trim()) return actualPeople;
     const query = searchQuery.toLowerCase();
-    return clients.filter(c => 
+    return actualPeople.filter(c => 
       c.name.toLowerCase().includes(query) || 
       c.email.toLowerCase().includes(query) ||
       (c.notes && c.notes.toLowerCase().includes(query))
@@ -261,8 +286,9 @@ export function ClientList({ projects }: ClientListProps) {
       if (prev && clients.some((c) => c._id === prev._id)) {
         return clients.find((c) => c._id === prev._id) || null;
       }
-      if (!prev && clients.length > 0) {
-        return clients[0];
+      const actualPeople = clients.filter(c => !c.isCompany);
+      if (!prev && actualPeople.length > 0) {
+        return actualPeople[0];
       }
       return prev;
     });
@@ -281,6 +307,22 @@ export function ClientList({ projects }: ClientListProps) {
     });
   }, [companiesList]);
 
+  // Load company form values when editing
+  useEffect(() => {
+    if (editingCompany) {
+      const placeholder = editingCompany.clients.find(c => c.isCompany);
+      setCompFormName(editingCompany.name);
+      setCompFormEmail(placeholder ? placeholder.email : '');
+      setCompFormPhone(placeholder ? (placeholder.phone || placeholder.socials?.find(s => s.platform === 'Phone')?.value || '') : '');
+      setCompFormCustomFields(placeholder ? (placeholder.customFields || []) : []);
+    } else {
+      setCompFormName('');
+      setCompFormEmail('');
+      setCompFormPhone('');
+      setCompFormCustomFields([]);
+    }
+  }, [editingCompany]);
+
   const activeCompanyInfo = useMemo(() => {
     return companiesList.find((c) => c.name === selectedCompany) || null;
   }, [companiesList, selectedCompany]);
@@ -289,37 +331,105 @@ export function ClientList({ projects }: ClientListProps) {
     (p) => p.clientId === selectedClient?._id,
   );
 
-  const handleAddClient = async (values: ClientFormValues) => {
-    await addClient({
-      ...values,
-      avatarUrl: values.avatarUrl?.trim() || undefined,
-      socials: values.socials?.map((s, i) => ({
-        ...s,
-        id: s.id ?? `soc-${Date.now()}-${i}`, // ให้ id เป็น string เสมอ
-      })),
-    });
-    // get the newly created client from the API response and set it as selected
+  const handleAddClient = async (values: any) => {
+    await addClient(values);
     await refetch();
     setIsCreateOpen(false);
   };
 
-  const handleEditClient = async (values: ClientFormValues) => {
-    console.log('handleEditClient', editingClient);
+  const handleEditClient = async (values: any) => {
     if (!editingClient || !editingClient._id) return;
     await updateClient({
       _id: editingClient._id,
-      data: {
-        ...values,
-        avatarUrl: values.avatarUrl?.trim() || undefined,
-        socials: values.socials?.map((s) => ({
-          ...s,
-          id: s.id ?? '', // ให้ id เป็น string เสมอ
-        })),
-      },
+      data: values,
     });
     await refetch();
     setEditingClient(null);
     setIsCreateOpen(false);
+  };
+
+  const handleCompanySubmit = async () => {
+    if (!compFormName.trim()) return;
+    
+    const name = compFormName.trim();
+    const email = compFormEmail.trim();
+    const phone = compFormPhone.trim();
+    const customFields = compFormCustomFields.filter(f => f.label.trim() && f.value.trim());
+
+    if (editingCompany) {
+      // 1. Update/create placeholder client document in DB
+      const placeholder = editingCompany.clients.find(c => c.isCompany);
+      if (placeholder) {
+        await updateClient({
+          _id: placeholder._id,
+          data: {
+            name: name,
+            companyName: name,
+            email: email,
+            phone: phone,
+            socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
+            notes: `company: ${name}\nisCompany: true\nphone: ${phone}` + 
+                   (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
+            customFields: customFields,
+          }
+        });
+      } else {
+        await addClient({
+          name: name,
+          companyName: name,
+          email: email,
+          isCompany: true,
+          phone: phone,
+          socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
+          notes: `company: ${name}\nisCompany: true\nphone: ${phone}` + 
+                 (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
+          customFields: customFields,
+          fastwork_link: '',
+        });
+      }
+
+      // 2. Cascade rename companyName to all members of the company
+      for (const client of editingCompany.clients) {
+        if (client.isCompany) continue;
+        const updatedNotes = client.notes ? client.notes.split('\n').map(line => {
+          if (line.toLowerCase().startsWith('company:')) {
+            return `company: ${name}`;
+          }
+          return line;
+        }).join('\n') : `company: ${name}`;
+
+        await updateClient({
+          _id: client._id,
+          data: {
+            companyName: name,
+            notes: updatedNotes
+          }
+        });
+      }
+      setEditingCompany(null);
+    } else {
+      // Create new company
+      await addClient({
+        name: name,
+        companyName: name,
+        email: email,
+        isCompany: true,
+        phone: phone,
+        socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
+        notes: `company: ${name}\nisCompany: true\nphone: ${phone}` + 
+               (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
+        customFields: customFields,
+        fastwork_link: '',
+      });
+      setIsCompanyCreateOpen(false);
+    }
+
+    await refetch();
+    // Reset form states
+    setCompFormName('');
+    setCompFormEmail('');
+    setCompFormPhone('');
+    setCompFormCustomFields([]);
   };
 
   const renderSocialLink = (social: Social, idx: number) => {
@@ -464,10 +574,16 @@ export function ClientList({ projects }: ClientListProps) {
         </div>
 
         <Button
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => {
+            if (activeTab === 'companies') {
+              setIsCompanyCreateOpen(true);
+            } else {
+              setIsCreateOpen(true);
+            }
+          }}
           className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-sm shrink-0"
         >
-          <Plus className="mr-1.5 h-4 w-4" /> Add someone
+          <Plus className="mr-1.5 h-4 w-4" /> Add {activeTab === 'companies' ? 'company' : 'someone'}
         </Button>
       </div>
 
@@ -647,18 +763,20 @@ export function ClientList({ projects }: ClientListProps) {
                     <th className="py-3 px-5">Projects</th>
                     <th className="py-3 px-5 w-32">Status</th>
                     <th className="py-3 px-5">Primary Contact</th>
+                    <th className="py-3 px-5 w-24 text-right pr-8"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
                   {filteredCompanies.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                      <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                         No companies found.
                       </td>
                     </tr>
                   ) : (
                     filteredCompanies.map((company) => {
-                      const primaryClient = company.clients[0] || null;
+                      const actualClients = company.clients.filter(c => !c.isCompany);
+                      const primaryClient = actualClients[0] || null;
 
                       return (
                         <tr
@@ -691,21 +809,25 @@ export function ClientList({ projects }: ClientListProps) {
                           {/* Team / Contacts (Avatars) */}
                           <td className="py-4 px-5 align-middle">
                             <div className="flex -space-x-2 overflow-hidden">
-                              {company.clients.map((c) => (
-                                <Tooltip key={c._id}>
-                                  <TooltipTrigger asChild>
-                                    <Avatar className="h-7 w-7 border-2 border-background shadow-3xs shrink-0 cursor-pointer hover:translate-y-[-2px] transition-transform">
-                                      <AvatarImage src={c.avatarUrl} alt={c.name} />
-                                      <AvatarFallback className="bg-primary/5 text-primary font-bold text-[10px]">
-                                        {c.name.charAt(0)}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="text-xs">
-                                    {c.name} ({c.email})
-                                  </TooltipContent>
-                                </Tooltip>
-                              ))}
+                              {actualClients.length === 0 ? (
+                                <span className="text-xs text-muted-foreground/75 italic">No contacts</span>
+                              ) : (
+                                actualClients.map((c) => (
+                                  <Tooltip key={c._id}>
+                                    <TooltipTrigger asChild>
+                                      <Avatar className="h-7 w-7 border-2 border-background shadow-3xs shrink-0 cursor-pointer hover:translate-y-[-2px] transition-transform">
+                                        <AvatarImage src={c.avatarUrl} alt={c.name} />
+                                        <AvatarFallback className="bg-primary/5 text-primary font-bold text-[10px]">
+                                          {c.name.charAt(0)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      {c.name} ({c.email})
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ))
+                              )}
                             </div>
                           </td>
 
@@ -736,10 +858,37 @@ export function ClientList({ projects }: ClientListProps) {
                           <td className="py-4 px-5 text-muted-foreground align-middle font-medium">
                             {primaryClient ? `${primaryClient.name} (${primaryClient.email})` : '-'}
                           </td>
+
+                          {/* Actions */}
+                          <td className="py-4 px-5 text-right align-middle pr-8">
+                            <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg"
+                                onClick={() => setEditingCompany(company)}
+                                aria-label="Edit company"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })
                   )}
+
+                  {/* Footer row: Add company */}
+                  <tr className="bg-muted/5 hover:bg-muted/10 transition-colors">
+                    <td colSpan={7} className="p-0">
+                      <div
+                        onClick={() => setIsCompanyCreateOpen(true)}
+                        className="px-8 py-4 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
+                      >
+                        <Plus className="h-4 w-4" /> Add company
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -1189,19 +1338,17 @@ export function ClientList({ projects }: ClientListProps) {
 
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className='sm:max-w-[625px]'>
-          <DialogHeader>
-            <DialogTitle>Add New Client</DialogTitle>
-            <DialogDescription>
-              Fill in the form below to add a new client to your CRM.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-[500px] p-6 rounded-[20px] overflow-hidden border border-border/40">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-bold text-[#2c2c54] dark:text-white">Create profile</DialogTitle>
           </DialogHeader>
-          <ScrollArea className='max-h-[70vh] pr-6 -mr-6'>
+          <ScrollArea className="max-h-[75vh] pr-2">
             <ClientForm
-              mode='create'
+              mode="create"
               onSubmit={handleAddClient}
-              submitLabel='Create Client'
+              submitLabel="Create profile"
               onCancel={() => setIsCreateOpen(false)}
+              isLoading={isAddingClient}
             />
           </ScrollArea>
         </DialogContent>
@@ -1212,23 +1359,174 @@ export function ClientList({ projects }: ClientListProps) {
         open={!!editingClient}
         onOpenChange={(open) => !open && setEditingClient(null)}
       >
-        <DialogContent className='sm:max-w-[625px]'>
-          <DialogHeader>
-            <DialogTitle>Edit Client</DialogTitle>
-            <DialogDescription>
-              Update the details for {editingClient?.name}.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-[500px] p-6 rounded-[20px] overflow-hidden border border-border/40">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-bold text-[#2c2c54] dark:text-white">Edit profile</DialogTitle>
           </DialogHeader>
-          <ScrollArea className='max-h-[70vh] pr-6 -mr-6'>
+          <ScrollArea className="max-h-[75vh] pr-2">
             <ClientForm
-              mode='edit'
+              mode="edit"
               defaultValues={editingClient || undefined}
               onSubmit={handleEditClient}
-              submitLabel='Save Changes'
+              submitLabel="Save profile"
               onCancel={() => setEditingClient(null)}
               isLoading={isUpdatingClient || isAddingClient}
             />
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create / Edit Company Dialog (Plutio style) */}
+      <Dialog open={isCompanyCreateOpen || !!editingCompany} onOpenChange={(open) => {
+        if (!open) {
+          setIsCompanyCreateOpen(false);
+          setEditingCompany(null);
+          setCompFormName('');
+          setCompFormEmail('');
+          setCompFormPhone('');
+          setCompFormCustomFields([]);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px] p-6 rounded-[20px] border border-border/40">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-bold text-[#2c2c54] dark:text-white">
+              {editingCompany ? 'Edit company' : 'Create company'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 pt-2">
+            {/* Company Name */}
+            <div className={stackedInputClass}>
+              <span className={labelClass}>Company name*</span>
+              <input
+                className={inputClass}
+                placeholder="Enter company name"
+                value={compFormName}
+                onChange={(e) => setCompFormName(e.target.value)}
+              />
+            </div>
+
+            {/* Email Address */}
+            <div className={stackedInputClass}>
+              <span className={labelClass}>Email address</span>
+              <input
+                className={inputClass}
+                type="email"
+                placeholder="company@domain.com"
+                value={compFormEmail}
+                onChange={(e) => setCompFormEmail(e.target.value)}
+              />
+            </div>
+
+            {/* Phone Number */}
+            <div className={stackedInputClass}>
+              <span className={labelClass}>Phone number</span>
+              <input
+                className={inputClass}
+                placeholder="Enter phone number"
+                value={compFormPhone}
+                onChange={(e) => setCompFormPhone(e.target.value)}
+              />
+            </div>
+
+            {/* Custom Fields List */}
+            {compFormCustomFields.length > 0 && (
+              <div className="space-y-3">
+                {compFormCustomFields.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="flex-grow grid grid-cols-[1fr_2fr] border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 rounded-[14px] divide-x divide-[#d0d0eb] dark:divide-slate-700 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all overflow-hidden">
+                      <div className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                        <span className={labelClass}>Field Label</span>
+                        <input
+                          className={inputClass}
+                          placeholder="Label"
+                          value={item.label}
+                          onChange={(e) => {
+                            const updated = [...compFormCustomFields];
+                            updated[index].label = e.target.value;
+                            setCompFormCustomFields(updated);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                        <span className={labelClass}>Field Value</span>
+                        <input
+                          className={inputClass}
+                          placeholder="Value"
+                          value={item.value}
+                          onChange={(e) => {
+                            const updated = [...compFormCustomFields];
+                            updated[index].value = e.target.value;
+                            setCompFormCustomFields(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-[14px] border border-dashed border-[#d0d0eb] dark:border-slate-700 shrink-0"
+                      onClick={() => {
+                        setCompFormCustomFields(compFormCustomFields.filter((_, idx) => idx !== index));
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Custom Field Button */}
+            <button
+              type="button"
+              onClick={() => setCompFormCustomFields([...compFormCustomFields, { label: '', value: '' }])}
+              className="w-full flex items-center justify-between border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-muted/50 rounded-[14px] p-3 text-muted-foreground transition-all"
+            >
+              <div className="flex items-center gap-3 font-semibold text-xs text-[#8b8ba9] dark:text-slate-300">
+                <div className="h-4 w-4 rounded-md border border-current flex items-center justify-center text-[10px] font-bold">
+                  +
+                </div>
+                <span>Add custom field</span>
+              </div>
+              <HelpCircle className="h-4 w-4 text-muted-foreground/40" />
+            </button>
+
+            {/* Action Buttons (Plutio styling) */}
+            <div className="flex gap-3 pt-4 border-t border-border/20">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsCompanyCreateOpen(false);
+                  setEditingCompany(null);
+                  setCompFormName('');
+                  setCompFormEmail('');
+                  setCompFormPhone('');
+                  setCompFormCustomFields([]);
+                }}
+                className="flex-1 rounded-[14px] h-10 border border-[#d0d0eb] text-muted-foreground bg-slate-50 hover:bg-slate-100 font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCompanySubmit}
+                disabled={!compFormName.trim() || isAddingClient || isUpdatingClient}
+                className={cn(
+                  "flex-1 rounded-[14px] h-10 font-bold transition-all flex items-center justify-center gap-1.5",
+                  compFormName.trim()
+                    ? "bg-[#47c947] hover:bg-[#3fb33f] text-white"
+                    : "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300"
+                )}
+              >
+                {compFormName.trim()
+                  ? (editingCompany ? 'Save changes' : 'Create company →')
+                  : 'Enter company name to continue →'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
