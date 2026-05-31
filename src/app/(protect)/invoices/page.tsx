@@ -58,6 +58,11 @@ export default function InvoicesProposalsPage() {
 
   // Navigation tab: 'invoices' | 'proposals'
   const [activeTab, setActiveTab] = useState<'invoices' | 'proposals'>('invoices');
+
+  const formatCurrency = (amount: number, currency?: string) => {
+    const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '฿';
+    return `${symbol}${amount?.toLocaleString()}`;
+  };
   
   // Selection states
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
@@ -79,6 +84,8 @@ export default function InvoicesProposalsPage() {
   const [formItems, setFormItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, rate: 0, amount: 0 }
   ]);
+  const [formCurrency, setFormCurrency] = useState('THB');
+  const [formPaymentMethod, setFormPaymentMethod] = useState('Bank Transfer');
 
   function addDays(date: Date, days: number): Date {
     const result = new Date(date);
@@ -151,6 +158,8 @@ export default function InvoicesProposalsPage() {
     setFormTaxRate(0);
     setFormDiscount(0);
     setFormItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
+    setFormCurrency('THB');
+    setFormPaymentMethod('Bank Transfer');
   };
 
   const handleOpenCreate = () => {
@@ -171,12 +180,16 @@ export default function InvoicesProposalsPage() {
         invoiceNumber: formDocNumber,
         clientId: formClientId,
         projectId: formProjectId !== 'none' ? formProjectId : undefined,
+        title: formTitle || `Invoice ${formDocNumber}`,
         issueDate: new Date(formIssueDate).toISOString(),
         dueDate: new Date(formEndDate).toISOString(),
         items: formItems,
         taxRate: formTaxRate,
         discount: formDiscount,
         total: total > 0 ? total : 0,
+        subtotal: subTotal,
+        currency: formCurrency,
+        paymentMethod: formPaymentMethod,
         status: 'Draft',
         notes: formNotes
       });
@@ -199,7 +212,7 @@ export default function InvoicesProposalsPage() {
   };
 
   const handleMarkPaid = async (id: string) => {
-    await updateInvoice({ id, data: { status: 'Paid' } });
+    await updateInvoice({ id, data: { status: 'Paid', paidAt: new Date().toISOString() } });
   };
 
   const handleMarkAccepted = async (id: string) => {
@@ -282,7 +295,7 @@ export default function InvoicesProposalsPage() {
                             <p className="text-xs text-muted-foreground truncate">{inv.client?.name || 'General Client'}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="font-semibold text-sm text-foreground">฿{inv.total?.toLocaleString()}</p>
+                            <p className="font-semibold text-sm text-foreground">{formatCurrency(inv.total ?? 0, inv.currency)}</p>
                             <Badge className={cn("text-[9px] h-4 px-1.5 rounded-full mt-1 border-0",
                               inv.status === 'Paid' ? 'bg-green-500/10 text-green-700' :
                               inv.status === 'Sent' ? 'bg-blue-500/10 text-blue-700' :
@@ -381,7 +394,10 @@ export default function InvoicesProposalsPage() {
                     <div className="flex justify-between items-start gap-4">
                       <div>
                         <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">INVOICE</h2>
-                        <p className="text-xs text-slate-500 font-bold mt-1 tracking-widest">{activeInvoice.invoiceNumber}</p>
+                        {activeInvoice.title && (
+                          <p className="text-sm font-semibold text-slate-700 mt-1">{activeInvoice.title}</p>
+                        )}
+                        <p className="text-xs text-slate-500 font-bold mt-0.5 tracking-widest">{activeInvoice.invoiceNumber}</p>
                       </div>
                       <div className="text-right">
                         <h3 className="font-bold text-base text-primary">wasan</h3>
@@ -431,8 +447,8 @@ export default function InvoicesProposalsPage() {
                             <tr key={idx} className="hover:bg-slate-50/50">
                               <td className="py-4 pr-4 font-medium">{item.description}</td>
                               <td className="py-4 px-4 text-center">{item.quantity}</td>
-                              <td className="py-4 px-4 text-right">฿{item.rate?.toLocaleString()}</td>
-                              <td className="py-4 pl-4 text-right font-semibold">฿{item.amount?.toLocaleString()}</td>
+                              <td className="py-4 px-4 text-right">{formatCurrency(item.rate ?? 0, activeInvoice.currency)}</td>
+                              <td className="py-4 pl-4 text-right font-semibold">{formatCurrency(item.amount ?? 0, activeInvoice.currency)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -442,38 +458,44 @@ export default function InvoicesProposalsPage() {
 
                   {/* SUMMARY SECTION */}
                   <div className="mt-8 pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between gap-6 text-xs">
-                    <div className="max-w-xs">
+                    <div className="max-w-xs space-y-4">
+                      {activeInvoice.paymentMethod && (
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Payment Method</p>
+                          <p className="text-slate-700 font-semibold">{activeInvoice.paymentMethod}</p>
+                        </div>
+                      )}
                       {activeInvoice.notes && (
-                        <>
-                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-2">Notes</p>
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
                           <p className="text-slate-500 whitespace-pre-wrap leading-relaxed">{activeInvoice.notes}</p>
-                        </>
+                        </div>
                       )}
                     </div>
                     
                     <div className="w-64 shrink-0 space-y-2 text-right">
                       <div className="flex justify-between text-slate-500">
                         <span>Subtotal</span>
-                        <span>฿{activeInvoice.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}</span>
+                        <span>{formatCurrency(activeInvoice.items.reduce((sum, item) => sum + item.amount, 0), activeInvoice.currency)}</span>
                       </div>
                       {activeInvoice.taxRate > 0 && (
                         <div className="flex justify-between text-slate-500">
                           <span>Tax ({activeInvoice.taxRate}%)</span>
                           <span>
-                            ฿{Math.round(activeInvoice.items.reduce((sum, item) => sum + item.amount, 0) * (activeInvoice.taxRate / 100)).toLocaleString()}
+                            {formatCurrency(Math.round(activeInvoice.items.reduce((sum, item) => sum + item.amount, 0) * (activeInvoice.taxRate / 100)), activeInvoice.currency)}
                           </span>
                         </div>
                       )}
                       {activeInvoice.discount > 0 && (
                         <div className="flex justify-between text-slate-500">
                           <span>Discount</span>
-                          <span>-฿{activeInvoice.discount.toLocaleString()}</span>
+                          <span>-{formatCurrency(activeInvoice.discount, activeInvoice.currency)}</span>
                         </div>
                       )}
                       <Separator className="bg-slate-200" />
                       <div className="flex justify-between text-base font-bold text-slate-800">
                         <span>Total Due</span>
-                        <span>฿{activeInvoice.total?.toLocaleString()}</span>
+                        <span>{formatCurrency(activeInvoice.total ?? 0, activeInvoice.currency)}</span>
                       </div>
                     </div>
                   </div>
@@ -662,21 +684,34 @@ export default function InvoicesProposalsPage() {
             </div>
 
             {activeTab === 'invoices' ? (
-              <div className="space-y-1">
-                <Label htmlFor="project">Project Link (Optional)</Label>
-                <Select value={formProjectId} onValueChange={setFormProjectId}>
-                  <SelectTrigger id="project" className="rounded-xl border-border/60">
-                    <SelectValue placeholder="Select Project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">General Invoice (No Project)</SelectItem>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="invoiceTitle">Invoice Title</Label>
+                  <Input
+                    id="invoiceTitle"
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="e.g. Website Development"
+                    required
+                    className="rounded-xl border-border/60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="project">Project Link (Optional)</Label>
+                  <Select value={formProjectId} onValueChange={setFormProjectId}>
+                    <SelectTrigger id="project" className="rounded-xl border-border/60">
+                      <SelectValue placeholder="Select Project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">General Invoice (No Project)</SelectItem>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             ) : (
               <div className="space-y-1">
@@ -716,6 +751,40 @@ export default function InvoicesProposalsPage() {
                 />
               </div>
             </div>
+
+            {activeTab === 'invoices' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select value={formCurrency} onValueChange={setFormCurrency}>
+                    <SelectTrigger id="currency" className="rounded-xl border-border/60">
+                      <SelectValue placeholder="Select Currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="THB">Thai Baht (฿)</SelectItem>
+                      <SelectItem value="USD">US Dollar ($)</SelectItem>
+                      <SelectItem value="EUR">Euro (€)</SelectItem>
+                      <SelectItem value="GBP">British Pound (£)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Select value={formPaymentMethod} onValueChange={setFormPaymentMethod}>
+                    <SelectTrigger id="paymentMethod" className="rounded-xl border-border/60">
+                      <SelectValue placeholder="Select Payment Method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="PromptPay">PromptPay</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Credit Card">Credit Card</SelectItem>
+                      <SelectItem value="PayPal">PayPal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
 
             {/* BILLABLE ITEMS */}
             <div className="space-y-2">

@@ -15,19 +15,47 @@ export type ProjectStatus =
 
 export type Project = {
   id: string;
-  order?: number; // ลำดับใน column
-  orderNo?: string;
   title: string;
   subtitle?: string;
   clientId: string;
-  jobTypeId?: string; // เพิ่มฟิลด์ประเภทของงาน
-  status: ProjectStatus;
+  details?: string;
+  startDate?: string | Date;
+  deadline?: string | Date;
+  gross_price?: number;
+  hourlyRate?: number;
+  currency?: string;
+  color?: string;
+  archived?: boolean;
+  billable?: boolean;
+  revisions?: number;
+  client?: Client | null;
+  status?: string;
+};
+
+export type Task = {
+  id: string;
+  order?: number; // ลำดับใน column
+  orderNo?: string;
+  title: string;
+  details?: string;
+  projectId?: string; // Links to parent Project Container
+  clientId: string;   // Keeping client ID reference
+  jobTypeId?: string; // Job type reference
+  status: ProjectStatus; // Backlog, In Progress, etc.
   gross_price: number;
   deadline: Date;
   revisions: number;
   subTasks?: SubTask[];
   client?: Client | null;
-  details?: string;
+  projectTitle?: string; // De-normalized title for convenience
+  color?: string;
+  archived?: boolean;
+  subtitle?: string;
+  startDate?: string | Date;
+  billable?: boolean;
+  hourlyRate?: number;
+  currency?: string;
+  repeats?: string;
 };
 
 export type Social = {
@@ -54,6 +82,13 @@ export type Client = {
   manager?: boolean;
   inviteToWorkspace?: boolean;
   customFields?: { label: string; value: string }[];
+  address?: string;
+  city_state?: string;
+  country?: string;
+  zip?: string;
+  timezone?: string;
+  bio?: string;
+  date_of_birth?: string;
 };
 
 export type Snippet = {
@@ -88,6 +123,12 @@ export type TimeLog = {
   endTime: string; // ISO String
   duration: number; // in seconds
   note?: string;
+  contactId?: string;
+  billable?: boolean;
+  costRate?: number;
+  billingRate?: number;
+  costStatus?: 'Paid' | 'Unpaid';
+  category?: string;
 };
 
 export type InvoiceItem = {
@@ -114,6 +155,11 @@ export type Invoice = {
   status: InvoiceStatus;
   notes?: string;
   client?: Client | null;
+  title?: string;
+  subtotal?: number;
+  paymentMethod?: string;
+  paidAt?: string;
+  currency?: string;
 };
 
 export type ProposalStatus = 'Draft' | 'Sent' | 'Accepted' | 'Declined';

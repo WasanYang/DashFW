@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, DragEvent } from 'react';
 import Link from 'next/link';
-import { Project, ProjectStatus, Client, SubTask } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import { Project, Task, ProjectStatus, Client, SubTask } from '@/lib/types';
 import { KanbanColumn } from './kanban-column';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,6 +28,10 @@ import {
   Search,
   Table,
   LayoutGrid,
+  Archive,
+  User,
+  ArrowRight,
+  FolderOpen,
 } from 'lucide-react';
 import {
   Dialog,
@@ -41,6 +46,7 @@ import { format } from 'date-fns';
 import { Separator } from '../ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import { Progress } from '../ui/progress';
+import { Badge } from '@/components/ui/badge';
 import {
   Accordion,
   AccordionContent,
@@ -53,16 +59,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import {
-  useAddProjectMutation,
-  useUpdateProjectMutation,
-} from '@/services/projectApi';
+  useAddTaskMutation,
+  useUpdateTaskMutation,
+} from '@/services/taskApi';
 import { EditableQuillField } from '../ui/editable-quill-field';
 import { formatNumber } from '@/lib/number-format';
 import { fetchJobTypes } from '@/services/jobTypeClient';
 import type { JobType } from '@/app/(protect)/job-types/page';
 
 interface KanbanBoardProps {
-  initialProjects: Project[];
+  initialTasks: Task[];
+  projects: Project[];
   clients: Client[];
 }
 
@@ -161,15 +168,20 @@ const calculateProgress = (tasks: SubTask[] | undefined): number => {
 };
 
 export function KanbanBoard({
-  initialProjects,
+  initialTasks,
+  projects: projectContainers,
   clients,
-}: Omit<KanbanBoardProps, 'translations'>) {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [modalContent, setModalContent] = useState<Project | 'create' | null>(
+}: KanbanBoardProps) {
+  const router = useRouter();
+  const [projects, setProjects] = useState<Task[]>(initialTasks);
+  const [modalContent, setModalContent] = useState<Task | 'create' | null>(
     null,
   );
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+  const [activeTaskFilter, setActiveTaskFilter] = useState<'all' | 'my' | 'delegated' | 'following' | 'today'>('all');
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingSubtitle, setIsEditingSubtitle] = useState(false);
@@ -251,21 +263,41 @@ export function KanbanBoard({
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [isEditingRevisions, setIsEditingRevisions] = useState(false);
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
-  const [editableProject, setEditableProject] = useState<Project | null>(null);
+  const [isEditingStartDate, setIsEditingStartDate] = useState(false);
+  const [isEditingHourlyRate, setIsEditingHourlyRate] = useState(false);
+  const [editableProject, setEditableProject] = useState<Task | null>(null);
 
-  const [addProjectMutation] = useAddProjectMutation();
-  const [updateProjectMutation] = useUpdateProjectMutation();
+  const [addTaskMutation] = useAddTaskMutation();
+  const [updateTaskMutation] = useUpdateTaskMutation();
 
   const filteredProjects = useMemo(() => {
-    if (!searchQuery.trim()) return projects;
+    let list = projects;
+    if (!showArchived) {
+      list = list.filter((p) => !p.archived);
+    }
+    if (selectedProjectId !== 'all') {
+      list = list.filter((p) => p.projectId === selectedProjectId);
+    } else {
+      if (activeTaskFilter === 'today') {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        list = list.filter((t) => t.deadline && format(new Date(t.deadline), 'yyyy-MM-dd') === todayStr);
+      } else if (activeTaskFilter === 'my') {
+        list = list.filter((t) => !t.projectId);
+      } else if (activeTaskFilter === 'delegated') {
+        list = list.filter((t) => t.gross_price > 0);
+      } else if (activeTaskFilter === 'following') {
+        list = list.filter((t) => t.revisions > 0);
+      }
+    }
+    if (!searchQuery.trim()) return list;
     const query = searchQuery.toLowerCase();
-    return projects.filter((p) => {
+    return list.filter((p) => {
       const titleMatch = p.title.toLowerCase().includes(query);
       const clientName = clients.find((c) => c._id === p.clientId)?.name || '';
       const clientMatch = clientName.toLowerCase().includes(query);
       return titleMatch || clientMatch;
     });
-  }, [projects, searchQuery, clients]);
+  }, [projects, searchQuery, clients, showArchived, selectedProjectId, activeTaskFilter]);
 
   const groupedProjects = useMemo(() => {
     return columns.reduce(
@@ -275,7 +307,7 @@ export function KanbanBoard({
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         return acc;
       },
-      {} as Record<ProjectStatus, Project[]>,
+      {} as Record<ProjectStatus, Task[]>,
     );
   }, [filteredProjects]);
 
@@ -323,7 +355,7 @@ export function KanbanBoard({
       const fromId = fromCol[fromIndex]?.id;
       if (!fromId) return prev;
       let newProjects = [...prev];
-      let updated: Project[] = [];
+      let updated: Task[] = [];
       if (fromStatus === toStatus) {
         // reorder ใน column เดียวกัน
         const col = [...fromCol];
@@ -365,7 +397,7 @@ export function KanbanBoard({
       }
       // Sync เฉพาะ status/order ไป backend
       updated.forEach((proj) => {
-        updateProjectMutation({
+        updateTaskMutation({
           id: proj.id,
           data: {
             status: proj.status,
@@ -413,7 +445,7 @@ export function KanbanBoard({
         p.id === projectId ? updatedProject : p,
       );
       // sync เฉพาะ status/order ไป backend
-      updateProjectMutation({
+      updateTaskMutation({
         id: updatedProject.id,
         data: {
           status: updatedProject.status,
@@ -429,7 +461,7 @@ export function KanbanBoard({
   };
 
   const addProject = async (
-    newProjectData: Omit<Project, 'id' | 'status' | 'revisions' | 'order'>,
+    newProjectData: Omit<Task, 'id' | 'status' | 'revisions' | 'order'>,
   ) => {
     try {
       // Do not generate id, let MongoDB handle it
@@ -443,23 +475,24 @@ export function KanbanBoard({
         backlogProjects.length > 0
           ? Math.max(...backlogProjects.map((p) => p.order ?? 0))
           : -1;
-      const res = await addProjectMutation({
+      const res = await addTaskMutation({
         ...newProjectData,
         status: 'Backlog',
         revisions: 0,
         subTasks,
         order: maxOrder + 1,
+        projectId: selectedProjectId !== 'all' ? selectedProjectId : undefined,
       }).unwrap();
       setProjects((prev) => [res, ...prev]);
       setModalContent(null);
     } catch (err) {
-      alert('Failed to add project');
+      alert('Failed to add task');
     }
   };
 
-  const updateProject = async (updatedProject: Project) => {
+  const updateProject = async (updatedProject: Task) => {
     try {
-      await updateProjectMutation({
+      await updateTaskMutation({
         id: updatedProject.id,
         data: updatedProject,
       }).unwrap();
@@ -473,17 +506,12 @@ export function KanbanBoard({
         setModalContent(updatedProject);
       }
     } catch (err) {
-      alert('Failed to update project');
+      alert('Failed to update task');
     }
   };
 
   const handleCardClick = (project: Project) => {
-    setModalContent(project);
-    setEditableProject({ ...project });
-    setIsEditingTitle(false);
-    setIsEditingPrice(false);
-    setIsEditingRevisions(false);
-    setIsEditingDeadline(false);
+    router.push(`/board/${project.id}`);
   };
 
   const handleCloseModal = () => {
@@ -493,9 +521,11 @@ export function KanbanBoard({
     setIsEditingPrice(false);
     setIsEditingRevisions(false);
     setIsEditingDeadline(false);
+    setIsEditingStartDate(false);
+    setIsEditingHourlyRate(false);
   };
 
-  const handleValueChange = (key: keyof Project, value: any) => {
+  const handleValueChange = (key: keyof Task, value: any) => {
     if (editableProject) {
       setEditableProject({ ...editableProject, [key]: value });
     }
@@ -556,6 +586,34 @@ export function KanbanBoard({
       setEditableProject({ ...modalContent });
     }
     setIsEditingDeadline(false);
+  };
+
+  const handleSaveStartDate = () => {
+    if (editableProject) {
+      updateProject(editableProject);
+      setModalContent(editableProject);
+    }
+    setIsEditingStartDate(false);
+  };
+  const handleCancelStartDate = () => {
+    if (modalContent && typeof modalContent === 'object') {
+      setEditableProject({ ...modalContent });
+    }
+    setIsEditingStartDate(false);
+  };
+
+  const handleSaveHourlyRate = () => {
+    if (editableProject) {
+      updateProject(editableProject);
+      setModalContent(editableProject);
+    }
+    setIsEditingHourlyRate(false);
+  };
+  const handleCancelHourlyRate = () => {
+    if (modalContent && typeof modalContent === 'object') {
+      setEditableProject({ ...modalContent });
+    }
+    setIsEditingHourlyRate(false);
   };
 
   const handleSubtaskUpdateInModal = (
@@ -645,98 +703,298 @@ export function KanbanBoard({
   }, [modalContent]);
 
   return (
-    <>
-      {/* HEADER CONTROLS */}
-      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 mt-2">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground/90">Projects</h1>
+    <div className="flex h-full w-full gap-6 overflow-hidden">
+      {/* LEFT SIDEBAR PANEL */}
+      <div className="w-[280px] shrink-0 hidden lg:flex flex-col bg-card border border-border/50 rounded-2xl p-4 gap-6 overflow-y-auto">
+        {/* Task sets */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="font-extrabold text-[11px] text-muted-foreground uppercase tracking-wider">Task sets</span>
+            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground" onClick={() => setModalContent('create')}>
+              <PlusCircle className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-normal mb-2">
+            For tasks that don't need a full project - perfect for goals, checklists or simple to-dos.
+          </p>
+          <div className="flex flex-col gap-1">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelectedProjectId('all');
+                setActiveTaskFilter('all');
+              }}
+              className={cn(
+                "w-full justify-start gap-2.5 h-9 px-3 rounded-xl text-xs font-bold",
+                selectedProjectId === 'all' && activeTaskFilter === 'all'
+                  ? "bg-primary/10 text-primary hover:bg-primary/15"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              )}
+            >
+              <ListTodo className="h-4 w-4 shrink-0" />
+              <span>All tasks</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelectedProjectId('all');
+                setActiveTaskFilter('my');
+              }}
+              className={cn(
+                "w-full justify-start gap-2.5 h-9 px-3 rounded-xl text-xs font-bold",
+                selectedProjectId === 'all' && activeTaskFilter === 'my'
+                  ? "bg-primary/10 text-primary hover:bg-primary/15"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              )}
+            >
+              <User className="h-4 w-4 shrink-0" />
+              <span>My tasks</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelectedProjectId('all');
+                setActiveTaskFilter('delegated');
+              }}
+              className={cn(
+                "w-full justify-start gap-2.5 h-9 px-3 rounded-xl text-xs font-bold",
+                selectedProjectId === 'all' && activeTaskFilter === 'delegated'
+                  ? "bg-primary/10 text-primary hover:bg-primary/15"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              )}
+            >
+              <ArrowRight className="h-4 w-4 shrink-0" />
+              <span>Delegated</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelectedProjectId('all');
+                setActiveTaskFilter('following');
+              }}
+              className={cn(
+                "w-full justify-start gap-2.5 h-9 px-3 rounded-xl text-xs font-bold",
+                selectedProjectId === 'all' && activeTaskFilter === 'following'
+                  ? "bg-primary/10 text-primary hover:bg-primary/15"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              )}
+            >
+              <Search className="h-4 w-4 shrink-0" />
+              <span>Following</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelectedProjectId('all');
+                setActiveTaskFilter('today');
+              }}
+              className={cn(
+                "w-full justify-start gap-2.5 h-9 px-3 rounded-xl text-xs font-bold",
+                selectedProjectId === 'all' && activeTaskFilter === 'today'
+                  ? "bg-primary/10 text-primary hover:bg-primary/15"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              )}
+            >
+              <CalendarIcon className="h-4 w-4 shrink-0" />
+              <span>Today</span>
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Search bar */}
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/75" />
-            <Input
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 rounded-xl border-border/70 focus-visible:ring-primary w-full bg-background/50 shadow-2xs"
-            />
-          </div>
 
-          {/* View switcher */}
-          <div className="flex bg-muted p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs">
-            <Button
-              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-              size="sm"
-              className={cn(
-                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                viewMode === 'kanban'
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setViewMode('kanban')}
-            >
-              <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> Kanban
-            </Button>
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              className={cn(
-                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                viewMode === 'table'
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setViewMode('table')}
-            >
-              <Table className="mr-1.5 h-3.5 w-3.5" /> Table
-            </Button>
-          </div>
+        <Separator className="bg-border/30" />
 
-          {/* Static decoration buttons to match Plutio style header */}
-          <div className="hidden lg:flex items-center gap-1 bg-muted p-1 rounded-xl border border-border/40 shrink-0 shadow-2xs">
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Edit view</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Filter</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Group</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Order</Button>
+        {/* Project Tasks */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1">
+              <span className="font-extrabold text-[11px] text-muted-foreground uppercase tracking-wider">Project tasks</span>
+              <span className="text-[10px] text-muted-foreground/60 cursor-pointer" title="Active projects list">ⓘ</span>
+            </div>
           </div>
-
-          <Button
-            onClick={() => setModalContent('create')}
-            className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-sm shrink-0"
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> New Project
-          </Button>
+          <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto pr-1">
+            {projectContainers.filter(p => !p.archived).map((proj) => (
+              <Button
+                key={proj.id}
+                variant="ghost"
+                onClick={() => {
+                  setSelectedProjectId(proj.id);
+                  setActiveTaskFilter('all');
+                }}
+                className={cn(
+                  "w-full justify-between items-center h-9 px-3 rounded-xl text-xs font-bold",
+                  selectedProjectId === proj.id
+                    ? "bg-primary/10 text-primary hover:bg-primary/15"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                )}
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <FolderOpen className="h-4 w-4 shrink-0 opacity-70" />
+                  <span className="truncate">{proj.title}</span>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[8px] font-extrabold uppercase shrink-0 py-0 px-1.5 h-4.5 rounded-md border-0 text-white select-none",
+                    (!proj.status || proj.status === 'New') && "bg-[#3b82f6]",
+                    proj.status === 'In progress' && "bg-[#22c55e]",
+                    proj.status === 'Pending' && "bg-[#f97316]",
+                    proj.status === 'Delayed' && "bg-[#ef4444]",
+                    proj.status === 'Completed' && "bg-[#475569]",
+                    proj.status === 'Canceled' && "bg-[#64748b]"
+                  )}
+                >
+                  {proj.status || 'New'}
+                </Badge>
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* STATUS SUMMARY BAR - SOFT AND PREMIUM PILLS */}
-      <div className="flex-shrink-0 flex items-center gap-2.5 mb-6 flex-wrap select-none">
-        <div className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-slate-500" />
-          <span>{statusCounts.Total} Projects</span>
+      {/* RIGHT MAIN CONTENT AREA */}
+      <div className="flex-grow flex flex-col min-w-0 overflow-y-auto pr-1">
+        {/* PATHWAY */}
+        <div className="text-[10px] font-black text-muted-foreground/70 tracking-wider uppercase mb-1.5 flex items-center gap-1.5 select-none mt-2">
+          <span>Tasks</span>
+          <span>/</span>
+          <span className="text-foreground/90">
+            {selectedProjectId !== 'all' 
+              ? (projectContainers.find(p => p.id === selectedProjectId)?.title || 'Project tasks')
+              : (activeTaskFilter === 'all' ? 'All tasks' : 
+                 activeTaskFilter === 'today' ? 'Today' : 
+                 activeTaskFilter === 'my' ? 'My tasks' : 
+                 activeTaskFilter === 'delegated' ? 'Delegated' : 'Following')
+            }
+          </span>
         </div>
-        <div className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-blue-500" />
-          <span>{statusCounts.Backlog} Backlog</span>
+
+        {/* HEADER CONTROLS */}
+        <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-foreground/90">Tasks</h1>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Project Dropdown Filter */}
+            <div className="w-56">
+              <Select
+                value={selectedProjectId}
+                onValueChange={(val) => {
+                  setSelectedProjectId(val);
+                  setActiveTaskFilter('all');
+                }}
+              >
+                <SelectTrigger className="rounded-xl h-9 bg-background/50 border-border/70 text-xs font-semibold">
+                  <SelectValue placeholder="Filter by Project" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projectContainers.map((proj) => (
+                    <SelectItem key={proj.id} value={proj.id}>
+                      {proj.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Search bar */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/75" />
+              <Input
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 rounded-xl border-border/70 focus-visible:ring-primary w-full bg-background/50 shadow-2xs"
+              />
+            </div>
+
+            {/* View switcher */}
+            <div className="flex bg-muted p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs">
+              <Button
+                variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
+                  viewMode === 'kanban'
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setViewMode('kanban')}
+              >
+                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> Kanban
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
+                  viewMode === 'table'
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setViewMode('table')}
+              >
+                <Table className="mr-1.5 h-3.5 w-3.5" /> Table
+              </Button>
+            </div>
+
+            {/* Archived projects toggle */}
+            <Button
+              variant={showArchived ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowArchived(!showArchived)}
+              className={cn(
+                "h-9 rounded-xl border-border/70 text-xs font-semibold gap-1.5 shrink-0 transition-all",
+                showArchived ? "bg-muted text-primary border-primary/45" : "bg-background/50 shadow-2xs"
+              )}
+            >
+              <Archive className="w-3.5 h-3.5" /> {showArchived ? 'Hide Archived' : 'Show Archived'}
+            </Button>
+
+            {/* Static decoration buttons to match Plutio style header */}
+            <div className="hidden lg:flex items-center gap-1 bg-muted p-1 rounded-xl border border-border/40 shrink-0 shadow-2xs">
+              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Edit view</Button>
+              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Filter</Button>
+              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Group</Button>
+              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Order</Button>
+            </div>
+
+            <Button
+              onClick={() => setModalContent('create')}
+              className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-sm shrink-0"
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> New Task
+            </Button>
+          </div>
         </div>
-        <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span>{statusCounts['In Progress']} In progress</span>
+
+        {/* STATUS SUMMARY BAR - SOFT AND PREMIUM PILLS */}
+        <div className="flex-shrink-0 flex items-center gap-2.5 mb-6 flex-wrap select-none">
+          <div className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-slate-500" />
+            <span>{statusCounts.Total} Tasks</span>
+          </div>
+          <div className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span>{statusCounts.Backlog} Backlog</span>
+          </div>
+          <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>{statusCounts['In Progress']} In progress</span>
+          </div>
+          <div className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-orange-500" />
+            <span>{statusCounts.Review} Review</span>
+          </div>
+          <div className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-purple-500" />
+            <span>{statusCounts.Completed} Completed</span>
+          </div>
+          <div className="bg-slate-500/10 text-slate-700 dark:text-slate-400 border border-slate-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
+            <span>{statusCounts.Paid} Paid</span>
+          </div>
         </div>
-        <div className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-orange-500" />
-          <span>{statusCounts.Review} Review</span>
-        </div>
-        <div className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-purple-500" />
-          <span>{statusCounts.Completed} Completed</span>
-        </div>
-        <div className="bg-slate-500/10 text-slate-700 dark:text-slate-400 border border-slate-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
-          <span>{statusCounts.Paid} Paid</span>
-        </div>
-      </div>
 
       <Dialog
         open={!!modalContent}
@@ -746,16 +1004,16 @@ export function KanbanBoard({
           {modalContent === 'create' ? (
             <>
               <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
+                <DialogTitle>Create New Task</DialogTitle>
                 <DialogDescription>
-                  Fill in the details below to add a new project to your board.
+                  Fill in the details below to add a new task to your board.
                 </DialogDescription>
               </DialogHeader>
               <CreateProjectForm
                 clients={clients}
                 onSubmit={addProject}
                 translations={{
-                  titleLabel: 'Project Title',
+                  titleLabel: 'Task Title',
                   clientLabel: 'Client',
                   selectClientPlaceholder: 'Select a client',
                   priceLabel: 'Gross Price',
@@ -764,9 +1022,9 @@ export function KanbanBoard({
                   subtasksLabel: 'Sub-tasks',
                   addSubtask: 'Add Sub-task',
                   removeSubtask: 'Remove',
-                  createProjectButton: 'Create Project',
+                  createProjectButton: 'Create Task',
                   creatingProjectButton: 'Creating...',
-                  titleRequired: 'Project title is required.',
+                  titleRequired: 'Task title is required.',
                   clientRequired: 'Please select a client.',
                   priceRequired: 'Price must be a positive number.',
                   deadlineRequired: 'Deadline is required.',
@@ -1257,6 +1515,232 @@ export function KanbanBoard({
                         )}
                       </div>
                     </div>
+
+                    {/* Planning & Billing Grid */}
+                    <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-4'>
+                      {/* Start Date */}
+                      <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
+                        <CalendarIcon className='h-6 w-6 text-muted-foreground' />
+                        <div className='flex-grow'>
+                          <p className='text-sm text-muted-foreground'>
+                            Start Date
+                          </p>
+                          {isEditingStartDate ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant={'outline'}
+                                  className={cn(
+                                    'pl-3 text-left font-normal h-auto py-1 w-full justify-start',
+                                    !editableProject.startDate &&
+                                      'text-muted-foreground',
+                                  )}
+                                >
+                                  {editableProject.startDate ? (
+                                    format(
+                                      new Date(editableProject.startDate),
+                                      'PPP',
+                                    )
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                  <CalendarIcon className='ml-auto h-4 w-4 opacity-50' />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className='w-auto p-0'
+                                align='start'
+                              >
+                                <Calendar
+                                  mode='single'
+                                  selected={editableProject.startDate ? new Date(editableProject.startDate) : undefined}
+                                  onSelect={(date) =>
+                                    handleValueChange('startDate', date)
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          ) : (
+                            <p className='font-semibold'>
+                              {modalContent.startDate ? (
+                                format(
+                                  new Date(modalContent.startDate),
+                                  'MMM d, yyyy',
+                                )
+                              ) : (
+                                <span className="italic text-xs text-muted-foreground">Not set</span>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                        {isEditingStartDate ? (
+                          <div className='flex'>
+                            <Button
+                              variant='ghost'
+                              size='icon'
+                              onClick={handleSaveStartDate}
+                            >
+                              <Check className='h-5 w-5' />
+                            </Button>
+                            <Button
+                              variant='ghost'
+                              size='icon'
+                              onClick={handleCancelStartDate}
+                            >
+                              <X className='h-5 w-5' />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            onClick={() => setIsEditingStartDate(true)}
+                          >
+                            <Pencil className='h-4 w-4' />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Billing Settings */}
+                      <div className='flex flex-col gap-2 p-4 rounded-lg bg-muted justify-center'>
+                        <div className='flex items-center justify-between w-full'>
+                          <span className='text-sm font-medium text-muted-foreground'>Billable</span>
+                          <input
+                            type='checkbox'
+                            checked={!!editableProject.billable}
+                            onChange={(e) => {
+                              const updated = { ...editableProject, billable: e.target.checked };
+                              setEditableProject(updated);
+                              updateProject(updated);
+                            }}
+                            className='h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary'
+                          />
+                        </div>
+                        <Separator className="my-1" />
+                        <div className='flex items-center gap-1 w-full justify-between'>
+                          <div className='flex-grow'>
+                            <p className='text-xs text-muted-foreground'>Hourly Rate</p>
+                            {isEditingHourlyRate ? (
+                              <div className='flex items-center gap-1 mt-1'>
+                                <select
+                                  value={editableProject.currency || 'USD'}
+                                  onChange={(e) =>
+                                    handleValueChange('currency', e.target.value)
+                                  }
+                                  className='border rounded h-7 text-xs px-1'
+                                >
+                                  <option value='USD'>$</option>
+                                  <option value='THB'>฿</option>
+                                  <option value='EUR'>€</option>
+                                  <option value='GBP'>£</option>
+                                </select>
+                                <Input
+                                  type='number'
+                                  value={editableProject.hourlyRate || ''}
+                                  onChange={(e) =>
+                                    handleValueChange(
+                                      'hourlyRate',
+                                      e.target.value ? Number(e.target.value) : undefined,
+                                    )
+                                  }
+                                  className='font-semibold text-xs p-1 h-7 w-20'
+                                />
+                              </div>
+                            ) : (
+                              <p className='font-semibold text-sm'>
+                                {modalContent.hourlyRate ? (
+                                  <>
+                                    {modalContent.currency === 'THB' ? '฿' : modalContent.currency === 'EUR' ? '€' : modalContent.currency === 'GBP' ? '£' : '$'}
+                                    {modalContent.hourlyRate} / hr
+                                  </>
+                                ) : (
+                                  <span className="italic text-xs text-muted-foreground">Not set</span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                          {isEditingHourlyRate ? (
+                            <div className='flex'>
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                className="h-7 w-7"
+                                onClick={handleSaveHourlyRate}
+                              >
+                                <Check className='h-4 w-4' />
+                              </Button>
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                className="h-7 w-7"
+                                onClick={handleCancelHourlyRate}
+                              >
+                                <X className='h-4 w-4' />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant='ghost'
+                              size='icon'
+                              className="h-7 w-7"
+                              onClick={() => setIsEditingHourlyRate(true)}
+                            >
+                              <Pencil className='h-3.5 w-3.5' />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Project Tag Color */}
+                      <div className='flex flex-col gap-2 p-4 rounded-lg bg-muted justify-center md:col-span-1'>
+                        <p className='text-sm text-muted-foreground font-medium'>
+                          Project Tag Color
+                        </p>
+                        <div className='flex flex-wrap gap-1.5 items-center mt-1'>
+                          {[
+                            { name: 'Red', hex: '#ef4444' },
+                            { name: 'Orange', hex: '#f97316' },
+                            { name: 'Yellow', hex: '#eab308' },
+                            { name: 'Green', hex: '#22c55e' },
+                            { name: 'Blue', hex: '#3b82f6' },
+                            { name: 'Purple', hex: '#a855f7' },
+                            { name: 'Slate', hex: '#64748b' }
+                          ].map((c) => (
+                            <button
+                              key={c.hex}
+                              className={cn(
+                                "w-5 h-5 rounded-full border transition-transform hover:scale-110",
+                                editableProject.color === c.hex
+                                  ? "ring-2 ring-ring ring-offset-2 scale-110"
+                                  : "border-muted"
+                              )}
+                              style={{ backgroundColor: c.hex }}
+                              onClick={() => {
+                                const updated = { ...editableProject, color: c.hex };
+                                setEditableProject(updated);
+                                updateProject(updated);
+                              }}
+                              title={c.name}
+                            />
+                          ))}
+                          <button
+                            className={cn(
+                              "px-1.5 py-0.5 text-[10px] border rounded hover:bg-background transition-colors",
+                              !editableProject.color && "bg-background font-semibold"
+                            )}
+                            onClick={() => {
+                              const updated = { ...editableProject, color: '' };
+                              setEditableProject(updated);
+                              updateProject(updated);
+                            }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     <Separator />
                     {/* Project Details Section: Rich Text Editor */}
                     <div className='mb-6'>
@@ -1355,120 +1839,109 @@ export function KanbanBoard({
               <thead>
                 <tr className="border-b border-border/30 bg-muted/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80 text-left">
                   <th className="py-3 px-5 w-12 text-center"></th>
-                  <th className="py-3 px-5">Project</th>
-                  <th className="py-3 px-5">Project Client</th>
-                  <th className="py-3 px-5 w-44">Status</th>
-                  <th className="py-3 px-5 w-20">Members</th>
-                  <th className="py-3 px-5 w-48">Progress</th>
-                  <th className="py-3 px-5 w-36 text-right pr-8">Budget</th>
+                  <th className="py-3 px-2 w-10 text-center"></th>
+                  <th className="py-3 px-5">Task</th>
+                  <th className="py-3 px-5 w-48">Project</th>
+                  <th className="py-3 px-5 w-24">Assignee</th>
+                  <th className="py-3 px-5 w-32">Start date</th>
+                  <th className="py-3 px-5 w-32">Due date</th>
+                  <th className="py-3 px-5 w-28">Repeats</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
                 {filteredProjects.map((project) => {
-                  const client = clients.find((c) => c._id === project.clientId);
-                  const progress = calculateProgress(project.subTasks);
-                  const [totalTasks, doneTasks] = countAll(project.subTasks);
+                  const parentProj = projectContainers.find((p) => p.id === project.projectId);
+                  const isDone = project.status === 'Completed' || project.status === 'Paid';
 
                   return (
                     <tr
                       key={project.id}
                       className="hover:bg-muted/15 transition-all duration-150 group"
                     >
-                      {/* Checkbox circle */}
-                      <td className="py-4 px-5 text-center align-middle">
-                        <div className="w-4 h-4 rounded-full border border-muted-foreground/25 hover:border-primary/80 hover:bg-primary/5 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-105" />
+                      {/* Checkbox square */}
+                      <td className="py-4 px-5 text-center align-middle w-12">
+                        <input
+                          type="checkbox"
+                          checked={isDone}
+                          onChange={() => {
+                            updateProject({ ...project, status: isDone ? 'Backlog' : 'Completed' });
+                          }}
+                          className="h-4 w-4 rounded border-muted-foreground/30 text-primary focus:ring-primary cursor-pointer transition-all"
+                        />
                       </td>
 
-                      {/* Project Title */}
-                      <td className="py-4 px-5 font-bold text-foreground/90 align-middle">
-                        <span
-                          onClick={() => handleCardClick(project)}
-                          className="cursor-pointer hover:text-primary hover:underline transition-all"
-                        >
-                          {project.title}
-                        </span>
+                      {/* Status indicator dot */}
+                      <td className="py-4 px-2 text-center align-middle w-10">
+                        <div 
+                          className={cn(
+                            "w-2.5 h-2.5 rounded-full mx-auto",
+                            isDone ? "bg-green-500" :
+                            project.status === 'Review' ? "bg-amber-500" :
+                            project.status === 'In Progress' ? "bg-blue-500" : 
+                            project.color ? "" : "bg-slate-300"
+                          )}
+                          style={(!isDone && project.status !== 'Review' && project.status !== 'In Progress' && project.color) ? { backgroundColor: project.color } : undefined}
+                        />
                       </td>
 
-                      {/* Project Client */}
-                      <td className="py-4 px-5 text-muted-foreground align-middle">
-                        {client ? (
-                          <span className="inline-flex items-center bg-primary/5 text-primary border border-primary/10 font-bold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                            {client.name}
-                          </span>
-                        ) : (
-                          <span className="italic text-xs opacity-60">No client</span>
+                      {/* Task title */}
+                      <td className="py-4 px-5 font-bold text-foreground/90 align-middle hover:text-primary transition-colors cursor-pointer" onClick={() => handleCardClick(project)}>
+                        <span className="line-clamp-2 max-w-[320px]">{project.title}</span>
+                        {project.archived && (
+                          <Badge variant="outline" className="text-[9px] font-bold text-destructive bg-destructive/10 border-destructive/20 uppercase shrink-0 py-0 px-1.5 h-4 ml-1.5 inline-block">
+                            Archived
+                          </Badge>
                         )}
                       </td>
 
-                      {/* Status Dropdown - Pill badge select */}
-                      <td className="py-4 px-5 align-middle">
-                        <Select
-                          value={project.status}
-                          onValueChange={(val) =>
-                            updateProject({ ...project, status: val as ProjectStatus })
-                          }
-                        >
-                          <SelectTrigger
-                            className={cn(
-                              "h-7 w-32 font-bold text-[10px] rounded-full border border-transparent shadow-3xs uppercase tracking-wider transition-all duration-200 focus:ring-0 focus-visible:ring-0",
-                              project.status === "Completed" || project.status === "Paid"
-                                ? "bg-green-500/10 text-green-700 hover:bg-green-500/15"
-                                : project.status === "Review"
-                                ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/15"
-                                : project.status === "In Progress"
-                                ? "bg-primary/10 text-primary hover:bg-primary/15"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            )}
+                      {/* Project badge */}
+                      <td className="py-4 px-5 align-middle w-48">
+                        {parentProj ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20 font-bold text-[10px] px-2.5 py-0.5 rounded-full truncate max-w-[150px]"
+                            title={parentProj.title}
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="Backlog">Backlog</SelectItem>
-                            <SelectItem value="In Progress">In Progress</SelectItem>
-                            <SelectItem value="Review">Review</SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
-                            <SelectItem value="Paid">Paid</SelectItem>
-                          </SelectContent>
-                        </Select>
+                            {parentProj.title}
+                          </Badge>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground/60 italic">General Task</span>
+                        )}
                       </td>
 
-                      {/* Members */}
-                      <td className="py-4 px-5 align-middle">
-                        <Avatar className="h-6.5 w-6.5 border border-primary/10 shadow-3xs">
-                          <AvatarFallback className="bg-primary/5 text-primary font-bold text-[10px]">
-                            W
-                          </AvatarFallback>
-                        </Avatar>
-                      </td>
-
-                      {/* Progress */}
-                      <td className="py-4 px-5 align-middle">
-                        <div className="flex items-center gap-3">
-                          <Progress value={progress} className="h-1.5 w-24 bg-muted/80" />
-                          <span className="text-[10px] font-bold text-muted-foreground/85 whitespace-nowrap">
-                            {totalTasks > 0 ? `${doneTasks}/${totalTasks} tasks` : "No tasks"}
-                          </span>
+                      {/* Assignee */}
+                      <td className="py-4 px-5 align-middle w-24">
+                        <div className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/25 flex items-center justify-center bg-muted/5">
+                          <User className="h-3 w-3 text-muted-foreground/40" />
                         </div>
                       </td>
 
-                      {/* Budget (Price) */}
-                      <td className="py-4 px-5 text-right font-black text-foreground/80 align-middle pr-8">
-                        {project.gross_price > 0
-                          ? `฿${project.gross_price.toLocaleString()}`
-                          : "฿0"}
+                      {/* Start Date */}
+                      <td className="py-4 px-5 align-middle w-32 text-xs font-semibold text-muted-foreground/90">
+                        {project.startDate ? format(new Date(project.startDate), 'dd MMM yyyy') : '-'}
+                      </td>
+
+                      {/* Due Date (deadline) */}
+                      <td className="py-4 px-5 align-middle w-32 text-xs font-semibold text-muted-foreground/90">
+                        {project.deadline ? format(new Date(project.deadline), 'dd MMM yyyy') : '-'}
+                      </td>
+
+                      {/* Repeats */}
+                      <td className="py-4 px-5 align-middle w-28 text-xs font-semibold text-muted-foreground/80">
+                        {project.repeats || '-'}
                       </td>
                     </tr>
                   );
                 })}
 
-                {/* Footer row: Create project */}
+                {/* Footer row: Create task */}
                 <tr className="bg-muted/5 hover:bg-muted/10 transition-colors">
-                  <td colSpan={7} className="p-0">
+                  <td colSpan={8} className="p-0">
                     <div
                       onClick={() => setModalContent("create")}
                       className="px-8 py-4 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
                     >
-                      <Plus className="h-4 w-4" /> Create new project
+                      <Plus className="h-4 w-4" /> Create new task
                     </div>
                   </td>
                 </tr>
@@ -1498,6 +1971,7 @@ export function KanbanBoard({
           ))}
         </div>
       )}
-    </>
+      </div>
+    </div>
   );
 }

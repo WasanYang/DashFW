@@ -1,12 +1,12 @@
 'use client';
 
 import { DragEvent } from 'react';
-import { Project, ProjectStatus } from '@/lib/types';
+import { ProjectStatus, Task } from '@/lib/types';
 import { KanbanCard } from './kanban-card';
 
 interface KanbanColumnProps {
   status: ProjectStatus;
-  projects: Project[];
+  projects: Task[];
   onDrop: (e: DragEvent<HTMLDivElement>, status: ProjectStatus) => void;
   onDragStart: (
     e: DragEvent<HTMLDivElement>,
@@ -18,8 +18,8 @@ interface KanbanColumnProps {
     toIndex: number,
     status: ProjectStatus,
   ) => void;
-  updateProject: (project: Project) => void;
-  onCardClick: (project: Project) => void;
+  updateProject: (project: Task) => void;
+  onCardClick: (project: Task) => void;
 }
 
 export function KanbanColumn({

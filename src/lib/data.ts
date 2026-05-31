@@ -1,4 +1,4 @@
-import { Project, Client, Snippet, Checklist } from './types';
+import { Project, Client, Snippet, Checklist, Task } from './types';
 
 export const mockClients: Client[] = [
   {
@@ -37,8 +37,24 @@ export const mockClients: Client[] = [
 export const mockProjects: Project[] = [
   {
     id: 'proj-1',
+    title: 'Suanson Project Container',
+    clientId: 'client-1',
+    gross_price: 1500,
+  },
+  {
+    id: 'proj-2',
+    title: 'Only U Project Container',
+    clientId: 'client-2',
+    gross_price: 1000,
+  },
+];
+
+export const mockTasks: Task[] = [
+  {
+    id: 'proj-1',
     title: 'New OTA Listing Setup',
     clientId: 'client-1',
+    projectId: 'proj-1',
     status: 'In Progress',
     gross_price: 500,
     deadline: new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
@@ -71,6 +87,7 @@ export const mockProjects: Project[] = [
     id: 'proj-2',
     title: 'Google Business SEO',
     clientId: 'client-2',
+    projectId: 'proj-2',
     status: 'In Progress',
     gross_price: 350,
     deadline: new Date(new Date().getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days from now

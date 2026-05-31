@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { useGetProjectsQuery } from '@/services/projectApi';
+import { useGetTasksQuery } from '@/services/taskApi';
 import { format } from 'date-fns';
 import { Clock, CheckCircle2, AlertCircle, Mail, Globe, Sparkles, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,11 +19,11 @@ export default function PublicProjectSharePage() {
   const params = useParams();
   const projectId = params?.id as string;
 
-  const { data: projects = [], isLoading } = useGetProjectsQuery();
+  const { data: tasks = [], isLoading } = useGetTasksQuery();
 
   const project = useMemo(() => {
-    return projects.find((p) => p.id === projectId) || null;
-  }, [projects, projectId]);
+    return tasks.find((t) => t.id === projectId) || null;
+  }, [tasks, projectId]);
 
   // Calculate Subtask Completion
   const stats = useMemo(() => {

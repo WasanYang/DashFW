@@ -35,6 +35,13 @@ const schema = z.object({
       })
     )
     .optional(),
+  address: z.string().optional(),
+  city_state: z.string().optional(),
+  country: z.string().optional(),
+  zip: z.string().optional(),
+  timezone: z.string().optional(),
+  bio: z.string().optional(),
+  date_of_birth: z.string().optional(),
 });
 
 export type ClientFormValues = z.infer<typeof schema>;
@@ -91,6 +98,14 @@ export function ClientForm({
   const defaultCustomFields: { label: string; value: string }[] =
     defaultValues?.customFields || [];
 
+  let defaultAddress = defaultValues?.address || '';
+  let defaultCityState = defaultValues?.city_state || '';
+  let defaultCountry = defaultValues?.country || '';
+  let defaultZip = defaultValues?.zip || '';
+  let defaultTimezone = defaultValues?.timezone || 'Asia/Bangkok';
+  let defaultBio = defaultValues?.bio || '';
+  let defaultDOB = defaultValues?.date_of_birth || '';
+
   // If missing structured properties, attempt parsing notes
   if (defaultValues?.notes) {
     const lines = defaultValues.notes.split('\n');
@@ -114,6 +129,20 @@ export function ClientForm({
             value: parts.slice(1).join(':'),
           });
         }
+      } else if (lower.startsWith('address:') && !defaultAddress) {
+        defaultAddress = line.substring(8).trim();
+      } else if (lower.startsWith('city_state:') && !defaultCityState) {
+        defaultCityState = line.substring(11).trim();
+      } else if (lower.startsWith('country:') && !defaultCountry) {
+        defaultCountry = line.substring(8).trim();
+      } else if (lower.startsWith('zip:') && !defaultZip) {
+        defaultZip = line.substring(4).trim();
+      } else if (lower.startsWith('timezone:') && defaultTimezone === 'Asia/Bangkok') {
+        defaultTimezone = line.substring(9).trim();
+      } else if (lower.startsWith('bio:') && !defaultBio) {
+        defaultBio = line.substring(4).trim();
+      } else if (lower.startsWith('date_of_birth:') && !defaultDOB) {
+        defaultDOB = line.substring(14).trim();
       }
     });
   }
@@ -131,6 +160,13 @@ export function ClientForm({
       manager: defaultManager,
       inviteToWorkspace: defaultInvite,
       customFields: defaultCustomFields,
+      address: defaultAddress,
+      city_state: defaultCityState,
+      country: defaultCountry,
+      zip: defaultZip,
+      timezone: defaultTimezone,
+      bio: defaultBio,
+      date_of_birth: defaultDOB,
     },
   });
 
@@ -192,6 +228,14 @@ export function ClientForm({
       });
     }
 
+    if (formValues.address) notesLines.push(`address: ${formValues.address}`);
+    if (formValues.city_state) notesLines.push(`city_state: ${formValues.city_state}`);
+    if (formValues.country) notesLines.push(`country: ${formValues.country}`);
+    if (formValues.zip) notesLines.push(`zip: ${formValues.zip}`);
+    if (formValues.timezone) notesLines.push(`timezone: ${formValues.timezone}`);
+    if (formValues.bio) notesLines.push(`bio: ${formValues.bio}`);
+    if (formValues.date_of_birth) notesLines.push(`date_of_birth: ${formValues.date_of_birth}`);
+
     // Append original notes (filtering auto-generated fields to prevent duplicates)
     if (defaultValues?.notes) {
       const originalNotes = defaultValues.notes
@@ -205,7 +249,14 @@ export function ClientForm({
             !lower.startsWith('phone:') &&
             !lower.startsWith('manager:') &&
             !lower.startsWith('invite_to_workspace:') &&
-            !lower.startsWith('custom_field:')
+            !lower.startsWith('custom_field:') &&
+            !lower.startsWith('address:') &&
+            !lower.startsWith('city_state:') &&
+            !lower.startsWith('country:') &&
+            !lower.startsWith('zip:') &&
+            !lower.startsWith('timezone:') &&
+            !lower.startsWith('bio:') &&
+            !lower.startsWith('date_of_birth:')
           );
         })
         .join('\n');
@@ -232,6 +283,13 @@ export function ClientForm({
       manager: formValues.manager,
       inviteToWorkspace: formValues.inviteToWorkspace,
       customFields: formValues.customFields || [],
+      address: formValues.address || '',
+      city_state: formValues.city_state || '',
+      country: formValues.country || '',
+      zip: formValues.zip || '',
+      timezone: formValues.timezone || '',
+      bio: formValues.bio || '',
+      date_of_birth: formValues.date_of_birth || '',
     };
 
     onSubmit(submitPayload);
@@ -383,7 +441,7 @@ export function ClientForm({
           <div className="space-y-3">
             {customFields.map((item, index) => (
               <div key={item.id} className="flex items-center gap-2">
-                <div className="flex-1 grid grid-cols-[1fr_2fr] border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 rounded-[14px] divide-x divide-[#d0d0eb] dark:divide-slate-700 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all overflow-hidden">
+                <div className="flex-grow grid grid-cols-[1fr_2fr] border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 rounded-[14px] divide-x divide-[#d0d0eb] dark:divide-slate-700 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all overflow-hidden">
                   <FormField
                     control={form.control}
                     name={`customFields.${index}.label`}
@@ -503,6 +561,159 @@ export function ClientForm({
             )}
           />
         </div>
+
+        {/* Separator - Profile & Location */}
+        <div className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-dashed border-[#d0d0eb] dark:border-slate-700"></div>
+          <span className="flex-shrink mx-4 text-[10px] font-bold text-[#8b8ba9] dark:text-slate-400 select-none uppercase tracking-widest">
+            Profile & Location
+          </span>
+          <div className="flex-grow border-t border-dashed border-[#d0d0eb] dark:border-slate-700"></div>
+        </div>
+
+        {/* Address */}
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => (
+            <FormItem className="space-y-0">
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Address</span>
+                <input
+                  className={inputClass}
+                  placeholder="Street address"
+                  {...field}
+                />
+              </div>
+              <FormMessage className="text-[11px] mt-1 text-destructive" />
+            </FormItem>
+          )}
+        />
+
+        {/* City/State & Zip (Side by Side) */}
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="city_state"
+            render={({ field }) => (
+              <FormItem className="space-y-0">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>City / State</span>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. Bangkok"
+                    {...field}
+                  />
+                </div>
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="zip"
+            render={({ field }) => (
+              <FormItem className="space-y-0">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>Zip Code</span>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. 10110"
+                    {...field}
+                  />
+                </div>
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Country & Timezone (Side by Side) */}
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="country"
+            render={({ field }) => (
+              <FormItem className="space-y-0">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>Country</span>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. Thailand"
+                    {...field}
+                  />
+                </div>
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="timezone"
+            render={({ field }) => (
+              <FormItem className="space-y-0">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>Timezone</span>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value || 'Asia/Bangkok'}
+                  >
+                    <SelectTrigger className="border-none p-0 h-auto bg-transparent focus:ring-0 text-[13px] text-foreground shadow-none">
+                      <SelectValue placeholder="Timezone" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="Asia/Bangkok">Asia/Bangkok (GMT+7)</SelectItem>
+                      <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
+                      <SelectItem value="America/New_York">America/New_York (EST/EDT)</SelectItem>
+                      <SelectItem value="Europe/London">Europe/London (GMT/BST)</SelectItem>
+                      <SelectItem value="Asia/Tokyo">Asia/Tokyo (GMT+9)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <FormMessage className="text-[11px] mt-1 text-destructive" />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Date of Birth */}
+        <FormField
+          control={form.control}
+          name="date_of_birth"
+          render={({ field }) => (
+            <FormItem className="space-y-0">
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Date of birth</span>
+                <input
+                  className={inputClass}
+                  type="date"
+                  placeholder="YYYY-MM-DD"
+                  {...field}
+                />
+              </div>
+              <FormMessage className="text-[11px] mt-1 text-destructive" />
+            </FormItem>
+          )}
+        />
+
+        {/* Bio */}
+        <FormField
+          control={form.control}
+          name="bio"
+          render={({ field }) => (
+            <FormItem className="space-y-0">
+              <div className="flex flex-col border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 rounded-[14px] focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+                <span className={labelClass}>Bio</span>
+                <textarea
+                  className="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 w-full resize-none min-h-[60px]"
+                  placeholder="Tell us about yourself..."
+                  {...field}
+                />
+              </div>
+              <FormMessage className="text-[11px] mt-1 text-destructive" />
+            </FormItem>
+          )}
+        />
 
         {/* Submit Actions (only rendered if needed inside modal context) */}
         {mode === 'edit' && (

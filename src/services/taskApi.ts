@@ -1,36 +1,36 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { Project } from '@/lib/types';
+import type { Task } from '@/lib/types';
 
-export const projectApi = createApi({
-  reducerPath: 'projectApi',
+export const taskApi = createApi({
+  reducerPath: 'taskApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api/' }),
   endpoints: (builder) => ({
-    getProjects: builder.query<Project[], void>({
-      query: () => 'project',
+    getTasks: builder.query<Task[], void>({
+      query: () => 'task',
     }),
-    addProject: builder.mutation<Project, Partial<Project>>({
+    addTask: builder.mutation<Task, Partial<Task>>({
       query: (body) => ({
-        url: 'project',
+        url: 'task',
         method: 'POST',
         body,
       }),
     }),
-    updateProject: builder.mutation<
+    updateTask: builder.mutation<
       { message: string; modifiedCount: number },
-      { id: string; data: Partial<Project> }
+      { id: string; data: Partial<Task> }
     >({
       query: ({ id, data }) => ({
-        url: 'project',
+        url: 'task',
         method: 'PUT',
         body: { id, ...data },
       }),
     }),
-    deleteProject: builder.mutation<
+    deleteTask: builder.mutation<
       { message: string; deletedCount: number },
       { id: string }
     >({
       query: ({ id }) => ({
-        url: 'project',
+        url: 'task',
         method: 'DELETE',
         body: { id },
       }),
@@ -39,8 +39,8 @@ export const projectApi = createApi({
 });
 
 export const {
-  useGetProjectsQuery,
-  useAddProjectMutation,
-  useUpdateProjectMutation,
-  useDeleteProjectMutation,
-} = projectApi;
+  useGetTasksQuery,
+  useAddTaskMutation,
+  useUpdateTaskMutation,
+  useDeleteTaskMutation,
+} = taskApi;

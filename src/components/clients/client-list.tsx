@@ -26,7 +26,7 @@ import {
   Trash2,
   HelpCircle,
 } from 'lucide-react';
-import { Client, Project, Social, SubTask } from '@/lib/types';
+import { Client, Project, Social, SubTask, Task } from '@/lib/types';
 import {
   useGetClientsQuery,
   useAddClientMutation,
@@ -48,6 +48,13 @@ import { Progress } from '../ui/progress';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/number-format';
 import {
@@ -58,7 +65,7 @@ import {
 } from '@/components/ui/tooltip';
 
 interface ClientListProps {
-  projects: Project[];
+  tasks: Task[];
 }
 
 const socialIcons: { [key: string]: React.ElementType } = {
@@ -123,7 +130,8 @@ const getClientCompany = (client: Client): string => {
   return 'Sabai Sabai Workspace'; // Default fallback matching original mockup
 };
 
-export function ClientList({ projects }: ClientListProps) {
+export function ClientList({ tasks }: ClientListProps) {
+  const projects = tasks; // Alias for compatibility with internal UI naming
   const {
     data: clients = [],
     isLoading,
@@ -136,7 +144,7 @@ export function ClientList({ projects }: ClientListProps) {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [projectModal, setProjectModal] = useState<Project | null>(null);
+  const [projectModal, setProjectModal] = useState<Task | null>(null);
 
   const [viewMode, setViewMode] = useState<'table' | 'split'>('table');
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +163,12 @@ export function ClientList({ projects }: ClientListProps) {
   const [compFormEmail, setCompFormEmail] = useState('');
   const [compFormPhone, setCompFormPhone] = useState('');
   const [compFormCustomFields, setCompFormCustomFields] = useState<{ label: string; value: string }[]>([]);
+  const [compFormAddress, setCompFormAddress] = useState('');
+  const [compFormCityState, setCompFormCityState] = useState('');
+  const [compFormCountry, setCompFormCountry] = useState('');
+  const [compFormZip, setCompFormZip] = useState('');
+  const [compFormTimezone, setCompFormTimezone] = useState('Asia/Bangkok');
+  const [compFormBio, setCompFormBio] = useState('');
 
   // Style constants for stacked inputs
   const stackedInputClass =
@@ -315,11 +329,23 @@ export function ClientList({ projects }: ClientListProps) {
       setCompFormEmail(placeholder ? placeholder.email : '');
       setCompFormPhone(placeholder ? (placeholder.phone || placeholder.socials?.find(s => s.platform === 'Phone')?.value || '') : '');
       setCompFormCustomFields(placeholder ? (placeholder.customFields || []) : []);
+      setCompFormAddress(placeholder ? (placeholder.address || '') : '');
+      setCompFormCityState(placeholder ? (placeholder.city_state || '') : '');
+      setCompFormCountry(placeholder ? (placeholder.country || '') : '');
+      setCompFormZip(placeholder ? (placeholder.zip || '') : '');
+      setCompFormTimezone(placeholder ? (placeholder.timezone || 'Asia/Bangkok') : 'Asia/Bangkok');
+      setCompFormBio(placeholder ? (placeholder.bio || '') : '');
     } else {
       setCompFormName('');
       setCompFormEmail('');
       setCompFormPhone('');
       setCompFormCustomFields([]);
+      setCompFormAddress('');
+      setCompFormCityState('');
+      setCompFormCountry('');
+      setCompFormZip('');
+      setCompFormTimezone('Asia/Bangkok');
+      setCompFormBio('');
     }
   }, [editingCompany]);
 
@@ -355,6 +381,12 @@ export function ClientList({ projects }: ClientListProps) {
     const email = compFormEmail.trim();
     const phone = compFormPhone.trim();
     const customFields = compFormCustomFields.filter(f => f.label.trim() && f.value.trim());
+    const address = compFormAddress.trim();
+    const cityState = compFormCityState.trim();
+    const country = compFormCountry.trim();
+    const zip = compFormZip.trim();
+    const timezone = compFormTimezone.trim();
+    const bio = compFormBio.trim();
 
     if (editingCompany) {
       // 1. Update/create placeholder client document in DB
@@ -368,9 +400,15 @@ export function ClientList({ projects }: ClientListProps) {
             email: email,
             phone: phone,
             socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
-            notes: `company: ${name}\nisCompany: true\nphone: ${phone}` + 
+            notes: `company: ${name}\nisCompany: true\nphone: ${phone}\naddress: ${address}\ncity_state: ${cityState}\ncountry: ${country}\nzip: ${zip}\ntimezone: ${timezone}\nbio: ${bio}` + 
                    (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
             customFields: customFields,
+            address,
+            city_state: cityState,
+            country,
+            zip,
+            timezone,
+            bio,
           }
         });
       } else {
@@ -381,10 +419,16 @@ export function ClientList({ projects }: ClientListProps) {
           isCompany: true,
           phone: phone,
           socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
-          notes: `company: ${name}\nisCompany: true\nphone: ${phone}` + 
+          notes: `company: ${name}\nisCompany: true\nphone: ${phone}\naddress: ${address}\ncity_state: ${cityState}\ncountry: ${country}\nzip: ${zip}\ntimezone: ${timezone}\nbio: ${bio}` + 
                  (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
           customFields: customFields,
           fastwork_link: '',
+          address,
+          city_state: cityState,
+          country,
+          zip,
+          timezone,
+          bio,
         });
       }
 
@@ -416,10 +460,16 @@ export function ClientList({ projects }: ClientListProps) {
         isCompany: true,
         phone: phone,
         socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
-        notes: `company: ${name}\nisCompany: true\nphone: ${phone}` + 
+        notes: `company: ${name}\nisCompany: true\nphone: ${phone}\naddress: ${address}\ncity_state: ${cityState}\ncountry: ${country}\nzip: ${zip}\ntimezone: ${timezone}\nbio: ${bio}` + 
                (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
         customFields: customFields,
         fastwork_link: '',
+        address,
+        city_state: cityState,
+        country,
+        zip,
+        timezone,
+        bio,
       });
       setIsCompanyCreateOpen(false);
     }
@@ -430,6 +480,12 @@ export function ClientList({ projects }: ClientListProps) {
     setCompFormEmail('');
     setCompFormPhone('');
     setCompFormCustomFields([]);
+    setCompFormAddress('');
+    setCompFormCityState('');
+    setCompFormCountry('');
+    setCompFormZip('');
+    setCompFormTimezone('Asia/Bangkok');
+    setCompFormBio('');
   };
 
   const renderSocialLink = (social: Social, idx: number) => {
@@ -1385,6 +1441,12 @@ export function ClientList({ projects }: ClientListProps) {
           setCompFormEmail('');
           setCompFormPhone('');
           setCompFormCustomFields([]);
+          setCompFormAddress('');
+          setCompFormCityState('');
+          setCompFormCountry('');
+          setCompFormZip('');
+          setCompFormTimezone('Asia/Bangkok');
+          setCompFormBio('');
         }
       }}>
         <DialogContent className="sm:max-w-[500px] p-6 rounded-[20px] border border-border/40">
@@ -1394,139 +1456,222 @@ export function ClientList({ projects }: ClientListProps) {
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4 pt-2">
-            {/* Company Name */}
-            <div className={stackedInputClass}>
-              <span className={labelClass}>Company name*</span>
-              <input
-                className={inputClass}
-                placeholder="Enter company name"
-                value={compFormName}
-                onChange={(e) => setCompFormName(e.target.value)}
-              />
-            </div>
-
-            {/* Email Address */}
-            <div className={stackedInputClass}>
-              <span className={labelClass}>Email address</span>
-              <input
-                className={inputClass}
-                type="email"
-                placeholder="company@domain.com"
-                value={compFormEmail}
-                onChange={(e) => setCompFormEmail(e.target.value)}
-              />
-            </div>
-
-            {/* Phone Number */}
-            <div className={stackedInputClass}>
-              <span className={labelClass}>Phone number</span>
-              <input
-                className={inputClass}
-                placeholder="Enter phone number"
-                value={compFormPhone}
-                onChange={(e) => setCompFormPhone(e.target.value)}
-              />
-            </div>
-
-            {/* Custom Fields List */}
-            {compFormCustomFields.length > 0 && (
-              <div className="space-y-3">
-                {compFormCustomFields.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className="flex-grow grid grid-cols-[1fr_2fr] border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 rounded-[14px] divide-x divide-[#d0d0eb] dark:divide-slate-700 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all overflow-hidden">
-                      <div className="space-y-0 p-3 py-2 flex flex-col justify-center">
-                        <span className={labelClass}>Field Label</span>
-                        <input
-                          className={inputClass}
-                          placeholder="Label"
-                          value={item.label}
-                          onChange={(e) => {
-                            const updated = [...compFormCustomFields];
-                            updated[index].label = e.target.value;
-                            setCompFormCustomFields(updated);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-0 p-3 py-2 flex flex-col justify-center">
-                        <span className={labelClass}>Field Value</span>
-                        <input
-                          className={inputClass}
-                          placeholder="Value"
-                          value={item.value}
-                          onChange={(e) => {
-                            const updated = [...compFormCustomFields];
-                            updated[index].value = e.target.value;
-                            setCompFormCustomFields(updated);
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-[14px] border border-dashed border-[#d0d0eb] dark:border-slate-700 shrink-0"
-                      onClick={() => {
-                        setCompFormCustomFields(compFormCustomFields.filter((_, idx) => idx !== index));
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+          <ScrollArea className="max-h-[70vh] pr-2">
+            <div className="space-y-4 pt-2 pb-2">
+              {/* Company Name */}
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Company name*</span>
+                <input
+                  className={inputClass}
+                  placeholder="Enter company name"
+                  value={compFormName}
+                  onChange={(e) => setCompFormName(e.target.value)}
+                />
               </div>
-            )}
 
-            {/* Add Custom Field Button */}
-            <button
-              type="button"
-              onClick={() => setCompFormCustomFields([...compFormCustomFields, { label: '', value: '' }])}
-              className="w-full flex items-center justify-between border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-muted/50 rounded-[14px] p-3 text-muted-foreground transition-all"
-            >
-              <div className="flex items-center gap-3 font-semibold text-xs text-[#8b8ba9] dark:text-slate-300">
-                <div className="h-4 w-4 rounded-md border border-current flex items-center justify-center text-[10px] font-bold">
-                  +
+              {/* Email Address */}
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Email address</span>
+                <input
+                  className={inputClass}
+                  type="email"
+                  placeholder="company@domain.com"
+                  value={compFormEmail}
+                  onChange={(e) => setCompFormEmail(e.target.value)}
+                />
+              </div>
+
+              {/* Phone Number */}
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Phone number</span>
+                <input
+                  className={inputClass}
+                  placeholder="Enter phone number"
+                  value={compFormPhone}
+                  onChange={(e) => setCompFormPhone(e.target.value)}
+                />
+              </div>
+
+              {/* Address */}
+              <div className={stackedInputClass}>
+                <span className={labelClass}>Address</span>
+                <input
+                  className={inputClass}
+                  placeholder="Street address"
+                  value={compFormAddress}
+                  onChange={(e) => setCompFormAddress(e.target.value)}
+                />
+              </div>
+
+              {/* City/State & Zip (Side by Side) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>City / State</span>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. Bangkok"
+                    value={compFormCityState}
+                    onChange={(e) => setCompFormCityState(e.target.value)}
+                  />
                 </div>
-                <span>Add custom field</span>
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>Zip Code</span>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. 10110"
+                    value={compFormZip}
+                    onChange={(e) => setCompFormZip(e.target.value)}
+                  />
+                </div>
               </div>
-              <HelpCircle className="h-4 w-4 text-muted-foreground/40" />
-            </button>
 
-            {/* Action Buttons (Plutio styling) */}
-            <div className="flex gap-3 pt-4 border-t border-border/20">
-              <Button
+              {/* Country & Timezone (Side by Side) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>Country</span>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. Thailand"
+                    value={compFormCountry}
+                    onChange={(e) => setCompFormCountry(e.target.value)}
+                  />
+                </div>
+                <div className={stackedInputClass}>
+                  <span className={labelClass}>Timezone</span>
+                  <Select
+                    onValueChange={(val: string) => setCompFormTimezone(val)}
+                    value={compFormTimezone}
+                  >
+                    <SelectTrigger className="border-none p-0 h-auto bg-transparent focus:ring-0 text-[13px] text-foreground shadow-none">
+                      <SelectValue placeholder="Timezone" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="Asia/Bangkok">Asia/Bangkok (GMT+7)</SelectItem>
+                      <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
+                      <SelectItem value="America/New_York">America/New_York (EST/EDT)</SelectItem>
+                      <SelectItem value="Europe/London">Europe/London (GMT/BST)</SelectItem>
+                      <SelectItem value="Asia/Tokyo">Asia/Tokyo (GMT+9)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div className="flex flex-col border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 rounded-[14px] focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+                <span className={labelClass}>Bio</span>
+                <textarea
+                  className="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 w-full resize-none min-h-[60px]"
+                  placeholder="Tell us about the company..."
+                  value={compFormBio}
+                  onChange={(e) => setCompFormBio(e.target.value)}
+                />
+              </div>
+
+              {/* Custom Fields List */}
+              {compFormCustomFields.length > 0 && (
+                <div className="space-y-3">
+                  {compFormCustomFields.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className="flex-grow grid grid-cols-[1fr_2fr] border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 rounded-[14px] divide-x divide-[#d0d0eb] dark:divide-slate-700 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all overflow-hidden">
+                        <div className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                          <span className={labelClass}>Field Label</span>
+                          <input
+                            className={inputClass}
+                            placeholder="Label"
+                            value={item.label}
+                            onChange={(e) => {
+                              const updated = [...compFormCustomFields];
+                              updated[index].label = e.target.value;
+                              setCompFormCustomFields(updated);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-0 p-3 py-2 flex flex-col justify-center">
+                          <span className={labelClass}>Field Value</span>
+                          <input
+                            className={inputClass}
+                            placeholder="Value"
+                            value={item.value}
+                            onChange={(e) => {
+                              const updated = [...compFormCustomFields];
+                              updated[index].value = e.target.value;
+                              setCompFormCustomFields(updated);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-[14px] border border-dashed border-[#d0d0eb] dark:border-slate-700 shrink-0"
+                        onClick={() => {
+                          setCompFormCustomFields(compFormCustomFields.filter((_, idx) => idx !== index));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add Custom Field Button */}
+              <button
                 type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsCompanyCreateOpen(false);
-                  setEditingCompany(null);
-                  setCompFormName('');
-                  setCompFormEmail('');
-                  setCompFormPhone('');
-                  setCompFormCustomFields([]);
-                }}
-                className="flex-1 rounded-[14px] h-10 border border-[#d0d0eb] text-muted-foreground bg-slate-50 hover:bg-slate-100 font-semibold"
+                onClick={() => setCompFormCustomFields([...compFormCustomFields, { label: '', value: '' }])}
+                className="w-full flex items-center justify-between border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-muted/50 rounded-[14px] p-3 text-muted-foreground transition-all"
               >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleCompanySubmit}
-                disabled={!compFormName.trim() || isAddingClient || isUpdatingClient}
-                className={cn(
-                  "flex-1 rounded-[14px] h-10 font-bold transition-all flex items-center justify-center gap-1.5",
-                  compFormName.trim()
-                    ? "bg-[#47c947] hover:bg-[#3fb33f] text-white"
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300"
-                )}
-              >
-                {compFormName.trim()
-                  ? (editingCompany ? 'Save changes' : 'Create company →')
-                  : 'Enter company name to continue →'}
-              </Button>
+                <div className="flex items-center gap-3 font-semibold text-xs text-[#8b8ba9] dark:text-slate-300">
+                  <div className="h-4 w-4 rounded-md border border-current flex items-center justify-center text-[10px] font-bold">
+                    +
+                  </div>
+                  <span>Add custom field</span>
+                </div>
+                <HelpCircle className="h-4 w-4 text-muted-foreground/40" />
+              </button>
+
+              {/* Action Buttons (Plutio styling) */}
+              <div className="flex gap-3 pt-4 border-t border-border/20">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsCompanyCreateOpen(false);
+                    setEditingCompany(null);
+                    setCompFormName('');
+                    setCompFormEmail('');
+                    setCompFormPhone('');
+                    setCompFormCustomFields([]);
+                    setCompFormAddress('');
+                    setCompFormCityState('');
+                    setCompFormCountry('');
+                    setCompFormZip('');
+                    setCompFormTimezone('Asia/Bangkok');
+                    setCompFormBio('');
+                  }}
+                  className="flex-1 rounded-[14px] h-10 border border-[#d0d0eb] text-muted-foreground bg-slate-50 hover:bg-slate-100 font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCompanySubmit}
+                  disabled={!compFormName.trim() || isAddingClient || isUpdatingClient}
+                  className={cn(
+                    "flex-1 rounded-[14px] h-10 font-bold transition-all flex items-center justify-center gap-1.5",
+                    compFormName.trim()
+                      ? "bg-[#47c947] hover:bg-[#3fb33f] text-white"
+                      : "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300"
+                  )}
+                >
+                  {compFormName.trim()
+                    ? (editingCompany ? 'Save changes' : 'Create company →')
+                    : 'Enter company name to continue →'}
+                </Button>
+              </div>
             </div>
-          </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 

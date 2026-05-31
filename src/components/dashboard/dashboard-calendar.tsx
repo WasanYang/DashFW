@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
-import { Project } from '@/lib/types';
+import { Task } from '@/lib/types';
 import {
   format,
   startOfWeek,
@@ -22,10 +22,10 @@ import {
 } from 'date-fns';
 
 interface DashboardCalendarProps {
-  projects: Project[];
+  tasks: Task[];
 }
 
-export function DashboardCalendar({ projects }: DashboardCalendarProps) {
+export function DashboardCalendar({ tasks }: DashboardCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
 
@@ -170,8 +170,8 @@ export function DashboardCalendar({ projects }: DashboardCalendarProps) {
             <div className="grid grid-cols-7 divide-x divide-y divide-border/50 text-sm">
               {monthDays.map((day) => {
                 const dayKey = format(day, 'yyyy-MM-dd');
-                const dayProjects = projects.filter(
-                  (p) => p.deadline && isSameDay(new Date(p.deadline), day)
+                const dayTasks = tasks.filter(
+                  (t) => t.deadline && isSameDay(new Date(t.deadline), day)
                 );
                 const isCurrentMonth = day.getMonth() === currentDate.getMonth();
                 const isToday = isSameDay(day, new Date());
@@ -194,31 +194,31 @@ export function DashboardCalendar({ projects }: DashboardCalendarProps) {
                       >
                         {format(day, 'd')}
                       </span>
-                      {dayProjects.length > 0 && (
+                      {dayTasks.length > 0 && (
                         <span className="text-[9px] font-bold text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded-full border border-primary/10">
-                          {dayProjects.length} task{dayProjects.length === 1 ? '' : 's'}
+                          {dayTasks.length} task{dayTasks.length === 1 ? '' : 's'}
                         </span>
                       )}
                     </div>
 
                     <div className="flex-1 flex flex-col gap-1 overflow-y-auto max-h-[85px] pr-0.5">
-                      {dayProjects.map((p) => (
+                      {dayTasks.map((t) => (
                         <Link
-                          key={p.id}
-                          href={`/board/${p.id}`}
+                          key={t.id}
+                          href={t.projectId ? `/board/${t.projectId}` : `/board`}
                           className={cn(
                             "block text-[10px] px-2 py-1.5 rounded-lg font-semibold truncate border leading-tight transition-all duration-150 hover:scale-[1.01] hover:shadow-xs cursor-pointer",
-                            p.status === 'Completed' || p.status === 'Paid'
+                            t.status === 'Completed' || t.status === 'Paid'
                               ? 'bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/15'
-                              : p.status === 'Review'
+                              : t.status === 'Review'
                               ? 'bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/15'
-                              : p.status === 'In Progress'
+                              : t.status === 'In Progress'
                               ? 'bg-primary/10 text-primary border-primary/25 hover:bg-primary/15'
                               : 'bg-muted text-muted-foreground border-muted-foreground/10 hover:bg-muted/90'
                           )}
-                          title={`${p.title} (${p.status})`}
+                          title={`${t.title} (${t.status})`}
                         >
-                          {p.title}
+                          {t.title}
                         </Link>
                       ))}
                     </div>
@@ -231,8 +231,8 @@ export function DashboardCalendar({ projects }: DashboardCalendarProps) {
           <div className="min-w-[800px] grid grid-cols-7 divide-x divide-border/50 text-sm">
             {weekDays.map((day) => {
               const dayKey = format(day, 'yyyy-MM-dd');
-              const dayProjects = projects.filter(
-                (p) => p.deadline && isSameDay(new Date(p.deadline), day)
+              const dayTasks = tasks.filter(
+                (t) => t.deadline && isSameDay(new Date(t.deadline), day)
               );
               const isToday = isSameDay(day, new Date());
 
@@ -261,41 +261,41 @@ export function DashboardCalendar({ projects }: DashboardCalendarProps) {
                     </span>
                   </div>
 
-                  {/* Project Deadlines list */}
+                  {/* Task Deadlines list */}
                   <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[190px] pr-0.5">
-                    {dayProjects.length === 0 ? (
+                    {dayTasks.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-muted-foreground/15 rounded-xl p-3 bg-muted/5 min-h-[70px]">
                         <span className="text-[10px] text-muted-foreground/50 font-medium">
                           No deadlines
                         </span>
                       </div>
                     ) : (
-                      dayProjects.map((p) => (
+                      dayTasks.map((t) => (
                         <Link
-                          key={p.id}
-                          href={`/board/${p.id}`}
+                          key={t.id}
+                          href={t.projectId ? `/board/${t.projectId}` : `/board`}
                           className={cn(
                             "block text-[11px] p-2.5 rounded-xl font-semibold border leading-tight transition-all duration-200 hover:scale-[1.02] hover:shadow-xs cursor-pointer",
-                            p.status === 'Completed' || p.status === 'Paid'
+                            t.status === 'Completed' || t.status === 'Paid'
                               ? 'bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/15'
-                              : p.status === 'Review'
+                              : t.status === 'Review'
                               ? 'bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/15'
-                              : p.status === 'In Progress'
+                              : t.status === 'In Progress'
                               ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
                               : 'bg-muted text-muted-foreground border-muted-foreground/10 hover:bg-muted/90'
                           )}
-                          title={`${p.title} (${p.status})`}
+                          title={`${t.title} (${t.status})`}
                         >
                           <div className="font-bold text-foreground/90 mb-1.5 truncate">
-                            {p.title}
+                            {t.title}
                           </div>
                           <div className="flex justify-between items-center text-[9px] opacity-80 font-normal">
                             <span className="px-1.5 py-0.5 rounded-full bg-background/50 border text-[8px] font-bold uppercase tracking-wider">
-                              {p.status}
+                              {t.status}
                             </span>
-                            {p.gross_price > 0 && (
+                            {t.gross_price > 0 && (
                               <span className="font-bold text-foreground/80">
-                                ฿{p.gross_price.toLocaleString()}
+                                ฿{t.gross_price.toLocaleString()}
                               </span>
                             )}
                           </div>

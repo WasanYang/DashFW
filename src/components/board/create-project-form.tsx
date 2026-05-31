@@ -26,7 +26,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Client, Project, SubTask, JobType } from '@/lib/types';
+import { Client, Task, SubTask, JobType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -35,7 +35,7 @@ import { fetchJobTypes } from '@/services/jobTypeClient';
 
 interface CreateProjectFormProps {
   clients: Client[];
-  onSubmit: (data: Omit<Project, 'id' | 'status' | 'revisions'>) => void;
+  onSubmit: (data: Omit<Task, 'id' | 'status' | 'revisions'>) => void;
   translations: Record<string, string>;
 }
 

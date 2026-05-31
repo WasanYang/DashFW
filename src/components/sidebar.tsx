@@ -39,8 +39,8 @@ const navGroups = [
     id: 'core',
     items: [
       { href: '/dashboard', label: 'Home', icon: Home },
-      { href: '/board', label: 'Projects', icon: FolderKanban },
-      { href: '/board', label: 'Tasks', icon: ListTodo, wip: true },
+      { href: '/projects', label: 'Projects', icon: FolderKanban },
+      { href: '/board', label: 'Tasks', icon: ListTodo },
       { href: '/snippets', label: 'Inbox', icon: Inbox, wip: true },
     ]
   },
@@ -93,7 +93,8 @@ export function AppSidebar() {
 
   const getIsActive = (href: string, label: string) => {
     if (pathname === '/dashboard') return label === 'Home';
-    if (pathname === '/board') return label === 'Projects';
+    if (pathname === '/projects') return label === 'Projects';
+    if (pathname === '/board') return label === 'Tasks';
     if (pathname === '/snippets') return label === 'AI Snippets';
     if (pathname === '/checklists') return label === 'AI Checklists';
     if (pathname === '/invoices') return label === 'Proposals';

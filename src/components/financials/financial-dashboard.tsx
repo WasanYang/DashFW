@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useGetProjectsQuery } from '@/services/projectApi';
+import { useGetTasksQuery } from '@/services/taskApi';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import {
   BarChart,
@@ -19,7 +19,7 @@ import {
 const FASTWORK_FEE_RATE = 0.1; // 10%
 
 export function FinancialDashboard() {
-  const { data: projects = [], isLoading } = useGetProjectsQuery();
+  const { data: tasks = [], isLoading } = useGetTasksQuery();
   const [grossPrice, setGrossPrice] = useState<number | string>('');
 
   const netProfit = useMemo(() => {
@@ -36,16 +36,16 @@ export function FinancialDashboard() {
 
   // Dynamically calculate Pipeline and Withdrawn Earnings from DB
   const pipelineTotal = useMemo(() => {
-    return projects
-      .filter((p) => p.status !== 'Completed' && p.status !== 'Paid')
-      .reduce((sum, p) => sum + (p.gross_price || 0), 0);
-  }, [projects]);
+    return tasks
+      .filter((t) => t.status !== 'Completed' && t.status !== 'Paid')
+      .reduce((sum, t) => sum + (t.gross_price || 0), 0);
+  }, [tasks]);
 
   const withdrawnTotal = useMemo(() => {
-    return projects
-      .filter((p) => p.status === 'Paid')
-      .reduce((sum, p) => sum + (p.gross_price || 0) * (1 - FASTWORK_FEE_RATE), 0);
-  }, [projects]);
+    return tasks
+      .filter((t) => t.status === 'Paid')
+      .reduce((sum, t) => sum + (t.gross_price || 0) * (1 - FASTWORK_FEE_RATE), 0);
+  }, [tasks]);
 
   const monthlyData = useMemo(() => {
     // Generate the last 6 months dynamically (including the current month)
@@ -59,20 +59,20 @@ export function FinancialDashboard() {
       const monthEnd = endOfMonth(monthDate);
       const label = format(monthDate, 'MMM');
 
-      // Filter projects that have deadline in this month
-      const monthProjects = projects.filter((p) => {
-        if (!p.deadline) return false;
-        const d = new Date(p.deadline);
+      // Filter tasks that have deadline in this month
+      const monthTasks = tasks.filter((t) => {
+        if (!t.deadline) return false;
+        const d = new Date(t.deadline);
         return d >= monthStart && d <= monthEnd;
       });
 
-      const pipeline = monthProjects
-        .filter((p) => p.status !== 'Completed' && p.status !== 'Paid')
-        .reduce((sum, p) => sum + (p.gross_price || 0), 0);
+      const pipeline = monthTasks
+        .filter((t) => t.status !== 'Completed' && t.status !== 'Paid')
+        .reduce((sum, t) => sum + (t.gross_price || 0), 0);
 
-      const withdrawn = monthProjects
-        .filter((p) => p.status === 'Paid')
-        .reduce((sum, p) => sum + (p.gross_price || 0) * (1 - FASTWORK_FEE_RATE), 0);
+      const withdrawn = monthTasks
+        .filter((t) => t.status === 'Paid')
+        .reduce((sum, t) => sum + (t.gross_price || 0) * (1 - FASTWORK_FEE_RATE), 0);
 
       return {
         month: label,
@@ -80,7 +80,7 @@ export function FinancialDashboard() {
         withdrawn,
       };
     });
-  }, [projects]);
+  }, [tasks]);
 
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Loading financials...</div>;

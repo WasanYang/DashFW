@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -19,8 +20,10 @@ import {
   Clock,
   FileText,
   Globe,
+  Settings,
 } from 'lucide-react';
 import { useGetProjectsQuery } from '@/services/projectApi';
+import { useGetTasksQuery } from '@/services/taskApi';
 import { useGetClientsQuery } from '@/services/clientApi';
 import { useGetInvoicesQuery } from '@/services/invoiceApi';
 import { useGetProposalsQuery } from '@/services/proposalApi';
@@ -56,6 +59,7 @@ const PIE_COLORS = ['#3b82f6', '#f472b6'];
 
 export default function DashboardPage() {
   const { data: projects = [], isLoading: loadingProjects } = useGetProjectsQuery();
+  const { data: tasks = [], isLoading: loadingTasks } = useGetTasksQuery();
   const { data: clients = [], isLoading: loadingClients } = useGetClientsQuery();
   const { data: invoices = [], isLoading: loadingInvoices } = useGetInvoicesQuery();
   const { data: proposals = [], isLoading: loadingProposals } = useGetProposalsQuery();
@@ -72,6 +76,12 @@ export default function DashboardPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [trackerTaskName, setTrackerTaskName] = useState('');
   const [trackerProjectId, setTrackerProjectId] = useState('none');
+  const [trackerContactId, setTrackerContactId] = useState('none');
+  const [trackerBillable, setTrackerBillable] = useState(true);
+  const [trackerBillingRate, setTrackerBillingRate] = useState<number | string>('');
+  const [trackerCostRate, setTrackerCostRate] = useState<number | string>('');
+  const [trackerCategory, setTrackerCategory] = useState('Development');
+  const [showSettings, setShowSettings] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Google Calendar Integration states
@@ -110,12 +120,22 @@ export default function DashboardPage() {
     const savedStartTime = localStorage.getItem('dashfw_timer_start');
     const savedTaskName = localStorage.getItem('dashfw_timer_task');
     const savedProjectId = localStorage.getItem('dashfw_timer_project');
+    const savedContactId = localStorage.getItem('dashfw_timer_contact');
+    const savedBillable = localStorage.getItem('dashfw_timer_billable');
+    const savedBillingRate = localStorage.getItem('dashfw_timer_billing_rate');
+    const savedCostRate = localStorage.getItem('dashfw_timer_cost_rate');
+    const savedCategory = localStorage.getItem('dashfw_timer_category');
     
     if (savedStartTime) {
       const parsedStart = new Date(savedStartTime);
       setStartTime(parsedStart);
       setTrackerTaskName(savedTaskName || '');
       setTrackerProjectId(savedProjectId || 'none');
+      setTrackerContactId(savedContactId || 'none');
+      setTrackerBillable(savedBillable !== 'false');
+      setTrackerBillingRate(savedBillingRate || '');
+      setTrackerCostRate(savedCostRate || '');
+      setTrackerCategory(savedCategory || 'Development');
       setIsTracking(true);
       
       const secondsDiff = Math.floor((new Date().getTime() - parsedStart.getTime()) / 1000);
@@ -149,6 +169,11 @@ export default function DashboardPage() {
     localStorage.setItem('dashfw_timer_start', now.toISOString());
     localStorage.setItem('dashfw_timer_task', trackerTaskName);
     localStorage.setItem('dashfw_timer_project', trackerProjectId);
+    localStorage.setItem('dashfw_timer_contact', trackerContactId);
+    localStorage.setItem('dashfw_timer_billable', String(trackerBillable));
+    localStorage.setItem('dashfw_timer_billing_rate', String(trackerBillingRate));
+    localStorage.setItem('dashfw_timer_cost_rate', String(trackerCostRate));
+    localStorage.setItem('dashfw_timer_category', trackerCategory);
   };
 
   const handleStopTimer = async () => {
@@ -163,17 +188,33 @@ export default function DashboardPage() {
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
       duration: elapsedSeconds,
-      note: ''
+      note: '',
+      contactId: trackerContactId !== 'none' ? trackerContactId : undefined,
+      billable: trackerBillable,
+      billingRate: trackerBillingRate ? Number(trackerBillingRate) : undefined,
+      costRate: trackerCostRate ? Number(trackerCostRate) : undefined,
+      category: trackerCategory,
+      costStatus: 'Unpaid'
     });
     
     // Clear localStorage
     localStorage.removeItem('dashfw_timer_start');
     localStorage.removeItem('dashfw_timer_task');
     localStorage.removeItem('dashfw_timer_project');
+    localStorage.removeItem('dashfw_timer_contact');
+    localStorage.removeItem('dashfw_timer_billable');
+    localStorage.removeItem('dashfw_timer_billing_rate');
+    localStorage.removeItem('dashfw_timer_cost_rate');
+    localStorage.removeItem('dashfw_timer_category');
     
     // Reset states
     setTrackerTaskName('');
     setTrackerProjectId('none');
+    setTrackerContactId('none');
+    setTrackerBillable(true);
+    setTrackerBillingRate('');
+    setTrackerCostRate('');
+    setTrackerCategory('Development');
     setElapsedSeconds(0);
     setStartTime(null);
   };
@@ -254,7 +295,7 @@ export default function DashboardPage() {
       'Completed': 0,
       'Paid': 0,
     };
-    projects.forEach((p) => {
+    tasks.forEach((p) => {
       if (counts[p.status] !== undefined) {
         counts[p.status]++;
       }
@@ -264,12 +305,12 @@ export default function DashboardPage() {
       name: key,
       value: counts[key] * 100, // scaled for chart aesthetics
     }));
-  }, [projects]);
+  }, [tasks]);
 
   // Projects status distribution (Donut)
   const projectsStatusData = useMemo(() => {
     const statusCounts: { [key: string]: number } = {};
-    projects.forEach((p) => {
+    tasks.forEach((p) => {
       statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
     });
 
@@ -286,13 +327,13 @@ export default function DashboardPage() {
       ];
     }
     return data;
-  }, [projects]);
+  }, [tasks]);
 
   // Tasks Completion rate (Pie)
   const tasksProgressData = useMemo(() => {
     let completed = 0;
     let total = 0;
-    projects.forEach((p) => {
+    tasks.forEach((p) => {
       if (p.subTasks) {
         p.subTasks.forEach((t) => {
           total++;
@@ -311,7 +352,7 @@ export default function DashboardPage() {
       { name: 'Completed', value: completed },
       { name: 'Remaining', value: total - completed },
     ];
-  }, [projects]);
+  }, [tasks]);
 
   // Timesheet: Completed projects value over the last 6 months
   const timesheetData = useMemo(() => {
@@ -325,7 +366,7 @@ export default function DashboardPage() {
       const monthEnd = endOfMonth(m);
       const label = format(m, 'MMM');
 
-      const completedVal = projects
+      const completedVal = tasks
         .filter((p) => {
           if (!p.deadline) return false;
           const d = new Date(p.deadline);
@@ -338,12 +379,13 @@ export default function DashboardPage() {
         value: completedVal,
       };
     });
-  }, [projects]);
+  }, [tasks]);
 
-  const hasRealData = projects.length > 0;
+  const hasRealData = tasks.length > 0;
 
   if (
     loadingProjects ||
+    loadingTasks ||
     loadingClients ||
     loadingInvoices ||
     loadingProposals ||
@@ -390,10 +432,23 @@ export default function DashboardPage() {
               </Select>
             </div>
             
-            <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end shrink-0 border-t md:border-t-0 pt-3 md:pt-0">
-              <span className="font-mono text-2xl font-bold tracking-wider text-foreground select-none">
+            <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0 border-t md:border-t-0 pt-3 md:pt-0">
+              <span className="font-mono text-2xl font-bold tracking-wider text-foreground select-none mr-2">
                 {formatDuration(elapsedSeconds)}
               </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettings((prev) => !prev)}
+                className={cn(
+                  "h-10 w-10 rounded-xl border border-border/60 transition-colors",
+                  showSettings && "bg-muted text-primary"
+                )}
+                title="Timer Settings"
+              >
+                <Settings className="w-4.5 h-4.5" />
+              </Button>
               {isTracking ? (
                 <Button
                   onClick={handleStopTimer}
@@ -412,11 +467,101 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          {/* Collapsible Plutio-style settings drawer */}
+          {showSettings && (
+            <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              {/* Member / Contact */}
+              <div className="space-y-1">
+                <Label htmlFor="trackerContact" className="text-xs font-semibold text-muted-foreground">Assignee / Member</Label>
+                <Select
+                  value={trackerContactId}
+                  onValueChange={setTrackerContactId}
+                  disabled={isTracking}
+                >
+                  <SelectTrigger id="trackerContact" className="bg-background border-border/60 h-10 rounded-xl text-xs">
+                    <SelectValue placeholder="Select Member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">General (No Assignee)</SelectItem>
+                    {clients.map((c) => (
+                      <SelectItem key={c._id} value={c._id} className="text-xs">
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Category */}
+              <div className="space-y-1">
+                <Label htmlFor="trackerCategory" className="text-xs font-semibold text-muted-foreground">Category</Label>
+                <Select
+                  value={trackerCategory}
+                  onValueChange={setTrackerCategory}
+                  disabled={isTracking}
+                >
+                  <SelectTrigger id="trackerCategory" className="bg-background border-border/60 h-10 rounded-xl text-xs">
+                    <SelectValue placeholder="Select Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Development" className="text-xs">Development</SelectItem>
+                    <SelectItem value="Design" className="text-xs">Design</SelectItem>
+                    <SelectItem value="Marketing" className="text-xs">Marketing</SelectItem>
+                    <SelectItem value="Consulting" className="text-xs">Consulting</SelectItem>
+                    <SelectItem value="Writing" className="text-xs">Writing</SelectItem>
+                    <SelectItem value="Support" className="text-xs">Support</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Billing Rate */}
+              <div className="space-y-1">
+                <Label htmlFor="trackerBillingRate" className="text-xs font-semibold text-muted-foreground">Billing Rate (/hr)</Label>
+                <Input
+                  id="trackerBillingRate"
+                  type="number"
+                  placeholder="e.g. 50"
+                  value={trackerBillingRate}
+                  onChange={(e) => setTrackerBillingRate(e.target.value)}
+                  disabled={isTracking}
+                  className="bg-background border-border/60 h-10 rounded-xl text-xs"
+                />
+              </div>
+
+              {/* Cost Rate */}
+              <div className="space-y-1">
+                <Label htmlFor="trackerCostRate" className="text-xs font-semibold text-muted-foreground">Cost Rate (/hr)</Label>
+                <Input
+                  id="trackerCostRate"
+                  type="number"
+                  placeholder="e.g. 30"
+                  value={trackerCostRate}
+                  onChange={(e) => setTrackerCostRate(e.target.value)}
+                  disabled={isTracking}
+                  className="bg-background border-border/60 h-10 rounded-xl text-xs"
+                />
+              </div>
+
+              {/* Billable Checkbox */}
+              <div className="flex flex-col justify-center items-center h-full pt-4 md:pt-0">
+                <Label htmlFor="trackerBillable" className="text-xs font-semibold text-muted-foreground mb-1.5">Billable Time</Label>
+                <input
+                  id="trackerBillable"
+                  type="checkbox"
+                  checked={trackerBillable}
+                  onChange={(e) => setTrackerBillable(e.target.checked)}
+                  disabled={isTracking}
+                  className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* SECTION 1: CALENDAR (Top) */}
-      <DashboardCalendar projects={projects} />
+      <DashboardCalendar tasks={tasks} />
 
       {/* SECTION 2: 3-COLUMN BAR CHARTS GRID (Middle) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -595,10 +740,34 @@ export default function DashboardPage() {
               <div className="divide-y divide-border/40">
                 {timeLogs.map((log) => (
                   <div key={log.id} className="py-3 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold text-sm truncate">{log.taskName}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {log.projectTitle || 'General Time'} &bull; {format(new Date(log.startTime), 'MMM d, h:mm a')}
+                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span>{log.projectTitle || 'General Time'}</span>
+                        <span>&bull;</span>
+                        <span>{format(new Date(log.startTime), 'MMM d, h:mm a')}</span>
+                        {log.category && (
+                          <>
+                            <span>&bull;</span>
+                            <span className="bg-primary/5 text-primary text-[10px] px-1.5 py-0.5 rounded font-medium">{log.category}</span>
+                          </>
+                        )}
+                        {log.billable && (
+                          <>
+                            <span>&bull;</span>
+                            <span className="text-green-600 bg-green-500/10 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                              Billable{log.billingRate ? ` ($${log.billingRate}/hr)` : ''}
+                            </span>
+                          </>
+                        )}
+                        {log.contactId && (
+                          <>
+                            <span>&bull;</span>
+                            <span className="text-slate-500 text-[10px]">
+                              Member: {clients.find(c => c._id === log.contactId)?.name || 'Unknown'}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">

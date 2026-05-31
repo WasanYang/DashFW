@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, DragEvent, useMemo } from 'react';
-import { Project, SubTask } from '@/lib/types';
+import { Task, SubTask } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { JobType } from '@/app/(protect)/job-types/page';
 import { useGetJobTypesQuery } from '@/services/jobTypeApiSlice';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Minus, Plus, ChevronDown } from 'lucide-react';
+import { Clock, Minus, Plus, ChevronDown, Archive } from 'lucide-react';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,7 +17,7 @@ import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
 import { formatNumber } from '@/lib/number-format';
 
 export interface KanbanCardProps {
-  project: Project;
+  project: Task;
   onDragStart: (
     e: DragEvent<HTMLDivElement>,
     projectId: string,
@@ -35,8 +35,8 @@ export interface KanbanCardProps {
     status: string,
   ) => void;
   index: number;
-  updateProject: (project: Project) => void;
-  onCardClick: (project: Project) => void;
+  updateProject: (project: Task) => void;
+  onCardClick: (project: Task) => void;
   status: string;
 }
 
@@ -181,7 +181,8 @@ export function KanbanCard({
           onDragOver ? (e) => onDragOver(e, index, status) : undefined
         }
         onDrop={onDrop ? (e) => onDrop(e, index, status) : undefined}
-        className='cursor-grab active:cursor-grabbing'
+        className='cursor-grab active:cursor-grabbing transition-all duration-200'
+        style={{ borderTop: project.color ? `4px solid ${project.color}` : undefined }}
       >
         <CardHeader className='p-4 flex flex-row items-center justify-between'>
           <div
@@ -189,10 +190,15 @@ export function KanbanCard({
             className='cursor-pointer  flex-1 min-w-0'
           >
             <CardTitle
-              className='text-base truncate max-w-full hover:underline'
+              className='text-base truncate max-w-full hover:underline flex items-center gap-1.5'
               title={project.title}
             >
-              {project.title}
+              <span className="truncate">{project.title}</span>
+              {project.archived && (
+                <Badge variant="outline" className="text-[9px] font-bold text-destructive bg-destructive/10 border-destructive/20 uppercase shrink-0 py-0 px-1.5 h-4">
+                  Archived
+                </Badge>
+              )}
             </CardTitle>
             <div className='flex flex-row gap-2 items-center mt-1'>
               {project.client?.name && (
@@ -207,6 +213,21 @@ export function KanbanCard({
               )}
             </div>
           </div>
+          <Button
+            variant='ghost'
+            size='icon'
+            className={cn(
+              'ml-2 h-6 w-6 flex-shrink-0 text-muted-foreground transition-colors hover:bg-muted',
+              project.archived ? 'text-destructive hover:text-destructive/80' : 'hover:text-primary'
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              updateProject({ ...project, archived: !project.archived });
+            }}
+            title={project.archived ? 'Restore from Archive' : 'Archive Task'}
+          >
+            <Archive className='h-4 w-4' />
+          </Button>
           <Button
             variant='ghost'
             size='icon'
