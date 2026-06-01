@@ -53,6 +53,7 @@ export type Project = {
   company?: Company | null;
   status?: string;
   relatedProjectIds?: string[];
+  boardViews?: string[];
 };
 
 export type Task = {

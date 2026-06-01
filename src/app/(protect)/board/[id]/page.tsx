@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { RepeatsPopover } from '@/components/board/repeats-popover';
 import {
   ArrowLeft,
@@ -22,7 +23,8 @@ import {
   Share2,
   Trash2,
   Plus,
-  Pencil,
+  Copy,
+  Edit2,
   Search,
   Calendar as CalendarIcon,
   ChevronDown,
@@ -152,7 +154,10 @@ export default function ProjectDetailsPage() {
   const projectTasks = tasks.filter((t) => t.projectId === id);
 
   // Extract distinct views from tasks
-  const distinctViews = Array.from(new Set(projectTasks.map(t => t.boardView || 'Main View')));
+  const distinctViews = Array.from(new Set([
+    ...(project?.boardViews || []),
+    ...projectTasks.map(t => t.boardView || 'Main View')
+  ]));
   if (!distinctViews.includes('Main View')) {
     distinctViews.unshift('Main View');
   }
@@ -218,16 +223,22 @@ export default function ProjectDetailsPage() {
       return;
     }
     
-    // Find all tasks currently in this view
-    const tasksInView = projectTasks.filter(t => (t.boardView || 'Main View') === oldName);
+    // 1. Save new view list to project so empty views persist
+    const newViews = distinctViews.map(v => v === oldName ? trimmed : v);
+    if (!newViews.includes(trimmed)) newViews.push(trimmed);
     
     try {
-      // Update them all to the new view name
-      await Promise.all(
-        tasksInView.map(t => 
-          updateTask({ id: t.id, data: { boardView: trimmed } }).unwrap()
-        )
-      );
+      await updateProject({ id, data: { boardViews: Array.from(new Set(newViews)) } }).unwrap();
+      
+      // 2. Find all tasks currently in this view and update them
+      const tasksInView = projectTasks.filter(t => (t.boardView || 'Main View') === oldName);
+      if (tasksInView.length > 0) {
+        await Promise.all(
+          tasksInView.map(t => 
+            updateTask({ id: t.id, data: { boardView: trimmed } }).unwrap()
+          )
+        );
+      }
       toast({ title: 'สำเร็จ', description: `เปลี่ยนชื่อเป็น "${trimmed}" เรียบร้อย` });
     } catch (err) {
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถเปลี่ยนชื่อ View ได้', variant: 'destructive' });
@@ -235,6 +246,71 @@ export default function ProjectDetailsPage() {
     
     setEditingViewName(null);
     setActiveBoardView(trimmed);
+  };
+
+  const handleAddView = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || distinctViews.includes(trimmed)) return;
+    const newViews = [...distinctViews, trimmed];
+    try {
+      await updateProject({ id, data: { boardViews: newViews } }).unwrap();
+      setActiveBoardView(trimmed);
+    } catch (err) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถเพิ่ม View ใหม่ได้', variant: 'destructive' });
+    }
+  };
+
+  const handleDuplicateView = async (viewName: string) => {
+    const newViewName = `${viewName} (Copy)`;
+    
+    // 1. Add to project.boardViews
+    const newViews = [...distinctViews, newViewName];
+    try {
+      await updateProject({ id, data: { boardViews: newViews } }).unwrap();
+      
+      // 2. Duplicate all tasks
+      const tasksInView = projectTasks.filter(t => (t.boardView || 'Main View') === viewName);
+      if (tasksInView.length > 0) {
+        await Promise.all(
+          tasksInView.map(t => {
+            const taskData: any = { ...t };
+            delete taskData.id;
+            delete taskData.googleEventId;
+            return addTask({ ...taskData, boardView: newViewName }).unwrap();
+          })
+        );
+      }
+      toast({ title: 'ทำสำเนาสำเร็จ', description: `สร้าง "${newViewName}" เรียบร้อยแล้ว` });
+      setActiveBoardView(newViewName);
+    } catch (err) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถทำสำเนา View ได้', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteView = async (viewName: string) => {
+    if (viewName === 'Main View') {
+      toast({ title: 'ไม่สามารถลบได้', description: 'Main View เป็นมุมมองหลักของโปรเจกต์', variant: 'destructive' });
+      return;
+    }
+    if (!window.confirm(`คุณต้องการลบ View "${viewName}" และงานทั้งหมดที่อยู่ในนี้ใช่หรือไม่?`)) return;
+    
+    // 1. Remove from project.boardViews
+    const newViews = distinctViews.filter(v => v !== viewName);
+    try {
+      await updateProject({ id, data: { boardViews: newViews } }).unwrap();
+      
+      // 2. Delete all tasks in this view
+      const tasksInView = projectTasks.filter(t => t.boardView === viewName);
+      if (tasksInView.length > 0) {
+        await Promise.all(
+          tasksInView.map(t => deleteTask({ id: t.id }).unwrap())
+        );
+      }
+      toast({ title: 'ลบสำเร็จ', description: `ลบ View "${viewName}" เรียบร้อยแล้ว` });
+      setActiveBoardView('Main View');
+    } catch (err) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถลบ View ได้', variant: 'destructive' });
+    }
   };
 
   const handleAddTask = async (groupName: string, text: string) => {
@@ -527,15 +603,15 @@ export default function ProjectDetailsPage() {
           <div className="flex items-start gap-4">
             <div className="flex-1 space-y-6 min-w-0 pb-12">
             
-            {/* Horizontal Board Views */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border/50 mb-4">
+            {/* Horizontal Board Views - Browser Tab Style */}
+            <div className="flex items-end gap-1 overflow-x-auto border-b border-border/70 mb-6 pl-1 pt-2">
               {distinctViews.map(view => (
                 editingViewName === view ? (
                   <Input
                     key={`edit-${view}`}
                     value={editedViewNameValue}
                     onChange={(e) => setEditedViewNameValue(e.target.value)}
-                    className="h-8 w-32 text-xs rounded-xl border-border/60 bg-background"
+                    className="h-9 w-32 text-xs rounded-t-lg rounded-b-none border-border bg-background translate-y-[1px] focus-visible:ring-0 focus-visible:ring-offset-0 relative z-10"
                     autoFocus
                     onBlur={() => handleRenameView(view, editedViewNameValue)}
                     onKeyDown={(e) => {
@@ -546,29 +622,60 @@ export default function ProjectDetailsPage() {
                 ) : (
                   <div key={view} className="relative group flex items-center">
                     <Button
-                      variant={activeBoardView === view ? 'secondary' : 'ghost'}
+                      variant="ghost"
                       onClick={() => setActiveBoardView(view)}
                       className={cn(
-                        "rounded-xl h-8 px-4 text-xs font-semibold transition-all shrink-0 pr-8",
-                        activeBoardView === view ? "bg-muted text-foreground border border-border/60 shadow-sm" : "text-muted-foreground hover:bg-muted/50"
+                        "rounded-t-lg rounded-b-none h-9 px-4 text-[13px] font-medium transition-all shrink-0 pr-8 border",
+                        activeBoardView === view 
+                          ? "bg-background text-foreground border-border/70 border-b-transparent shadow-[0_-2px_10px_rgba(0,0,0,0.02)] translate-y-[1px] relative z-10" 
+                          : "text-muted-foreground border-transparent hover:bg-muted/50 hover:border-border/30 hover:text-foreground"
                       )}
                     >
                       {view}
                     </Button>
-                    {activeBoardView === view && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 h-6 w-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingViewName(view);
-                          setEditedViewNameValue(view);
-                        }}
-                      >
-                        <Pencil className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "absolute right-1 h-6 w-6 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-20",
+                            activeBoardView === view ? "text-foreground" : "text-muted-foreground"
+                          )}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48 rounded-xl">
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingViewName(view);
+                            setEditedViewNameValue(view);
+                          }}
+                        >
+                          <Edit2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicateView(view); }}>
+                          <Copy className="h-4 w-4 mr-2 text-muted-foreground" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        {view !== 'Main View' && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteView(view); }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete View
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 )
               ))}
@@ -583,7 +690,7 @@ export default function ProjectDetailsPage() {
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && newViewName.trim()) {
-                        setActiveBoardView(newViewName.trim());
+                        handleAddView(newViewName);
                         setNewViewName('');
                         setIsAddViewOpen(false);
                       }
@@ -618,30 +725,22 @@ export default function ProjectDetailsPage() {
 
             {/* Search and task stats toolbar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search tasks..."
-                  value={taskSearchQuery}
-                  onChange={(e) => setTaskSearchQuery(e.target.value)}
-                  className="pl-9 h-9 rounded-xl border-border/60 text-xs bg-background"
-                />
-              </div>
-
-              <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                <div className="flex items-center gap-2 flex-grow sm:flex-grow-0">
-                  <Progress value={progressPercent} className="w-24 sm:w-32 h-2" />
-                  <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">
-                    {completedTasksCount}/{totalTasksCount} items ({Math.round(progressPercent)}%)
-                  </span>
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search tasks..."
+                    value={taskSearchQuery}
+                    onChange={(e) => setTaskSearchQuery(e.target.value)}
+                    className="pl-9 h-9 rounded-xl border-border/60 text-xs bg-background"
+                  />
                 </div>
-
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Input
                     placeholder="New task group..."
                     value={newGroupName}
                     onChange={(e) => setNewGroupName(e.target.value)}
-                    className="h-9 w-40 rounded-xl text-xs border-border/60 bg-background"
+                    className="h-9 w-full sm:w-48 rounded-xl text-xs border-border/60 bg-background"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleAddTaskGroup();
                     }}
@@ -652,6 +751,15 @@ export default function ProjectDetailsPage() {
                   >
                     <Plus className="w-3.5 h-3.5" /> Group
                   </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="flex items-center gap-2 flex-grow sm:flex-grow-0">
+                  <Progress value={progressPercent} className="w-24 sm:w-32 h-2" />
+                  <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">
+                    {completedTasksCount}/{totalTasksCount} items ({Math.round(progressPercent)}%)
+                  </span>
                 </div>
               </div>
             </div>
@@ -804,23 +912,24 @@ export default function ProjectDetailsPage() {
                       ))}
 
                       {/* Add new task input inside group */}
-                      <div className="flex gap-2 items-center pt-2 pl-7">
+                      <div className="flex gap-1 items-center pt-2 pl-2 pb-2 mt-2">
+                        <Button
+                          onClick={() => handleAddTaskInGroup(group.id)}
+                          variant="ghost"
+                          className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md shrink-0"
+                          title="Add Task"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
                         <Input
-                          placeholder="What needs to be done?..."
+                          placeholder="Add a new task..."
                           value={newTasksInputs[group.id] || ''}
                           onChange={(e) => setNewTasksInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
-                          className="h-8 rounded-xl border-border/50 text-xs bg-background max-w-md"
+                          className="h-8 text-xs border-transparent shadow-none bg-transparent hover:bg-muted/20 focus-visible:ring-0 focus-visible:bg-background focus-visible:border-border/50 max-w-sm px-2 transition-colors rounded-md"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleAddTaskInGroup(group.id);
                           }}
                         />
-                        <Button
-                          onClick={() => handleAddTaskInGroup(group.id)}
-                          variant="outline"
-                          className="h-8 rounded-xl text-xs px-3 gap-1 shrink-0"
-                        >
-                          <Plus className="w-3 h-3" /> Add Task
-                        </Button>
                       </div>
                     </div>
                   </div>
