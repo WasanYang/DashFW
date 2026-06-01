@@ -72,7 +72,7 @@ import {
   useAddTaskMutation,
   useUpdateTaskMutation,
 } from '@/services/taskApi';
-import { EditableQuillField } from '../ui/editable-quill-field';
+import { EditableNovelField } from '../ui/editable-novel-field';
 import { formatNumber } from '@/lib/number-format';
 import { fetchJobTypes } from '@/services/jobTypeClient';
 import type { JobType } from '@/app/(protect)/job-types/page';
@@ -1775,7 +1775,7 @@ export function KanbanBoard({
                             </span>
                           </AccordionTrigger>
                           <AccordionContent>
-                            <EditableQuillField
+                            <EditableNovelField
                               value={editableProject.details || ''}
                               onChange={(val) =>
                                 handleValueChange('details', val)

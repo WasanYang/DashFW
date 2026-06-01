@@ -54,6 +54,11 @@ export type Project = {
   status?: string;
   relatedProjectIds?: string[];
   boardViews?: string[];
+  detailsSections?: {
+    id: string;
+    title: string;
+    content: string;
+  }[];
 };
 
 export type Task = {

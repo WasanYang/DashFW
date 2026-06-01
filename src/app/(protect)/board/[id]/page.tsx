@@ -12,6 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { EditableNovelField } from '@/components/ui/editable-novel-field';
 import { RepeatsPopover } from '@/components/board/repeats-popover';
 import {
   ArrowLeft,
@@ -38,6 +41,7 @@ import {
   Repeat,
   UserCircle,
   MoreHorizontal,
+  GripVertical,
   Play
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -70,8 +74,7 @@ export default function ProjectDetailsPage() {
   const router = useRouter();
   const id = params?.id as string;
 
-  // Active workspace tab: 'Tasks' | 'Calendar' | 'Timesheet' | 'Invoices' | 'Edit'
-  const [activeTab, setActiveTab] = useState<'Tasks' | 'Calendar' | 'Timesheet' | 'Invoices' | 'Edit'>('Tasks');
+  const [activeTab, setActiveTab] = useState<'Tasks' | 'Notes' | 'Calendar' | 'Timesheet' | 'Invoices' | 'Edit'>('Tasks');
 
   // Search task query
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
@@ -215,7 +218,57 @@ export default function ProjectDetailsPage() {
     return `${hours.toFixed(2)} hrs`;
   };
 
-  // Handler for renaming a view
+  const onDragEndSections = async (result: DropResult) => {
+    if (!result.destination || !project?.detailsSections) return;
+    const { source, destination } = result;
+    if (source.index === destination.index) return;
+    
+    const newSections = Array.from(project.detailsSections);
+    const [moved] = newSections.splice(source.index, 1);
+    newSections.splice(destination.index, 0, moved);
+    
+    await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
+  };
+
+  const onDragEnd = async (result: DropResult) => {
+    const { destination, source, type } = result;
+
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    if (type === 'task') {
+      const sourceGroupId = source.droppableId;
+      const destinationGroupId = destination.droppableId;
+      
+      const sourceGroup = projectTasks.find(t => t.id === sourceGroupId);
+      const destinationGroup = projectTasks.find(t => t.id === destinationGroupId);
+      
+      if (!sourceGroup || !destinationGroup) return;
+
+      if (sourceGroupId === destinationGroupId) {
+        // Reordering within the same group
+        const newSubTasks = Array.from(sourceGroup.subTasks || []);
+        const [movedTask] = newSubTasks.splice(source.index, 1);
+        newSubTasks.splice(destination.index, 0, movedTask);
+        
+        await updateTask({ id: sourceGroupId, data: { subTasks: newSubTasks } }).unwrap();
+      } else {
+        // Moving between groups
+        const sourceSubTasks = Array.from(sourceGroup.subTasks || []);
+        const destSubTasks = Array.from(destinationGroup.subTasks || []);
+        
+        const [movedTask] = sourceSubTasks.splice(source.index, 1);
+        destSubTasks.splice(destination.index, 0, movedTask);
+        
+        await Promise.all([
+          updateTask({ id: sourceGroupId, data: { subTasks: sourceSubTasks } }).unwrap(),
+          updateTask({ id: destinationGroupId, data: { subTasks: destSubTasks } }).unwrap()
+        ]);
+      }
+    }
+  };
+
+  // CRUD View handlers for renaming a view
   const handleRenameView = async (oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) {
@@ -576,7 +629,7 @@ export default function ProjectDetailsPage() {
 
       {/* 2. SUB-NAVIGATION TABS (Lavender horizontal tab row) */}
       <div className="flex bg-primary/5 p-1.5 rounded-2xl border border-primary/10 overflow-x-auto print:hidden shrink-0">
-        {(['Tasks', 'Calendar', 'Timesheet', 'Invoices', 'Edit'] as const).map((tab) => {
+        {(['Tasks', 'Notes', 'Calendar', 'Timesheet', 'Invoices', 'Edit'] as const).map((tab) => {
           const isAct = activeTab === tab;
           return (
             <Button
@@ -627,7 +680,7 @@ export default function ProjectDetailsPage() {
                       className={cn(
                         "rounded-t-lg rounded-b-none h-9 px-4 text-[13px] font-medium transition-all shrink-0 pr-8 border",
                         activeBoardView === view 
-                          ? "bg-background text-foreground border-border/70 border-b-transparent shadow-[0_-2px_10px_rgba(0,0,0,0.02)] translate-y-[1px] relative z-10" 
+                          ? "bg-background text-primary font-bold border-t-2 border-t-primary border-x-border/70 border-b-transparent shadow-[0_-2px_10px_rgba(0,0,0,0.02)] translate-y-[1px] relative z-10" 
                           : "text-muted-foreground border-transparent hover:bg-muted/50 hover:border-border/30 hover:text-foreground"
                       )}
                     >
@@ -765,7 +818,8 @@ export default function ProjectDetailsPage() {
             </div>
 
             {/* List of Task Groups */}
-            <div className="space-y-4">
+            <DragDropContext onDragEnd={onDragEnd}>
+              <div className="space-y-4">
               {taskGroups.length === 0 ? (
                 <div className="py-12 text-center bg-card rounded-2xl border border-border/60 text-sm text-muted-foreground">
                   No task groups found. Use the toolbar on the right to add a task group or search.
@@ -826,15 +880,33 @@ export default function ProjectDetailsPage() {
                     </div>
 
                     {/* Task Group list items */}
-                    <div className="space-y-2">
-                      {(group.children || []).map((task, taskIdx) => (
+                    <Droppable droppableId={group.id} type="task">
+                      {(provided) => (
                         <div
-                          key={task.id}
-                          className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 transition-all gap-4 group"
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="space-y-2"
                         >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <input
-                              type="checkbox"
+                          {(group.children || []).map((task, taskIdx) => (
+                            <Draggable key={task.id} draggableId={task.id} index={taskIdx}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={cn(
+                                    "flex items-center justify-between p-3 rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 transition-all gap-4 group",
+                                    snapshot.isDragging && "shadow-lg bg-background border-primary/50 opacity-90 z-50"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div
+                                      {...provided.dragHandleProps}
+                                      className="cursor-grab hover:text-foreground text-muted-foreground/40 shrink-0"
+                                    >
+                                      <GripVertical className="h-4 w-4" />
+                                    </div>
+                                    <input
+                                      type="checkbox"
                               checked={task.completed}
                               onChange={(e) => handleToggleTask(task.id, e.target.checked, group.id)}
                               className="h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
@@ -908,8 +980,14 @@ export default function ProjectDetailsPage() {
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
                         </div>
-                      ))}
+                      )}
+                    </Droppable>
 
                       {/* Add new task input inside group */}
                       <div className="flex gap-1 items-center pt-2 pl-2 pb-2 mt-2">
@@ -931,11 +1009,11 @@ export default function ProjectDetailsPage() {
                           }}
                         />
                       </div>
-                    </div>
                   </div>
                 ))
               )}
             </div>
+            </DragDropContext>
 
             {/* AI Generator Box inside Tasks tab */}
             <div className="bg-primary/5 rounded-2xl p-5 border border-primary/20 space-y-3">
@@ -1554,8 +1632,140 @@ export default function ProjectDetailsPage() {
             </CardContent>
           </Card>
         )}
-      </div>
 
+        {/* ---------------- NOTES TAB (Accordions) ---------------- */}
+        {activeTab === 'Notes' && (
+          <div className="bg-card border border-border/60 rounded-2xl p-6 shadow-sm flex flex-col gap-6">
+            <div className="flex justify-between items-center border-b border-border/40 pb-4">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /> Project Notes & Details</h2>
+                <p className="text-sm text-muted-foreground">Manage OTA details, Google Ads keywords, and other notes here.</p>
+              </div>
+              <Button onClick={async () => {
+                const newSection = {
+                  id: `sec-${Date.now()}`,
+                  title: 'New Section',
+                  content: ''
+                };
+                await updateProject({ id: project.id, data: { detailsSections: [...(project.detailsSections || []), newSection] } }).unwrap();
+              }} size="sm" className="gap-2 h-9 px-4 rounded-xl shadow-sm">
+                <Plus className="w-4 h-4" /> Add Section
+              </Button>
+            </div>
+
+            {(!project.detailsSections || project.detailsSections.length === 0) ? (
+              <div className="text-center py-12 bg-muted/20 border border-dashed rounded-xl">
+                <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <p className="text-sm text-muted-foreground mb-4">No notes or details added yet.</p>
+                <Button variant="outline" onClick={async () => {
+                  const newSection = {
+                    id: `sec-${Date.now()}`,
+                    title: 'New Section',
+                    content: ''
+                  };
+                  await updateProject({ id: project.id, data: { detailsSections: [newSection] } }).unwrap();
+                }}>
+                  Create First Section
+                </Button>
+              </div>
+            ) : (
+              <DragDropContext onDragEnd={onDragEndSections}>
+                <Droppable droppableId="details-sections" type="section">
+                  {(provided) => (
+                    <div {...provided.droppableProps} ref={provided.innerRef}>
+                      <Accordion type="multiple" className="w-full space-y-4">
+                        {(project.detailsSections || []).map((section, index) => (
+                          <Draggable key={section.id} draggableId={section.id} index={index}>
+                            {(provided) => (
+                              <div ref={provided.innerRef} {...provided.draggableProps} style={provided.draggableProps.style}>
+                                <AccordionItem value={section.id} className="border border-border/50 rounded-xl px-4 bg-background shadow-sm overflow-hidden mb-4">
+                                  <div className="flex items-center w-full group">
+                                    <div {...provided.dragHandleProps} className="p-2 -ml-2 cursor-grab text-muted-foreground hover:text-foreground opacity-50 hover:opacity-100">
+                                      <GripVertical className="h-4 w-4" />
+                                    </div>
+                                    {editingId === section.id ? (
+                                      <div className="flex items-center gap-2 flex-1 py-4">
+                                        <Input
+                                          autoFocus
+                                          value={editingText}
+                                          onChange={e => setEditingText(e.target.value)}
+                                          onKeyDown={async e => {
+                                            if (e.key === 'Enter' && editingText.trim()) {
+                                              const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, title: editingText } : s);
+                                              await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
+                                              setEditingId(null);
+                                            }
+                                          }}
+                                          className="h-8 min-w-[200px]"
+                                        />
+                                        <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700 text-white rounded" onClick={async () => {
+                                          if (!editingText.trim()) return;
+                                          const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, title: editingText } : s);
+                                          await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
+                                          setEditingId(null);
+                                        }}>
+                                          <Check className="w-4 h-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded" onClick={() => setEditingId(null)}>
+                                          <X className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <AccordionTrigger className="hover:no-underline py-4 flex-none text-left pr-2">
+                                        <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">{section.title}</h3>
+                                      </AccordionTrigger>
+                                    )}
+                                    {editingId !== section.id && (
+                                      <>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingId(section.id);
+                                            setEditingText(section.title);
+                                          }}>
+                                            <Edit2 className="w-4 h-4" />
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (!window.confirm(`Are you sure you want to delete "${section.title}"?`)) return;
+                                            const newSections = project.detailsSections!.filter(s => s.id !== section.id);
+                                            await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
+                                          }}>
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                        <div className="flex-1" />
+                                      </>
+                                    )}
+                                  </div>
+                                  <AccordionContent className="pt-0 pb-6">
+                                    <div className="bg-muted/10 rounded-xl p-2 border border-border/30">
+                                      <EditableNovelField
+                                        value={section.content}
+                                        onChange={async (newContent) => {
+                                          const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, content: newContent } : s);
+                                          await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
+                                        }}
+                                        placeholder={`Start typing details for ${section.title}... (Supports tables and rich text formatting)`}
+                                      />
+                                    </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                      </Accordion>
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            )}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
