@@ -1,9 +1,29 @@
+export type RepeatConfig = {
+  interval: number;
+  unit: 'Day' | 'Week' | 'Month' | 'Year';
+  daysOfWeek?: string[]; // e.g. ['Mo', 'Tu']
+  action?: string;
+  isEnd?: boolean;
+  endDate?: string | Date;
+  monthlyType?: string; // 'date' | 'weekday'
+  monthlyDate?: number; // 1-31
+  monthlyOrdinal?: string; // 'First', 'Second', etc.
+  monthlyWeekday?: string; // 'Monday', 'Tuesday', etc.
+};
+
 export type SubTask = {
   id: string;
   text: string;
   description?: string;
   completed: boolean;
   children?: SubTask[];
+  startDate?: string | Date;
+  dueDate?: string | Date;
+  repeats?: string | RepeatConfig;
+  assignee?: string;
+  creator?: string;
+  dependencies?: string[];
+  customFields?: { label: string; value: string }[];
 };
 
 export type ProjectStatus =
@@ -17,7 +37,8 @@ export type Project = {
   id: string;
   title: string;
   subtitle?: string;
-  clientId: string;
+  clientId?: string;
+  companyId?: string;
   details?: string;
   startDate?: string | Date;
   deadline?: string | Date;
@@ -29,7 +50,9 @@ export type Project = {
   billable?: boolean;
   revisions?: number;
   client?: Client | null;
+  company?: Company | null;
   status?: string;
+  relatedProjectIds?: string[];
 };
 
 export type Task = {
@@ -43,7 +66,7 @@ export type Task = {
   jobTypeId?: string; // Job type reference
   status: ProjectStatus; // Backlog, In Progress, etc.
   gross_price: number;
-  deadline: Date;
+  deadline: any;
   revisions: number;
   subTasks?: SubTask[];
   client?: Client | null;
@@ -55,7 +78,8 @@ export type Task = {
   billable?: boolean;
   hourlyRate?: number;
   currency?: string;
-  repeats?: string;
+  repeats?: string | RepeatConfig;
+  boardView?: string;
 };
 
 export type Social = {
@@ -89,6 +113,29 @@ export type Client = {
   timezone?: string;
   bio?: string;
   date_of_birth?: string;
+  archived?: boolean;
+  companyId?: string;
+  company?: Company | null;
+};
+
+export type Company = {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  avatarUrl?: string;
+  socials?: Social[];
+  customFields?: { label: string; value: string }[];
+  address?: string;
+  city_state?: string;
+  country?: string;
+  zip?: string;
+  timezone?: string;
+  bio?: string;
+  archived?: boolean;
+  notes?: string;
+  clients?: Client[];
+  status?: 'Active' | 'Pending' | 'Inactive';
 };
 
 export type Snippet = {

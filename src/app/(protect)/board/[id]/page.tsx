@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RepeatsPopover } from '@/components/board/repeats-popover';
 import {
   ArrowLeft,
   Clock,
@@ -20,6 +22,7 @@ import {
   Share2,
   Trash2,
   Plus,
+  Pencil,
   Search,
   Calendar as CalendarIcon,
   ChevronDown,
@@ -28,8 +31,14 @@ import {
   FileText,
   Building2,
   Archive,
+  AlignLeft,
+  CalendarDays,
+  Repeat,
+  UserCircle,
+  MoreHorizontal,
+  Play
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { useGetProjectsQuery, useUpdateProjectMutation } from '@/services/projectApi';
 import { useGetTasksQuery, useAddTaskMutation, useUpdateTaskMutation, useDeleteTaskMutation } from '@/services/taskApi';
@@ -65,6 +74,15 @@ export default function ProjectDetailsPage() {
   // Search task query
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
 
+  // Horizontal Board Views
+  const [activeBoardView, setActiveBoardView] = useState('Main View');
+  const [isAddViewOpen, setIsAddViewOpen] = useState(false);
+  const [newViewName, setNewViewName] = useState('');
+  
+  // View Editing State
+  const [editingViewName, setEditingViewName] = useState<string | null>(null);
+  const [editedViewNameValue, setEditedViewNameValue] = useState('');
+
   // AI checklist state
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -72,6 +90,9 @@ export default function ProjectDetailsPage() {
   // Editing state for Task Titles or Group Names inline
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+
+  // Task Details Sidebar State
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<{ groupId: string, task: SubTask } | null>(null);
 
   // New item inputs
   const [newGroupName, setNewGroupName] = useState('');
@@ -130,9 +151,17 @@ export default function ProjectDetailsPage() {
   // Filter tasks that belong to this project container
   const projectTasks = tasks.filter((t) => t.projectId === id);
 
+  // Extract distinct views from tasks
+  const distinctViews = Array.from(new Set(projectTasks.map(t => t.boardView || 'Main View')));
+  if (!distinctViews.includes('Main View')) {
+    distinctViews.unshift('Main View');
+  }
+
   // Map tasks to taskGroups format for UI checklist
   const taskGroups = (() => {
-    let rawGroups = projectTasks.map((t) => ({
+    const filteredByView = projectTasks.filter(t => (t.boardView || 'Main View') === activeBoardView);
+    
+    let rawGroups = filteredByView.map((t) => ({
       id: t.id,
       text: t.title,
       completed: t.status === 'Completed' || t.status === 'Paid',
@@ -181,6 +210,48 @@ export default function ProjectDetailsPage() {
     return `${hours.toFixed(2)} hrs`;
   };
 
+  // Handler for renaming a view
+  const handleRenameView = async (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) {
+      setEditingViewName(null);
+      return;
+    }
+    
+    // Find all tasks currently in this view
+    const tasksInView = projectTasks.filter(t => (t.boardView || 'Main View') === oldName);
+    
+    try {
+      // Update them all to the new view name
+      await Promise.all(
+        tasksInView.map(t => 
+          updateTask({ id: t.id, data: { boardView: trimmed } }).unwrap()
+        )
+      );
+      toast({ title: 'สำเร็จ', description: `เปลี่ยนชื่อเป็น "${trimmed}" เรียบร้อย` });
+    } catch (err) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถเปลี่ยนชื่อ View ได้', variant: 'destructive' });
+    }
+    
+    setEditingViewName(null);
+    setActiveBoardView(trimmed);
+  };
+
+  const handleAddTask = async (groupName: string, text: string) => {
+    if (!text.trim() || !project || !project.clientId) return;
+    
+    await addTask({
+      title: text.trim(),
+      projectId: id,
+      clientId: project.clientId,
+      status: groupName as any,
+      gross_price: 0,
+      deadline: new Date(),
+      revisions: 0,
+      boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
+    });
+  };
+
   // CRUD Task Group handlers (creating a Task card under the Project)
   const handleAddTaskGroup = async () => {
     if (!newGroupName.trim()) return;
@@ -193,7 +264,8 @@ export default function ProjectDetailsPage() {
       gross_price: 0,
       deadline: new Date(),
       revisions: 0,
-      subTasks: []
+      subTasks: [],
+      boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
     }).unwrap();
 
     setNewGroupName('');
@@ -269,6 +341,28 @@ export default function ProjectDetailsPage() {
     }
     setEditingId(null);
     toast({ title: 'แก้ไขข้อความสำเร็จ' });
+  };
+
+  // Update specific field inside SubTask from the Sidebar
+  const handleUpdateTaskDetail = async (field: keyof SubTask, value: any) => {
+    if (!selectedTaskDetail) return;
+    const { groupId, task } = selectedTaskDetail;
+    const targetTask = projectTasks.find(t => t.id === groupId);
+    if (!targetTask) return;
+
+    const updatedTask = { ...task, [field]: value };
+    const updatedSubTasks = (targetTask.subTasks || []).map(st => st.id === task.id ? updatedTask : st);
+    
+    // Optimistic UI update
+    setSelectedTaskDetail({ groupId, task: updatedTask });
+    
+    try {
+      await updateTask({ id: groupId, data: { subTasks: updatedSubTasks } }).unwrap();
+    } catch (err) {
+      toast({ title: 'อัปเดตล้มเหลว', description: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', variant: 'destructive' });
+      // Revert on fail
+      setSelectedTaskDetail({ groupId, task });
+    }
   };
 
   // AI checklist generator
@@ -348,7 +442,7 @@ export default function ProjectDetailsPage() {
   };
 
   return (
-    <div className='flex flex-col gap-6 p-1 max-w-7xl mx-auto w-full'>
+    <div className='flex flex-col gap-6 p-4 md:px-8 md:py-6 w-full h-full'>
       {/* 1. TOP HEADER (Plutio-style Breadcrumbs & Settings) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-4 rounded-2xl border border-border/80 shadow-sm">
         <div className="flex flex-col gap-1 min-w-0">
@@ -430,7 +524,98 @@ export default function ProjectDetailsPage() {
       <div className="flex-grow">
         {/* VIEW A: TASKS WORKSPACE (Plutio-style Task Groups) */}
         {activeTab === 'Tasks' && (
-          <div className="space-y-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-1 space-y-6 min-w-0 pb-12">
+            
+            {/* Horizontal Board Views */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border/50 mb-4">
+              {distinctViews.map(view => (
+                editingViewName === view ? (
+                  <Input
+                    key={`edit-${view}`}
+                    value={editedViewNameValue}
+                    onChange={(e) => setEditedViewNameValue(e.target.value)}
+                    className="h-8 w-32 text-xs rounded-xl border-border/60 bg-background"
+                    autoFocus
+                    onBlur={() => handleRenameView(view, editedViewNameValue)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRenameView(view, editedViewNameValue);
+                      else if (e.key === 'Escape') setEditingViewName(null);
+                    }}
+                  />
+                ) : (
+                  <div key={view} className="relative group flex items-center">
+                    <Button
+                      variant={activeBoardView === view ? 'secondary' : 'ghost'}
+                      onClick={() => setActiveBoardView(view)}
+                      className={cn(
+                        "rounded-xl h-8 px-4 text-xs font-semibold transition-all shrink-0 pr-8",
+                        activeBoardView === view ? "bg-muted text-foreground border border-border/60 shadow-sm" : "text-muted-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      {view}
+                    </Button>
+                    {activeBoardView === view && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 h-6 w-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingViewName(view);
+                          setEditedViewNameValue(view);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </div>
+                )
+              ))}
+              
+              {isAddViewOpen ? (
+                <div className="flex items-center gap-1 ml-1 shrink-0">
+                  <Input
+                    value={newViewName}
+                    onChange={(e) => setNewViewName(e.target.value)}
+                    placeholder="New view name..."
+                    className="h-8 w-32 text-xs rounded-xl border-border/60 bg-background"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newViewName.trim()) {
+                        setActiveBoardView(newViewName.trim());
+                        setNewViewName('');
+                        setIsAddViewOpen(false);
+                      }
+                      if (e.key === 'Escape') setIsAddViewOpen(false);
+                    }}
+                  />
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-lg" onClick={() => {
+                    if (newViewName.trim()) {
+                      setActiveBoardView(newViewName.trim());
+                      setNewViewName('');
+                      setIsAddViewOpen(false);
+                    }
+                  }}>
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground rounded-lg" onClick={() => setIsAddViewOpen(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-xl h-8 w-8 text-muted-foreground ml-1 shrink-0 bg-transparent border border-dashed border-border/60"
+                  onClick={() => setIsAddViewOpen(true)}
+                  title="Add new view"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+
             {/* Search and task stats toolbar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60">
               <div className="relative w-full sm:max-w-xs">
@@ -571,23 +756,41 @@ export default function ProjectDetailsPage() {
                                   task.completed && "line-through text-muted-foreground"
                                 )}
                                 onClick={() => {
-                                  setEditingId(task.id);
-                                  setEditingText(task.text);
+                                  setSelectedTaskDetail({ groupId: group.id, task: task as SubTask });
                                 }}
                               >
                                 {task.text}
                               </span>
                             )}
 
-                            {/* Badges */}
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[10px] bg-muted font-bold text-muted-foreground px-1.5 py-0.5 rounded">
+                            {/* Badges and Columns */}
+                            <div className="flex items-center gap-3 shrink-0 ml-4 hidden sm:flex">
+                              <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-bold px-2 rounded-full cursor-pointer">
+                                {project.title}
+                              </Badge>
+                              <span className="text-[10px] bg-muted font-bold text-muted-foreground px-1.5 py-0.5 rounded w-10 text-center">
                                 #{String(taskIdx + 1).padStart(3, '0')}
                               </span>
+                              
+                              <div className="flex items-center gap-2 border-l border-border/40 pl-3 ml-1">
+                                {task.assignee ? (
+                                  <Avatar className="h-6 w-6 border border-border/50">
+                                    <AvatarFallback className="text-[9px] bg-purple-100 text-purple-700">{task.assignee.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                ) : (
+                                  <div className="h-6 w-6 rounded-full bg-muted border border-border/50 border-dashed flex items-center justify-center">
+                                    <UserCircle className="w-3 h-3 text-muted-foreground/50" />
+                                  </div>
+                                )}
+                                
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-green-600 rounded-full">
+                                  <Play className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -653,6 +856,149 @@ export default function ProjectDetailsPage() {
               </form>
             </div>
           </div>
+          
+          {/* FLOATING RIGHT PANEL (Task Details) */}
+          {selectedTaskDetail && (
+            <div className="fixed right-4 xl:right-8 top-24 z-40 w-[320px] xl:w-[400px] flex flex-col bg-card rounded-2xl shadow-2xl border border-border/60 overflow-hidden h-[calc(100vh-120px)]">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-border/40 bg-muted/10">
+                <div className="flex flex-col gap-1 overflow-hidden">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider truncate">
+                    <span className="truncate">{activeBoardView}</span>
+                    <span>/</span>
+                    <span className="truncate">{projectTasks.find(t => t.id === selectedTaskDetail.groupId)?.title}</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={selectedTaskDetail.task.text}
+                    onChange={(e) => handleUpdateTaskDetail('text', e.target.value)}
+                    className="text-base font-bold bg-transparent border-none p-0 h-auto focus:ring-0 truncate w-full"
+                    placeholder="Task name"
+                  />
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0 rounded-full" onClick={() => setSelectedTaskDetail(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Toolbar */}
+              <div className="flex items-center gap-2 p-2 px-4 border-b border-border/40 bg-muted/20 overflow-x-auto shrink-0">
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-primary bg-primary/5">
+                  <AlignLeft className="w-3.5 h-3.5" /> Details
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-muted-foreground hover:text-foreground">
+                  <MessageSquare className="w-3.5 h-3.5" /> Comments
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-muted-foreground hover:text-foreground">
+                  <Check className="w-3.5 h-3.5" /> Subtasks
+                </Button>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                {/* Description */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                    <AlignLeft className="w-4 h-4" /> Description
+                  </label>
+                  <textarea
+                    value={selectedTaskDetail.task.description || ''}
+                    onChange={(e) => handleUpdateTaskDetail('description', e.target.value)}
+                    placeholder="Add more details to this task..."
+                    className="min-h-[100px] w-full rounded-xl border border-border/60 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground/50 focus:outline-hidden focus:ring-1 focus:ring-primary resize-y"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  {/* Start Date */}
+                  <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4" /> Start date
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("h-8 justify-start text-left font-normal text-xs px-2 bg-background border-border/60 shadow-none", !selectedTaskDetail.task.startDate && "text-muted-foreground")}>
+                          {selectedTaskDetail.task.startDate ? format(new Date(selectedTaskDetail.task.startDate), 'dd/MM/yyyy') : <span>Pick a date</span>}
+                          <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-[60]" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedTaskDetail.task.startDate ? new Date(selectedTaskDetail.task.startDate) : undefined}
+                          onSelect={(date) => handleUpdateTaskDetail('startDate', date?.toISOString())}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Due Date */}
+                  <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-orange-500" /> Due date
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("h-8 justify-start text-left font-normal text-xs px-2 bg-background border-border/60 shadow-none", !selectedTaskDetail.task.dueDate && "text-muted-foreground")}>
+                          {selectedTaskDetail.task.dueDate ? format(new Date(selectedTaskDetail.task.dueDate), 'dd/MM/yyyy') : <span>Pick a date</span>}
+                          <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-[60]" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedTaskDetail.task.dueDate ? new Date(selectedTaskDetail.task.dueDate) : undefined}
+                          onSelect={(date) => handleUpdateTaskDetail('dueDate', date?.toISOString())}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Repeats */}
+                  <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                      <Repeat className="w-4 h-4 text-blue-500" /> Repeats
+                    </label>
+                    <div className="h-8 flex items-center bg-background rounded-lg border border-border/60 px-3">
+                      <RepeatsPopover 
+                        value={selectedTaskDetail.task.repeats} 
+                        onChange={(val) => handleUpdateTaskDetail('repeats', val === 'none' ? '' : (typeof val === 'object' ? JSON.stringify(val) : val))} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Assignee */}
+                  <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                      <UserCircle className="w-4 h-4 text-purple-500" /> Assignee
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {selectedTaskDetail.task.assignee ? (
+                        <Badge variant="secondary" className="text-[10px] rounded-full px-2 py-0.5 font-normal flex gap-1 items-center">
+                          {selectedTaskDetail.task.assignee}
+                          <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => handleUpdateTaskDetail('assignee', '')} />
+                        </Badge>
+                      ) : (
+                        <Input
+                          placeholder="Name..."
+                          className="h-7 w-24 text-[10px] rounded-md border-border/60 bg-background px-2"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleUpdateTaskDetail('assignee', e.currentTarget.value);
+                              e.currentTarget.value = '';
+                            }
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         )}
 
         {/* VIEW B: CALENDAR TAB */}
@@ -1100,6 +1446,7 @@ export default function ProjectDetailsPage() {
           </Card>
         )}
       </div>
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   FolderKanban,
@@ -33,6 +33,16 @@ import {
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useSidebar } from '@/components/ui/sidebar';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { logout } from '@/lib/auth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const navGroups = [
   {
@@ -79,13 +89,29 @@ const navGroups = [
 ];
 
 export function AppSidebar() {
+  const router = useRouter();
   const pathname = usePathname();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUserEmail(user?.email ?? null);
+    });
+    return () => unsubscribe();
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   if (!isMounted) {
     return null;
@@ -107,30 +133,49 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        'relative hidden h-screen flex-col border-r border-border/50 bg-card p-4 transition-all duration-300 ease-in-out md:flex shrink-0 shadow-2xs',
-        isCollapsed ? 'w-20' : 'w-64'
+        'relative hidden h-full flex-col rounded-2xl border border-border/50 bg-card p-3 transition-all duration-300 ease-in-out md:flex shrink-0 shadow-sm',
+        isCollapsed ? 'w-16' : 'w-56'
       )}
     >
       {/* Profile Section matching reference image */}
-      <div
-        className={cn(
-          'flex items-center gap-3 pb-4 border-b border-border/30 mb-4',
-          isCollapsed ? 'justify-center' : 'px-2'
-        )}
-      >
-        <div className='h-9 w-9 rounded-full bg-[#6b21a8] flex items-center justify-center text-white font-extrabold text-sm select-none shrink-0 shadow-xs'>
-          W
-        </div>
-        <div
-          className={cn(
-            'flex flex-col min-w-0 transition-all duration-200 ease-in-out',
-            isCollapsed && 'scale-x-0 opacity-0 hidden'
-          )}
-        >
-          <span className='font-bold text-sm text-foreground truncate'>wasan</span>
-          <span className='text-[10px] text-muted-foreground truncate'>freelancer</span>
-        </div>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div
+            className={cn(
+              'flex items-center gap-2.5 pb-3 border-b border-border/30 mb-3 cursor-pointer hover:bg-muted/50 rounded-xl p-1 -mx-1',
+              isCollapsed ? 'justify-center' : 'px-1.5'
+            )}
+          >
+            <div className='h-9 w-9 rounded-full bg-[#6b21a8] flex items-center justify-center text-white font-extrabold text-sm select-none shrink-0 shadow-xs'>
+              W
+            </div>
+            <div
+              className={cn(
+                'flex flex-col min-w-0 transition-all duration-200 ease-in-out',
+                isCollapsed && 'scale-x-0 opacity-0 hidden'
+              )}
+            >
+              <span className='font-bold text-sm text-foreground truncate'>wasan</span>
+              <span className='text-[10px] text-muted-foreground truncate'>freelancer</span>
+            </div>
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='start' className="w-56 ml-2">
+          <DropdownMenuLabel>
+            My Account
+            {userEmail && (
+              <div className='text-xs text-muted-foreground mt-1'>
+                {userEmail}
+              </div>
+            )}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem>Support</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">Logout</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Main Navigation with grouped items & dashed dividers */}
       <nav className='flex-1 flex flex-col gap-3 overflow-y-auto pr-1 scrollbar-thin'>
@@ -149,8 +194,8 @@ export function AppSidebar() {
                             variant="ghost"
                             disabled
                             className={cn(
-                              'w-full justify-start gap-3 rounded-xl border-0 h-9.5 px-3 opacity-40 cursor-not-allowed select-none hover:bg-transparent',
-                              isCollapsed && 'w-12 justify-center px-0'
+                              'w-full justify-start gap-2.5 rounded-lg border-0 h-8 px-2.5 opacity-40 cursor-not-allowed select-none hover:bg-transparent',
+                              isCollapsed && 'w-10 justify-center px-0'
                             )}
                             aria-label={item.label}
                           >
@@ -178,11 +223,11 @@ export function AppSidebar() {
                         <Button
                           variant="ghost"
                           className={cn(
-                            'w-full justify-start gap-3 rounded-xl border-0 transition-all duration-200 h-9.5 px-3',
+                            'w-full justify-start gap-2.5 rounded-lg border-0 transition-all duration-200 h-8 px-2.5',
                             isActive
                               ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary font-bold'
                               : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 font-semibold',
-                            isCollapsed && 'w-12 justify-center px-0'
+                            isCollapsed && 'w-10 justify-center px-0'
                           )}
                           aria-label={item.label}
                         >
@@ -216,8 +261,8 @@ export function AppSidebar() {
                 <Button
                   variant='ghost'
                   className={cn(
-                    'w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-xl h-9.5 px-3 font-semibold',
-                    isCollapsed && 'w-12 justify-center px-0'
+                    'w-full justify-start gap-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg h-8 px-2.5 font-semibold',
+                    isCollapsed && 'w-10 justify-center px-0'
                   )}
                 >
                   <Settings className='h-4.5 w-4.5' />

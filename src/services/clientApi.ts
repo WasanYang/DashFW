@@ -4,9 +4,11 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 export const clientApi = createApi({
   reducerPath: 'clientApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api/' }),
+  tagTypes: ['Client'],
   endpoints: (builder) => ({
     getClients: builder.query<Client[], void>({
       query: () => 'client',
+      providesTags: ['Client'],
     }),
     addClient: builder.mutation<Client, Partial<Client>>({
       query: (body) => ({
@@ -14,6 +16,7 @@ export const clientApi = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['Client'],
     }),
     updateClient: builder.mutation<
       { message: string; modifiedCount: number },
@@ -24,6 +27,7 @@ export const clientApi = createApi({
         method: 'PUT',
         body: { _id, ...data },
       }),
+      invalidatesTags: ['Client'],
     }),
     deleteClient: builder.mutation<
       { message: string; deletedCount: number },
@@ -34,6 +38,7 @@ export const clientApi = createApi({
         method: 'DELETE',
         body: { _id },
       }),
+      invalidatesTags: ['Client'],
     }),
   }),
 });

@@ -4,9 +4,11 @@ import type { Task } from '@/lib/types';
 export const taskApi = createApi({
   reducerPath: 'taskApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api/' }),
+  tagTypes: ['Task'],
   endpoints: (builder) => ({
     getTasks: builder.query<Task[], void>({
       query: () => 'task',
+      providesTags: ['Task'],
     }),
     addTask: builder.mutation<Task, Partial<Task>>({
       query: (body) => ({
@@ -14,6 +16,7 @@ export const taskApi = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['Task'],
     }),
     updateTask: builder.mutation<
       { message: string; modifiedCount: number },
@@ -24,6 +27,7 @@ export const taskApi = createApi({
         method: 'PUT',
         body: { id, ...data },
       }),
+      invalidatesTags: ['Task'],
     }),
     deleteTask: builder.mutation<
       { message: string; deletedCount: number },
@@ -34,6 +38,7 @@ export const taskApi = createApi({
         method: 'DELETE',
         body: { id },
       }),
+      invalidatesTags: ['Task'],
     }),
   }),
 });

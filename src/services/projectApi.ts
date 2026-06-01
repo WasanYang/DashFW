@@ -4,9 +4,11 @@ import type { Project } from '@/lib/types';
 export const projectApi = createApi({
   reducerPath: 'projectApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api/' }),
+  tagTypes: ['Project'],
   endpoints: (builder) => ({
     getProjects: builder.query<Project[], void>({
       query: () => 'project',
+      providesTags: ['Project'],
     }),
     addProject: builder.mutation<Project, Partial<Project>>({
       query: (body) => ({
@@ -14,6 +16,7 @@ export const projectApi = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['Project'],
     }),
     updateProject: builder.mutation<
       { message: string; modifiedCount: number },
@@ -24,6 +27,7 @@ export const projectApi = createApi({
         method: 'PUT',
         body: { id, ...data },
       }),
+      invalidatesTags: ['Project'],
     }),
     deleteProject: builder.mutation<
       { message: string; deletedCount: number },
@@ -34,6 +38,7 @@ export const projectApi = createApi({
         method: 'DELETE',
         body: { id },
       }),
+      invalidatesTags: ['Project'],
     }),
   }),
 });

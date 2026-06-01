@@ -92,7 +92,7 @@ export function Header() {
   };
 
   return (
-    <header className='sticky top-0 z-30 flex h-16 items-center gap-4 bg-transparent px-4 sm:px-6'>
+    <header className='sticky top-0 z-30 flex h-14 items-center gap-4 bg-transparent px-4 sm:px-5 shrink-0'>
       <Sheet>
         <SheetTrigger asChild>
           <Button size='icon' variant='outline' className='sm:hidden'>

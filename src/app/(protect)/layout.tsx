@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/sidebar';
-import { Header } from '@/components/header';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 
 export const metadata: Metadata = {
@@ -22,9 +21,8 @@ export default function RootLayout({
         <SidebarProvider>
           <div className='flex h-screen overflow-hidden bg-background'>
             <AppSidebar />
-            <div className='flex flex-1 flex-col min-w-0'>
-              <Header />
-              <main className='flex-1 overflow-y-auto bg-background p-4 sm:p-6 md:p-8'>
+            <div className='flex flex-1 flex-col min-w-0 bg-background overflow-hidden border-l border-border/50'>
+              <main className='flex-1 overflow-y-auto p-0'>
                 {children}
               </main>
             </div>

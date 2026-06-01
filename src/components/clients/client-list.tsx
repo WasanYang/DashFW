@@ -25,13 +25,21 @@ import {
   FolderKanban,
   Trash2,
   HelpCircle,
+  Archive,
 } from 'lucide-react';
-import { Client, Project, Social, SubTask, Task } from '@/lib/types';
+import { Client, Company, Project, Social, SubTask, Task } from '@/lib/types';
 import {
   useGetClientsQuery,
   useAddClientMutation,
   useUpdateClientMutation,
+  useDeleteClientMutation,
 } from '@/services/clientApi';
+import {
+  useGetCompaniesQuery,
+  useAddCompanyMutation,
+  useUpdateCompanyMutation,
+  useDeleteCompanyMutation,
+} from '@/services/companyApi';
 import {
   Dialog,
   DialogContent,
@@ -63,6 +71,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface ClientListProps {
   tasks: Task[];
@@ -126,24 +135,111 @@ const getClientCompany = (client: Client): string => {
       }
     }
   }
+  return '-';
+};
+
+const CompanyInlineEdit = ({ client, companyList, companiesData, updateClient }: { client: Client, companyList: string[], companiesData: Company[], updateClient: any }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   
-  return 'Sabai Sabai Workspace'; // Default fallback matching original mockup
+  const currentVal = client.companyId ? (companiesData.find((c: any) => c._id === client.companyId)?.name || '-') : '-';
+
+  const handleSelect = (val: string) => {
+    if (val !== currentVal) {
+      if (val === '-') {
+        updateClient({ _id: client._id, data: { companyId: null } });
+      } else {
+        const comp = companiesData.find((c: any) => c.name === val);
+        if (comp) {
+          updateClient({ _id: client._id, data: { companyId: comp._id } });
+        }
+      }
+    }
+    setOpen(false);
+  };
+
+  const filtered = companyList.filter((c: any) => c.toLowerCase().includes(search.toLowerCase()) && c !== '-');
+  
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if(o) setSearch(''); }}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center gap-1.5 cursor-pointer bg-primary/5 hover:bg-primary/10 border border-transparent hover:border-primary/20 px-2.5 py-1 rounded-md transition-colors w-full max-w-[150px] shadow-sm group">
+          <Building2 className="h-3 w-3 text-primary shrink-0 group-hover:scale-110 transition-transform" />
+          <span className="text-primary font-bold text-[10px] tracking-wide truncate">
+            {currentVal}
+          </span>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0 overflow-hidden rounded-xl border-border/40 shadow-lg" align="start">
+        <div className="flex flex-col">
+          <input
+            autoFocus
+            className="w-full bg-transparent p-2.5 text-xs font-semibold outline-none border-b border-border/40"
+            placeholder="Search or type to add..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && search) {
+                handleSelect(search);
+              }
+            }}
+          />
+          <div className="max-h-[200px] overflow-y-auto p-1 flex flex-col gap-0.5">
+            {!search && currentVal !== '-' && (
+              <div 
+                className="px-2.5 py-1.5 text-xs text-destructive font-bold rounded-lg hover:bg-destructive/10 cursor-pointer transition-colors flex items-center gap-1.5 mb-1"
+                onClick={() => handleSelect('-')}
+              >
+                <Trash2 className="h-3 w-3" /> Remove company
+              </div>
+            )}
+            {filtered.map((c: any) => (
+              <div 
+                key={c} 
+                className="px-2.5 py-1.5 text-xs font-medium rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                onClick={() => handleSelect(c)}
+              >
+                {c}
+              </div>
+            ))}
+            {search && !filtered.includes(search) && (
+              <div 
+                className="px-2.5 py-1.5 text-xs text-primary font-bold rounded-lg hover:bg-primary/10 cursor-pointer transition-colors flex items-center gap-1.5"
+                onClick={() => handleSelect(search)}
+              >
+                <Plus className="h-3 w-3" /> Add "{search}"
+              </div>
+            )}
+            {filtered.length === 0 && !search && currentVal === '-' && (
+              <div className="px-2 py-4 text-xs text-muted-foreground/60 text-center font-medium">
+                No companies found
+              </div>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 export function ClientList({ tasks }: ClientListProps) {
   const projects = tasks; // Alias for compatibility with internal UI naming
-  const {
-    data: clients = [],
-    isLoading,
-    error,
-    refetch,
-  } = useGetClientsQuery();
+  const { data: clients = [], isLoading: isLoadingClients, error: errorClients, refetch: refetchClients } = useGetClientsQuery();
+  const { data: rawCompanies = [], isLoading: isLoadingCompanies, error: errorCompanies, refetch: refetchCompanies } = useGetCompaniesQuery();
+
   const [addClient, { isLoading: isAddingClient }] = useAddClientMutation();
-  const [updateClient, { isLoading: isUpdatingClient }] =
-    useUpdateClientMutation();
+  const [updateClient, { isLoading: isUpdatingClient }] = useUpdateClientMutation();
+  const [deleteClient] = useDeleteClientMutation();
+  
+  const [addCompany, { isLoading: isAddingCompany }] = useAddCompanyMutation();
+  const [updateCompany, { isLoading: isUpdatingCompany }] = useUpdateCompanyMutation();
+  const [deleteCompany] = useDeleteCompanyMutation();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isCompanyCreateOpen, setIsCompanyCreateOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [projectModal, setProjectModal] = useState<Task | null>(null);
 
   const [viewMode, setViewMode] = useState<'table' | 'split'>('table');
@@ -151,14 +247,6 @@ export function ClientList({ tasks }: ClientListProps) {
   const [activeTab, setActiveTab] = useState<'people' | 'companies'>('people');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
 
-  // States for Company Creation / Edit (Plutio redesign)
-  const [isCompanyCreateOpen, setIsCompanyCreateOpen] = useState(false);
-  const [editingCompany, setEditingCompany] = useState<{
-    name: string;
-    clients: Client[];
-    status: 'Active' | 'Pending' | 'Inactive';
-    projectsCount: number;
-  } | null>(null);
   const [compFormName, setCompFormName] = useState('');
   const [compFormEmail, setCompFormEmail] = useState('');
   const [compFormPhone, setCompFormPhone] = useState('');
@@ -178,11 +266,10 @@ export function ClientList({ tasks }: ClientListProps) {
   const inputClass =
     'bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 w-full h-5';
 
-  // Dynamic client statuses and projects
   const clientStatusMap = useMemo(() => {
     const map: { [clientId: string]: { status: 'Active' | 'Pending' | 'Inactive'; projectsCount: number } } = {};
     
-    clients.forEach(client => {
+    clients.forEach((client: any) => {
       const associatedProjects = projects.filter(p => p.clientId === client._id);
       
       const hasActive = associatedProjects.some(p => p.status === 'In Progress' || p.status === 'Review');
@@ -205,50 +292,45 @@ export function ClientList({ tasks }: ClientListProps) {
   }, [clients, projects]);
 
   const companiesList = useMemo(() => {
-    const companyMap: {
-      [name: string]: {
-        name: string;
-        clients: Client[];
-        status: 'Active' | 'Pending' | 'Inactive';
-        projectsCount: number;
-      }
-    } = {};
-
-    clients.forEach((client) => {
-      const compName = getClientCompany(client);
-      const clientInfo = clientStatusMap[client._id] || { status: 'Inactive', projectsCount: 0 };
-
-      if (!companyMap[compName]) {
-        companyMap[compName] = {
-          name: compName,
-          clients: [],
-          status: 'Inactive',
-          projectsCount: 0,
-        };
-      }
-
-      companyMap[compName].clients.push(client);
-      companyMap[compName].projectsCount += clientInfo.projectsCount;
-
-      const currentStatus = companyMap[compName].status;
-      if (clientInfo.status === 'Active') {
-        companyMap[compName].status = 'Active';
-      } else if (clientInfo.status === 'Pending' && currentStatus !== 'Active') {
-        companyMap[compName].status = 'Pending';
-      }
+    return rawCompanies.map(comp => {
+      const associatedClients = clients.filter((c: any) => c.companyId === comp._id);
+      let projectsCount = 0;
+      let status: 'Active' | 'Pending' | 'Inactive' = 'Inactive';
+      
+      associatedClients.forEach((c: any) => {
+        const info = clientStatusMap[c._id] || { status: 'Inactive', projectsCount: 0 };
+        projectsCount += info.projectsCount;
+        if (info.status === 'Active') {
+          status = 'Active';
+        } else if (info.status === 'Pending' && status !== 'Active') {
+          status = 'Pending';
+        }
+      });
+      
+      const result: any = {
+        ...comp,
+        clients: associatedClients,
+        projectsCount,
+        status
+      };
+      return result;
     });
-
-    return Object.values(companyMap);
-  }, [clients, clientStatusMap]);
+  }, [rawCompanies, clients, clientStatusMap]);
 
   const filteredCompanies = useMemo(() => {
-    if (!searchQuery.trim()) return companiesList;
-    const query = searchQuery.toLowerCase();
-    return companiesList.filter((comp) =>
-      comp.name.toLowerCase().includes(query) ||
-      comp.clients.some(c => c.name.toLowerCase().includes(query) || c.email.toLowerCase().includes(query))
+    let list = companiesList;
+    if (!showArchived) {
+      list = list.filter(comp => {
+        const hasActiveClient = comp.clients.some((c: any) => !c.archived);
+        if (comp.clients.length === 0) return true;
+        return hasActiveClient;
+      });
+    }
+
+    return list.filter((comp) =>
+      comp.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [companiesList, searchQuery]);
+  }, [companiesList, searchQuery, showArchived]);
 
   const statusCounts = useMemo(() => {
     if (activeTab === 'companies') {
@@ -259,7 +341,7 @@ export function ClientList({ tasks }: ClientListProps) {
         Inactive: 0,
       };
       companiesList.forEach(comp => {
-        counts[comp.status]++;
+        counts[comp.status as 'Active' | 'Pending' | 'Inactive']++;
       });
       return counts;
     }
@@ -271,7 +353,7 @@ export function ClientList({ tasks }: ClientListProps) {
       Inactive: 0,
     };
     
-    clients.forEach(client => {
+    clients.forEach((client: any) => {
       const info = clientStatusMap[client._id];
       if (info) {
         counts[info.status]++;
@@ -284,31 +366,29 @@ export function ClientList({ tasks }: ClientListProps) {
   }, [clients, clientStatusMap, activeTab, companiesList]);
 
   const filteredClients = useMemo(() => {
-    const actualPeople = clients.filter(c => !c.isCompany);
-    if (!searchQuery.trim()) return actualPeople;
-    const query = searchQuery.toLowerCase();
-    return actualPeople.filter(c => 
-      c.name.toLowerCase().includes(query) || 
-      c.email.toLowerCase().includes(query) ||
-      (c.notes && c.notes.toLowerCase().includes(query))
+    let actualPeople = clients;
+    if (!showArchived) {
+      actualPeople = actualPeople.filter((c: any) => !c.archived);
+    }
+    
+    return actualPeople.filter((c: any) => 
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      c.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [clients, searchQuery]);
+  }, [clients, searchQuery, showArchived]);
 
-  // sync selectedClient with clients
   useEffect(() => {
     setSelectedClient((prev) => {
       if (prev && clients.some((c) => c._id === prev._id)) {
         return clients.find((c) => c._id === prev._id) || null;
       }
-      const actualPeople = clients.filter(c => !c.isCompany);
-      if (!prev && actualPeople.length > 0) {
-        return actualPeople[0];
+      if (clients.length > 0) {
+        return clients[0];
       }
       return prev;
     });
   }, [clients]);
 
-  // sync selectedCompany with companiesList
   useEffect(() => {
     setSelectedCompany((prev) => {
       if (prev && companiesList.some((c) => c.name === prev)) {
@@ -321,20 +401,18 @@ export function ClientList({ tasks }: ClientListProps) {
     });
   }, [companiesList]);
 
-  // Load company form values when editing
   useEffect(() => {
     if (editingCompany) {
-      const placeholder = editingCompany.clients.find(c => c.isCompany);
-      setCompFormName(editingCompany.name);
-      setCompFormEmail(placeholder ? placeholder.email : '');
-      setCompFormPhone(placeholder ? (placeholder.phone || placeholder.socials?.find(s => s.platform === 'Phone')?.value || '') : '');
-      setCompFormCustomFields(placeholder ? (placeholder.customFields || []) : []);
-      setCompFormAddress(placeholder ? (placeholder.address || '') : '');
-      setCompFormCityState(placeholder ? (placeholder.city_state || '') : '');
-      setCompFormCountry(placeholder ? (placeholder.country || '') : '');
-      setCompFormZip(placeholder ? (placeholder.zip || '') : '');
-      setCompFormTimezone(placeholder ? (placeholder.timezone || 'Asia/Bangkok') : 'Asia/Bangkok');
-      setCompFormBio(placeholder ? (placeholder.bio || '') : '');
+      setCompFormName(editingCompany.name || '');
+      setCompFormEmail(editingCompany.email || '');
+      setCompFormPhone(editingCompany.phone || '');
+      setCompFormCustomFields(editingCompany.customFields || []);
+      setCompFormAddress(editingCompany.address || '');
+      setCompFormCityState(editingCompany.city_state || '');
+      setCompFormCountry(editingCompany.country || '');
+      setCompFormZip(editingCompany.zip || '');
+      setCompFormTimezone(editingCompany.timezone || 'Asia/Bangkok');
+      setCompFormBio(editingCompany.bio || '');
     } else {
       setCompFormName('');
       setCompFormEmail('');
@@ -358,18 +436,30 @@ export function ClientList({ tasks }: ClientListProps) {
   );
 
   const handleAddClient = async (values: any) => {
-    await addClient(values);
-    await refetch();
+    const { companyName, ...rest } = values;
+    let companyId = null;
+    if (companyName) {
+      const comp = rawCompanies.find((c: any) => c.name === companyName);
+      if (comp) companyId = comp._id;
+    }
+    await addClient({ ...rest, companyId });
+    await refetchClients();
     setIsCreateOpen(false);
   };
 
   const handleEditClient = async (values: any) => {
     if (!editingClient || !editingClient._id) return;
+    const { companyName, ...rest } = values;
+    let companyId = null;
+    if (companyName) {
+      const comp = rawCompanies.find((c: any) => c.name === companyName);
+      if (comp) companyId = comp._id;
+    }
     await updateClient({
       _id: editingClient._id,
-      data: values,
+      data: { ...rest, companyId },
     });
-    await refetch();
+    await refetchClients();
     setEditingClient(null);
     setIsCreateOpen(false);
   };
@@ -389,81 +479,30 @@ export function ClientList({ tasks }: ClientListProps) {
     const bio = compFormBio.trim();
 
     if (editingCompany) {
-      // 1. Update/create placeholder client document in DB
-      const placeholder = editingCompany.clients.find(c => c.isCompany);
-      if (placeholder) {
-        await updateClient({
-          _id: placeholder._id,
-          data: {
-            name: name,
-            companyName: name,
-            email: email,
-            phone: phone,
-            socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
-            notes: `company: ${name}\nisCompany: true\nphone: ${phone}\naddress: ${address}\ncity_state: ${cityState}\ncountry: ${country}\nzip: ${zip}\ntimezone: ${timezone}\nbio: ${bio}` + 
-                   (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
-            customFields: customFields,
-            address,
-            city_state: cityState,
-            country,
-            zip,
-            timezone,
-            bio,
-          }
-        });
-      } else {
-        await addClient({
+      await updateCompany({
+        _id: editingCompany._id,
+        data: {
           name: name,
-          companyName: name,
           email: email,
-          isCompany: true,
           phone: phone,
           socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
-          notes: `company: ${name}\nisCompany: true\nphone: ${phone}\naddress: ${address}\ncity_state: ${cityState}\ncountry: ${country}\nzip: ${zip}\ntimezone: ${timezone}\nbio: ${bio}` + 
-                 (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
           customFields: customFields,
-          fastwork_link: '',
           address,
           city_state: cityState,
           country,
           zip,
           timezone,
           bio,
-        });
-      }
-
-      // 2. Cascade rename companyName to all members of the company
-      for (const client of editingCompany.clients) {
-        if (client.isCompany) continue;
-        const updatedNotes = client.notes ? client.notes.split('\n').map(line => {
-          if (line.toLowerCase().startsWith('company:')) {
-            return `company: ${name}`;
-          }
-          return line;
-        }).join('\n') : `company: ${name}`;
-
-        await updateClient({
-          _id: client._id,
-          data: {
-            companyName: name,
-            notes: updatedNotes
-          }
-        });
-      }
+        }
+      });
       setEditingCompany(null);
     } else {
-      // Create new company
-      await addClient({
+      await addCompany({
         name: name,
-        companyName: name,
         email: email,
-        isCompany: true,
         phone: phone,
         socials: phone ? [{ id: `soc-phone-${Date.now()}`, platform: 'Phone', value: phone }] : [],
-        notes: `company: ${name}\nisCompany: true\nphone: ${phone}\naddress: ${address}\ncity_state: ${cityState}\ncountry: ${country}\nzip: ${zip}\ntimezone: ${timezone}\nbio: ${bio}` + 
-               (customFields.length > 0 ? '\n' + customFields.map(cf => `custom_field:${cf.label}:${cf.value}`).join('\n') : ''),
         customFields: customFields,
-        fastwork_link: '',
         address,
         city_state: cityState,
         country,
@@ -471,11 +510,11 @@ export function ClientList({ tasks }: ClientListProps) {
         timezone,
         bio,
       });
-      setIsCompanyCreateOpen(false);
     }
 
-    await refetch();
-    // Reset form states
+    await refetchCompanies();
+    setIsCompanyCreateOpen(false);
+
     setCompFormName('');
     setCompFormEmail('');
     setCompFormPhone('');
@@ -511,7 +550,7 @@ export function ClientList({ tasks }: ClientListProps) {
     return calculateProgress(projectModal.subTasks);
   }, [projectModal]);
 
-  const renderSubtasksReadOnly = (tasks: SubTask[], level = 0) => (
+  const renderSubtasksReadOnly = (tasks: SubTask[], level = 0): React.ReactNode => (
     <div className='space-y-1'>
       {tasks.map((subtask) => (
         <div key={subtask.id} style={{ paddingLeft: `${level * 1.5}rem` }}>
@@ -541,149 +580,182 @@ export function ClientList({ tasks }: ClientListProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      {/* BREADCRUMB HEADER */}
-      <div className="flex-shrink-0 flex items-center gap-2 mb-2 text-sm font-bold text-muted-foreground/90">
-        <span>Contacts</span>
-        <span>/</span>
-        <span className="text-foreground/90">People</span>
-      </div>
+      <div className="mx-auto max-w-7xl mb-8 space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground/90">
+            <span>Contacts</span>
+            <span>/</span>
+            <span className="text-foreground/90">{activeTab === 'people' ? 'People' : 'Companies'}</span>
+          </div>
+          
+          <Button
+            onClick={() => {
+              if (activeTab === 'companies') {
+                setIsCompanyCreateOpen(true);
+              } else {
+                setIsCreateOpen(true);
+              }
+            }}
+            className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-sm shrink-0"
+          >
+            <Plus className="mr-1.5 h-4 w-4" /> Add {activeTab === 'companies' ? 'company' : 'someone'}
+          </Button>
+        </div>
 
-      {/* PEOPLE / COMPANIES TABS */}
-      <div className="flex-shrink-0 flex border-b border-border/40 gap-4 mb-4 select-none">
-        <button
-          onClick={() => setActiveTab('people')}
-          className={cn(
-            "pb-2.5 text-xs font-bold transition-all relative",
-            activeTab === 'people'
-              ? "text-primary border-b-2 border-primary"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          People
-        </button>
-        <button
-          onClick={() => setActiveTab('companies')}
-          className={cn(
-            "pb-2.5 text-xs font-bold transition-all relative",
-            activeTab === 'companies'
-              ? "text-primary border-b-2 border-primary"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Companies
-        </button>
-      </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex bg-muted/60 p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs select-none">
+              <Button
+                variant={activeTab === 'people' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 px-4 rounded-lg text-xs font-bold transition-all duration-200",
+                  activeTab === 'people'
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                )}
+                onClick={() => setActiveTab('people')}
+              >
+                People
+              </Button>
+              <Button
+                variant={activeTab === 'companies' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 px-4 rounded-lg text-xs font-bold transition-all duration-200",
+                  activeTab === 'companies'
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                )}
+                onClick={() => setActiveTab('companies')}
+              >
+                Companies
+              </Button>
+            </div>
 
-      {/* HEADER CONTROLS */}
-      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Search bar */}
-          <div className="relative w-64">
+            <div className="w-px h-6 bg-border/50 mx-1 hidden md:block"></div>
+
+            <div className="flex bg-muted/60 p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
+                  viewMode === 'table'
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                )}
+                onClick={() => setViewMode('table')}
+              >
+                <Table className="mr-1.5 h-3.5 w-3.5" /> Table
+              </Button>
+              <Button
+                variant={viewMode === 'split' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
+                  viewMode === 'split'
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                )}
+                onClick={() => setViewMode('split')}
+              >
+                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> CRM View
+              </Button>
+            </div>
+            
+            <div className="flex items-center gap-1.5 bg-card p-1 rounded-xl border border-border/40 shadow-sm shrink-0">
+              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Filter</Button>
+              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Sort</Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowArchived(!showArchived)}
+                className={cn("h-8 text-xs font-semibold px-2.5", showArchived ? "bg-muted text-primary" : "text-muted-foreground")}
+              >
+                <Archive className="w-3.5 h-3.5 mr-1.5" />
+                {showArchived ? 'Hide Archived' : 'Show Archived'}
+              </Button>
+            </div>
+          </div>
+          
+          <div className="relative w-full md:w-64 shrink-0">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/75" />
             <Input
               placeholder="Search contacts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 rounded-xl border-border/70 focus-visible:ring-primary w-full bg-background/50 shadow-2xs"
+              className="pl-9 h-9 rounded-xl border-border/70 focus-visible:ring-primary w-full bg-background/50 shadow-2xs transition-all hover:bg-background"
             />
           </div>
+        </div>
 
-          {/* View switcher */}
-          <div className="flex bg-muted p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs">
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              className={cn(
-                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                viewMode === 'table'
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setViewMode('table')}
-            >
-              <Table className="mr-1.5 h-3.5 w-3.5" /> Table
-            </Button>
-            <Button
-              variant={viewMode === 'split' ? 'default' : 'ghost'}
-              size="sm"
-              className={cn(
-                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                viewMode === 'split'
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setViewMode('split')}
-            >
-              <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> CRM View
-            </Button>
+        <div className="flex items-center gap-3 flex-wrap select-none pt-2">
+          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Total</span>
+              <span className="text-sm leading-none mt-0.5">{statusCounts.Total}</span>
+            </div>
           </div>
 
-          {/* Static decoration buttons to match Plutio style header */}
-          <div className="hidden lg:flex items-center gap-1 bg-muted p-1 rounded-xl border border-border/40 shrink-0 shadow-2xs">
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Edit view</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Filter</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Group</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Order</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Archived</Button>
-            <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Import / Export</Button>
+          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
+            <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center border border-orange-100 dark:border-orange-900/50">
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Pending</span>
+              <span className="text-sm leading-none mt-0.5">{statusCounts.Pending}</span>
+            </div>
           </div>
-        </div>
 
-        <Button
-          onClick={() => {
-            if (activeTab === 'companies') {
-              setIsCompanyCreateOpen(true);
-            } else {
-              setIsCreateOpen(true);
-            }
-          }}
-          className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-sm shrink-0"
-        >
-          <Plus className="mr-1.5 h-4 w-4" /> Add {activeTab === 'companies' ? 'company' : 'someone'}
-        </Button>
-      </div>
+          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Active</span>
+              <span className="text-sm leading-none mt-0.5">{statusCounts.Active}</span>
+            </div>
+          </div>
 
-      {/* STATUS SUMMARY BAR */}
-      <div className="flex-shrink-0 flex items-center gap-2.5 mb-6 flex-wrap select-none">
-        <div className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-slate-500" />
-          <span>{statusCounts.Total} {activeTab === 'companies' ? 'Companies' : 'Contacts'}</span>
-        </div>
-        <div className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-orange-500" />
-          <span>{statusCounts.Pending} Pending</span>
-        </div>
-        <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>{statusCounts.Active} Active</span>
-        </div>
-        <div className="bg-slate-500/10 text-slate-700 dark:text-slate-400 border border-slate-200/20 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-slate-500" />
-          <span>{statusCounts.Inactive} Inactive</span>
+          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
+            <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-900 flex items-center justify-center border border-slate-200 dark:border-slate-800">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Inactive</span>
+              <span className="text-sm leading-none mt-0.5">{statusCounts.Inactive}</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {viewMode === 'table' ? (
         activeTab === 'people' ? (
-          <Card className="border border-border/50 shadow-sm overflow-hidden bg-card rounded-2xl mb-8">
+          <div className="mx-auto max-w-7xl bg-card border border-border/40 shadow-sm rounded-2xl overflow-hidden mb-8">
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-border/30 bg-muted/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80 text-left">
-                    <th className="py-3 px-5 w-12 text-center"></th>
-                    <th className="py-3 px-5">Contact</th>
-                    <th className="py-3 px-5">User role</th>
-                    <th className="py-3 px-5">Company</th>
-                    <th className="py-3 px-5 w-32">Status</th>
-                    <th className="py-3 px-5">Email address</th>
-                    <th className="py-3 px-5 w-24 text-right pr-8">Actions</th>
+                  <tr className="border-b border-border/30 bg-muted/30 text-[10px] uppercase tracking-widest font-black text-muted-foreground/70 text-left">
+                    <th className="py-3.5 px-5 w-12 text-center"></th>
+                    <th className="py-3.5 px-5">Contact</th>
+                    <th className="py-3.5 px-5">Role</th>
+                    <th className="py-3.5 px-5">Company</th>
+                    <th className="py-3.5 px-5 w-32">Status</th>
+                    <th className="py-3.5 px-5">Email Address</th>
+                    <th className="py-3.5 px-5 w-24 text-right pr-8">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
                   {filteredClients.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
-                        No contacts found.
+                      <td colSpan={7} className="py-16 text-center text-sm font-medium text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <User className="h-10 w-10 text-muted-foreground/30" />
+                          <span>No contacts found.</span>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -693,86 +765,120 @@ export function ClientList({ tasks }: ClientListProps) {
                       return (
                         <tr
                           key={client._id}
-                          className="hover:bg-muted/15 transition-all duration-150 group"
+                          className={cn("hover:bg-muted/30 transition-all duration-200 group bg-card", client.archived ? "opacity-60" : "")}
                         >
-                          {/* Checkbox circle */}
-                          <td className="py-4 px-5 text-center align-middle">
-                            <div className="w-4 h-4 rounded-full border border-muted-foreground/25 hover:border-primary/80 hover:bg-primary/5 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-105" />
+                          <td className="py-3 px-5 text-center align-middle">
+                            <div className="w-4 h-4 rounded-full border border-muted-foreground/30 hover:border-primary hover:bg-primary/10 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-110" />
                           </td>
 
-                          {/* Contact Info (Avatar + Name) */}
-                          <td className="py-4 px-5 align-middle">
+                          <td className="py-3 px-5 align-middle">
                             <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8 border border-primary/10 shadow-3xs shrink-0">
+                              <Avatar className="h-8 w-8 border border-border shadow-sm shrink-0">
                                 <AvatarImage src={client.avatarUrl} alt={client.name} />
                                 <AvatarFallback className="bg-primary/5 text-primary font-bold text-xs">
                                   {client.name.charAt(0)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span
-                                onClick={() => {
-                                  setSelectedClient(client);
-                                  setViewMode('split');
+                              <input
+                                type="text"
+                                defaultValue={client.name}
+                                onBlur={(e) => {
+                                  if (e.target.value !== client.name) {
+                                    updateClient({ _id: client._id, data: { name: e.target.value } });
+                                  }
                                 }}
-                                className="font-bold text-foreground/90 cursor-pointer hover:text-primary hover:underline transition-all"
-                              >
-                                {client.name}
-                              </span>
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
+                                className="font-bold text-foreground/90 bg-transparent border border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary rounded px-2 py-1 -mx-2 transition-all text-[13px] w-full"
+                              />
                             </div>
                           </td>
 
-                          {/* User role */}
-                          <td className="py-4 px-5 align-middle">
-                            <span className="inline-flex items-center bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                          <td className="py-3 px-5 align-middle">
+                            <span className="inline-flex items-center bg-slate-100/80 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-[9px] px-2 py-0.5 rounded uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm">
                               Client
                             </span>
                           </td>
 
-                          {/* Company */}
-                          <td className="py-4 px-5 align-middle">
-                            <span className="inline-flex items-center gap-1.5 bg-primary/5 text-primary border border-primary/10 font-bold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                              <Building2 className="h-3 w-3" /> {getClientCompany(client)}
-                            </span>
+                          <td className="py-3 px-5 align-middle">
+                            <CompanyInlineEdit 
+                              client={client} 
+                              companyList={rawCompanies.map((c: any) => c.name)} 
+                              companiesData={rawCompanies}
+                              updateClient={updateClient} 
+                            />
                           </td>
 
-                          {/* Status */}
-                          <td className="py-4 px-5 align-middle">
+                          <td className="py-3 px-5 align-middle">
                             <span
                               className={cn(
-                                "inline-flex items-center justify-center h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-wider shadow-3xs",
+                                "inline-flex items-center justify-center h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm border",
                                 clientInfo.status === "Active"
-                                  ? "bg-green-500/10 text-green-700"
+                                  ? "bg-green-50 text-green-700 border-green-200/50 dark:bg-green-950/30 dark:border-green-900/50 dark:text-green-400"
                                   : clientInfo.status === "Pending"
-                                  ? "bg-amber-500/10 text-amber-700"
-                                  : "bg-muted text-muted-foreground"
+                                  ? "bg-orange-50 text-orange-700 border-orange-200/50 dark:bg-orange-950/30 dark:border-orange-900/50 dark:text-orange-400"
+                                  : "bg-muted text-muted-foreground border-border/50"
                               )}
                             >
                               {clientInfo.status}
                             </span>
                           </td>
 
-                          {/* Email address */}
-                          <td className="py-4 px-5 text-muted-foreground align-middle font-medium">
-                            {client.email}
+                          <td className="py-3 px-5 align-middle">
+                            <input
+                              type="email"
+                              defaultValue={client.email}
+                              onBlur={(e) => {
+                                if (e.target.value !== client.email) {
+                                  updateClient({ _id: client._id, data: { email: e.target.value } });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.currentTarget.blur();
+                              }}
+                              className="text-muted-foreground text-[13px] font-medium bg-transparent border border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary rounded px-2 py-1 -mx-2 transition-all w-full"
+                            />
                           </td>
 
-                          {/* Actions */}
                           <td className="py-4 px-5 text-right align-middle pr-8">
-                            <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
                                 onClick={() => setEditingClient(client)}
                                 aria-label="Edit client"
                               >
-                                <Pencil className="h-3.5 w-3.5" />
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-8 w-8 text-muted-foreground rounded-lg", client.archived ? "hover:text-destructive hover:bg-destructive/10 text-destructive" : "hover:text-amber-600 hover:bg-amber-600/10")}
+                                onClick={() => updateClient({ _id: client._id, data: { archived: !client.archived } })}
+                                aria-label="Archive client"
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                                onClick={() => {
+                                  if(window.confirm('Are you sure you want to permanently delete this contact?')) {
+                                    deleteClient({ _id: client._id });
+                                  }
+                                }}
+                                aria-label="Delete client"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                               {client.fastwork_link && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
                                   asChild
                                 >
                                   <a
@@ -781,7 +887,7 @@ export function ClientList({ tasks }: ClientListProps) {
                                     rel="noopener noreferrer"
                                     aria-label="Fastwork profile"
                                   >
-                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    <ExternalLink className="h-4 w-4" />
                                   </a>
                                 </Button>
                               )}
@@ -792,12 +898,11 @@ export function ClientList({ tasks }: ClientListProps) {
                     })
                   )}
 
-                  {/* Footer row: Add someone */}
-                  <tr className="bg-muted/5 hover:bg-muted/10 transition-colors">
-                    <td colSpan={7} className="p-0">
+                  <tr className="bg-muted/10 hover:bg-muted/30 transition-colors">
+                    <td colSpan={7} className="p-0 border-t border-border/40">
                       <div
                         onClick={() => setIsCreateOpen(true)}
-                        className="px-8 py-4 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
+                        className="px-8 py-3 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
                       >
                         <Plus className="h-4 w-4" /> Add someone
                       </div>
@@ -806,80 +911,80 @@ export function ClientList({ tasks }: ClientListProps) {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         ) : (
-          <Card className="border border-border/50 shadow-sm overflow-hidden bg-card rounded-2xl mb-8">
+          <div className="mx-auto max-w-7xl bg-card border border-border/40 shadow-sm rounded-2xl overflow-hidden mb-8">
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-border/30 bg-muted/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80 text-left">
-                    <th className="py-3 px-5 w-12 text-center"></th>
-                    <th className="py-3 px-5">Company</th>
-                    <th className="py-3 px-5">Team / Contacts</th>
-                    <th className="py-3 px-5">Projects</th>
-                    <th className="py-3 px-5 w-32">Status</th>
-                    <th className="py-3 px-5">Primary Contact</th>
-                    <th className="py-3 px-5 w-24 text-right pr-8"></th>
+                  <tr className="border-b border-border/40 bg-muted/30 text-[10px] uppercase tracking-widest font-black text-muted-foreground/70 text-left">
+                    <th className="py-3.5 px-5 w-12 text-center"></th>
+                    <th className="py-3.5 px-5">Company</th>
+                    <th className="py-3.5 px-5">Team / Contacts</th>
+                    <th className="py-3.5 px-5">Projects</th>
+                    <th className="py-3.5 px-5 w-32">Status</th>
+                    <th className="py-3.5 px-5">Primary Contact</th>
+                    <th className="py-3.5 px-5 w-24 text-right pr-8">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
                   {filteredCompanies.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
-                        No companies found.
+                      <td colSpan={7} className="py-16 text-center text-sm font-medium text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <Building2 className="h-10 w-10 text-muted-foreground/30" />
+                          <span>No companies found.</span>
+                        </div>
                       </td>
                     </tr>
                   ) : (
                     filteredCompanies.map((company) => {
-                      const actualClients = company.clients.filter(c => !c.isCompany);
+                      const actualClients = company.clients || [];
                       const primaryClient = actualClients[0] || null;
 
                       return (
                         <tr
                           key={company.name}
-                          className="hover:bg-muted/15 transition-all duration-150 group"
+                          className="hover:bg-muted/30 transition-all duration-200 group bg-card"
                         >
-                          {/* Checkbox circle */}
-                          <td className="py-4 px-5 text-center align-middle">
-                            <div className="w-4 h-4 rounded-full border border-muted-foreground/25 hover:border-primary/80 hover:bg-primary/5 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-105" />
+                          <td className="py-3 px-5 text-center align-middle">
+                            <div className="w-4 h-4 rounded-full border border-muted-foreground/30 hover:border-primary hover:bg-primary/10 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-110" />
                           </td>
 
-                          {/* Company Name */}
-                          <td className="py-4 px-5 align-middle">
+                          <td className="py-3 px-5 align-middle">
                             <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <Building2 className="h-4.5 w-4.5" />
+                              <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20 shadow-sm">
+                                <Building2 className="h-4 w-4" />
                               </div>
                               <span
                                 onClick={() => {
                                   setSelectedCompany(company.name);
                                   setViewMode('split');
                                 }}
-                                className="font-bold text-foreground/90 cursor-pointer hover:text-primary hover:underline transition-all"
+                                className="font-bold text-foreground/90 cursor-pointer hover:text-primary transition-all text-[13px] hover:underline"
                               >
                                 {company.name}
                               </span>
                             </div>
                           </td>
 
-                          {/* Team / Contacts (Avatars) */}
-                          <td className="py-4 px-5 align-middle">
+                          <td className="py-3 px-5 align-middle">
                             <div className="flex -space-x-2 overflow-hidden">
                               {actualClients.length === 0 ? (
-                                <span className="text-xs text-muted-foreground/75 italic">No contacts</span>
+                                <span className="text-[11px] text-muted-foreground/75 font-medium italic bg-muted/50 px-2 py-0.5 rounded-md border border-border/50">No contacts</span>
                               ) : (
-                                actualClients.map((c) => (
+                                actualClients.map((c: Client) => (
                                   <Tooltip key={c._id}>
                                     <TooltipTrigger asChild>
-                                      <Avatar className="h-7 w-7 border-2 border-background shadow-3xs shrink-0 cursor-pointer hover:translate-y-[-2px] transition-transform">
+                                      <Avatar className={cn("h-8 w-8 border-2 border-background shadow-sm shrink-0 cursor-pointer hover:translate-y-[-2px] transition-transform hover:z-10", c.archived ? "opacity-50" : "")}>
                                         <AvatarImage src={c.avatarUrl} alt={c.name} />
-                                        <AvatarFallback className="bg-primary/5 text-primary font-bold text-[10px]">
+                                        <AvatarFallback className="bg-primary/5 text-primary font-bold text-xs">
                                           {c.name.charAt(0)}
                                         </AvatarFallback>
                                       </Avatar>
                                     </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-xs">
-                                      {c.name} ({c.email})
+                                    <TooltipContent side="top" className="text-xs font-medium">
+                                      {c.name} ({c.email}) {c.archived ? '(Archived)' : ''}
                                     </TooltipContent>
                                   </Tooltip>
                                 ))
@@ -887,23 +992,22 @@ export function ClientList({ tasks }: ClientListProps) {
                             </div>
                           </td>
 
-                          {/* Projects Count */}
-                          <td className="py-4 px-5 align-middle">
-                            <span className="inline-flex items-center gap-1.5 bg-primary/5 text-primary border border-primary/10 font-bold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                          <td className="py-3 px-5 align-middle">
+                            <span className="inline-flex items-center gap-1.5 bg-primary/5 text-primary border border-primary/20 font-bold text-[10px] px-2.5 py-0.5 rounded-md tracking-wide shadow-sm">
                               {company.projectsCount} {company.projectsCount === 1 ? 'Project' : 'Projects'}
                             </span>
                           </td>
 
                           {/* Status */}
-                          <td className="py-4 px-5 align-middle">
+                          <td className="py-3 px-5 align-middle">
                             <span
                               className={cn(
-                                "inline-flex items-center justify-center h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-wider shadow-3xs",
+                                "inline-flex items-center justify-center h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm border",
                                 company.status === "Active"
-                                  ? "bg-green-500/10 text-green-700"
+                                  ? "bg-green-50 text-green-700 border-green-200/50 dark:bg-green-950/30 dark:border-green-900/50 dark:text-green-400"
                                   : company.status === "Pending"
-                                  ? "bg-amber-500/10 text-amber-700"
-                                  : "bg-muted text-muted-foreground"
+                                  ? "bg-orange-50 text-orange-700 border-orange-200/50 dark:bg-orange-950/30 dark:border-orange-900/50 dark:text-orange-400"
+                                  : "bg-muted text-muted-foreground border-border/50"
                               )}
                             >
                               {company.status}
@@ -911,21 +1015,48 @@ export function ClientList({ tasks }: ClientListProps) {
                           </td>
 
                           {/* Primary Contact Email */}
-                          <td className="py-4 px-5 text-muted-foreground align-middle font-medium">
+                          <td className="py-3 px-5 text-muted-foreground align-middle text-[13px] font-medium">
                             {primaryClient ? `${primaryClient.name} (${primaryClient.email})` : '-'}
                           </td>
 
                           {/* Actions */}
                           <td className="py-4 px-5 text-right align-middle pr-8">
-                            <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
                                 onClick={() => setEditingCompany(company)}
                                 aria-label="Edit company"
                               >
-                                <Pencil className="h-3.5 w-3.5" />
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-amber-600 hover:bg-amber-600/10 rounded-lg"
+                                onClick={() => {
+                                  // Archive all clients belonging to this company
+                                  company.clients.forEach((c: any) => {
+                                    updateClient({ _id: c._id, data: { archived: !c.archived } });
+                                  });
+                                }}
+                                aria-label="Archive company"
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                                onClick={() => {
+                                  if(window.confirm('Are you sure you want to permanently delete this company and all its contacts?')) {
+                                    company.clients.forEach((c: any) => deleteClient({ _id: c._id }));
+                                  }
+                                }}
+                                aria-label="Delete company"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </td>
@@ -935,11 +1066,11 @@ export function ClientList({ tasks }: ClientListProps) {
                   )}
 
                   {/* Footer row: Add company */}
-                  <tr className="bg-muted/5 hover:bg-muted/10 transition-colors">
-                    <td colSpan={7} className="p-0">
+                  <tr className="bg-muted/10 hover:bg-muted/30 transition-colors">
+                    <td colSpan={7} className="p-0 border-t border-border/40">
                       <div
                         onClick={() => setIsCompanyCreateOpen(true)}
-                        className="px-8 py-4 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
+                        className="px-8 py-3 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
                       >
                         <Plus className="h-4 w-4" /> Add company
                       </div>
@@ -948,35 +1079,39 @@ export function ClientList({ tasks }: ClientListProps) {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         )
       ) : (
         activeTab === 'people' ? (
           <div className='grid gap-8 lg:grid-cols-3'>
             <div className='lg:col-span-1'>
-              <Card>
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4'>
-                  <CardTitle>Clients</CardTitle>
-                  <Button size='sm' onClick={() => setIsCreateOpen(true)}>
+              <Card className="border-border/40 shadow-sm rounded-2xl bg-card overflow-hidden">
+                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4 bg-muted/20 border-b border-border/30'>
+                  <CardTitle className="text-lg font-black">Clients</CardTitle>
+                  <Button size='sm' onClick={() => setIsCreateOpen(true)} className="h-8 rounded-lg">
                     <Plus className='mr-1.5 h-4 w-4' />
-                    Add Client
+                    Add
                   </Button>
                 </CardHeader>
-                <CardContent className="px-2 sm:px-4">
-                  {isLoading ? (
+                <CardContent className="p-0">
+                  {(isLoadingClients || isLoadingCompanies) ? (
                     <div className='py-8 text-center text-sm text-muted-foreground'>
-                      Loading...
+                      <div className="animate-pulse flex flex-col items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-muted"></div>
+                        <div className="h-4 w-24 bg-muted rounded"></div>
+                      </div>
                     </div>
-                  ) : error ? (
-                    <div className='py-8 text-center text-sm text-destructive'>
+                  ) : (errorClients || errorCompanies) ? (
+                    <div className='py-8 text-center text-sm text-destructive font-medium'>
                       Error loading clients
                     </div>
                   ) : clients.length === 0 ? (
-                    <div className='py-8 text-center text-sm text-muted-foreground'>
-                      No clients found.
+                    <div className='py-12 text-center text-sm text-muted-foreground flex flex-col items-center gap-3'>
+                      <User className="h-10 w-10 text-muted-foreground/30" />
+                      <span>No clients found.</span>
                     </div>
                   ) : (
-                    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                    <div className="divide-y divide-border/30 max-h-[700px] overflow-y-auto">
                       {clients.map((client) => {
                         const completedProjectsCount = projects.filter(
                           (p) =>
@@ -990,36 +1125,39 @@ export function ClientList({ tasks }: ClientListProps) {
                             key={client._id}
                             onClick={() => setSelectedClient(client)}
                             className={cn(
-                              "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer",
+                              "flex items-center justify-between p-4 transition-all cursor-pointer group",
                               isSelected
-                                ? "border-primary/40 bg-primary/10 text-primary shadow-sm"
-                                : "border-border/60 bg-card hover:bg-muted/40 text-foreground"
+                                ? "bg-primary/5 relative"
+                                : "hover:bg-muted/30 bg-card"
                             )}
                           >
+                            {isSelected && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+                            )}
                             <div className="flex items-center gap-3 min-w-0">
-                              <Avatar className="h-9 w-9 shrink-0 border border-border/40">
+                              <Avatar className="h-10 w-10 shrink-0 border border-border/50 shadow-sm">
                                 <AvatarImage
                                   src={client.avatarUrl}
                                   alt={client.name}
                                   data-ai-hint="portrait person"
                                 />
-                                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                                <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                   {client.name.charAt(0)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col min-w-0">
-                                <span className="font-semibold text-sm truncate">{client.name}</span>
-                                <span className="text-[11px] text-muted-foreground">
+                                <span className={cn("font-bold text-[13px] truncate", isSelected ? "text-primary" : "text-foreground")}>{client.name}</span>
+                                <span className="text-[11px] text-muted-foreground font-medium">
                                   {completedProjectsCount} {completedProjectsCount === 1 ? 'project' : 'projects'} completed
                                 </span>
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
                                 onClick={() => setEditingClient(client)}
                                 aria-label="Edit client"
                               >
@@ -1029,7 +1167,7 @@ export function ClientList({ tasks }: ClientListProps) {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
                                   asChild
                                 >
                                   <a
@@ -1054,123 +1192,148 @@ export function ClientList({ tasks }: ClientListProps) {
 
             <div className='lg:col-span-2'>
               {selectedClient ? (
-                <Card>
-                  <CardHeader>
-                    <div className='flex items-start justify-between gap-4'>
-                      <div className='flex items-center gap-4'>
-                        <Avatar className='h-16 w-16 border border-primary/10 shadow-3xs shrink-0'>
+                <Card className="border-border/40 shadow-sm rounded-2xl bg-card overflow-hidden">
+                  {/* COVER PHOTO */}
+                  <div className="h-32 w-full bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 relative">
+                    {/* Placeholder for actual cover image if added in future */}
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+                  </div>
+
+                  <div className="px-6 relative">
+                    <div className='flex flex-col sm:flex-row items-start justify-between gap-4 -mt-12 mb-6'>
+                      <div className='flex flex-col sm:flex-row items-center sm:items-end gap-4'>
+                        <Avatar className='h-24 w-24 border-4 border-card shadow-md shrink-0 bg-card'>
                           <AvatarImage
                             src={selectedClient.avatarUrl}
                             alt={selectedClient.name}
                             data-ai-hint='portrait person'
                           />
-                          <AvatarFallback className='text-2xl font-bold bg-primary/5 text-primary'>
+                          <AvatarFallback className='text-3xl font-black bg-primary/10 text-primary'>
                             {selectedClient.name.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
+                        <div className="text-center sm:text-left mb-1">
                           <CardTitle className='text-2xl font-black tracking-tight text-foreground'>
                             {selectedClient.name}
                           </CardTitle>
-                          <p className='mt-1 text-muted-foreground text-sm font-medium'>
+                          <p className='text-muted-foreground text-[13px] font-medium'>
                             {selectedClient.email}
                           </p>
                         </div>
                       </div>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        onClick={() => setEditingClient(selectedClient)}
-                        className="rounded-xl font-bold text-xs"
-                      >
-                        Edit Details
-                      </Button>
+                      <div className="w-full sm:w-auto mt-2 sm:mt-12 flex items-center justify-center sm:justify-end gap-2">
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          className="rounded-xl font-bold text-xs h-9"
+                        >
+                          <MessageSquare className="mr-1.5 h-4 w-4" /> Message
+                        </Button>
+                        <Button
+                          variant='default'
+                          size='sm'
+                          onClick={() => setEditingClient(selectedClient)}
+                          className="rounded-xl font-bold text-xs h-9 shadow-sm"
+                        >
+                          <Pencil className="mr-1.5 h-4 w-4" /> Edit Details
+                        </Button>
+                      </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className='space-y-6'>
-                    <Separator />
-                    <div className='grid gap-6 md:grid-cols-2'>
+                    
+                    <Separator className="bg-border/40" />
+                    
+                    <div className='grid gap-8 md:grid-cols-2 py-6'>
+                      <div className="space-y-6">
+                        <div>
+                          <h4 className='mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground'>
+                            Contact & Socials
+                          </h4>
+                          <div className='space-y-3 bg-muted/20 p-4 rounded-xl border border-border/30'>
+                            {selectedClient.socials && selectedClient.socials.length > 0 ? (
+                              selectedClient.socials.map(renderSocialLink)
+                            ) : (
+                              <p className='text-[13px] text-muted-foreground font-medium italic'>
+                                No social links added.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
                       <div>
-                        <h4 className='mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground/80'>
-                          Contact & Socials
-                        </h4>
-                        <div className='space-y-4'>
-                          {selectedClient.socials &&
-                          selectedClient.socials.length > 0 ? (
-                            selectedClient.socials.map(renderSocialLink)
+                        <h4 className='mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground'>Notes</h4>
+                        <div className='bg-yellow-50/50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-200/50 dark:border-yellow-900/30 h-full min-h-[120px]'>
+                          {selectedClient.notes ? (
+                            <p className='text-[13px] text-foreground/80 whitespace-pre-wrap leading-relaxed font-medium'>
+                              {selectedClient.notes}
+                            </p>
                           ) : (
-                            <p className='text-sm text-muted-foreground'>
-                              No social links added.
+                            <p className='text-[13px] text-muted-foreground font-medium italic'>
+                              No notes for this client.
                             </p>
                           )}
                         </div>
                       </div>
-                      <div>
-                        <h4 className='mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground/80'>Notes</h4>
-                        {selectedClient.notes ? (
-                          <p className='text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed'>
-                            {selectedClient.notes}
-                          </p>
-                        ) : (
-                          <p className='text-sm text-muted-foreground'>
-                            No notes for this client.
-                          </p>
-                        )}
-                      </div>
                     </div>
 
-                    <Separator />
+                    <Separator className="bg-border/40" />
 
-                    <div>
-                      <h4 className='mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground/80'>
-                        Client Projects
-                      </h4>
+                    <div className="py-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className='text-[10px] font-black uppercase tracking-widest text-muted-foreground'>
+                          Client Projects
+                        </h4>
+                        <Badge variant="secondary" className="rounded-full text-[10px] font-bold px-2 py-0.5">
+                          {clientProjects.length} Total
+                        </Badge>
+                      </div>
                       <div className='grid gap-4 sm:grid-cols-2'>
                         {clientProjects.length > 0 ? (
                           clientProjects.map((project) => (
-                            <Card key={project.id} className="hover:border-primary/20 transition-all">
-                              <CardHeader className="pb-2">
-                                <button
-                                  onClick={() => setProjectModal(project)}
-                                  className='text-left hover:underline w-full'
+                            <div 
+                              key={project.id} 
+                              className="group flex flex-col justify-between p-4 rounded-xl border border-border/40 bg-card hover:bg-muted/20 hover:border-primary/30 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                              onClick={() => setProjectModal(project)}
+                            >
+                              <div className="mb-3">
+                                <h5 className='text-sm font-bold group-hover:text-primary transition-colors line-clamp-1'>
+                                  {project.title}
+                                </h5>
+                              </div>
+                              <div className='flex items-center justify-between mt-auto'>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "rounded-md border-0 px-2 py-0.5 text-[9px] uppercase tracking-wider font-bold shadow-sm",
+                                    project.status === 'Completed' || project.status === 'Paid'
+                                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                      : "bg-muted text-muted-foreground"
+                                  )}
                                 >
-                                  <CardTitle className='text-base font-bold'>
-                                    {project.title}
-                                  </CardTitle>
-                                </button>
-                              </CardHeader>
-                              <CardContent className='space-y-3'>
-                                <div className='flex items-center justify-between text-xs'>
-                                  <Badge
-                                    variant={
-                                      project.status === 'Completed' ||
-                                      project.status === 'Paid'
-                                        ? 'default'
-                                        : 'secondary'
-                                    }
-                                    className="rounded-full border-0 px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-bold"
-                                  >
-                                    {project.status}
-                                  </Badge>
-                                  <span className='font-bold text-muted-foreground'>
-                                    {formatNumber(project.gross_price)}
-                                  </span>
-                                </div>
-                              </CardContent>
-                            </Card>
+                                  {project.status}
+                                </Badge>
+                                <span className='font-black text-sm text-foreground/80 group-hover:text-foreground transition-colors'>
+                                  {formatNumber(project.gross_price)}
+                                </span>
+                              </div>
+                            </div>
                           ))
                         ) : (
-                          <p className='text-sm text-muted-foreground col-span-2'>
-                            No projects found for this client.
-                          </p>
+                          <div className="col-span-2 py-8 flex flex-col items-center justify-center gap-2 border border-dashed border-border/60 rounded-xl bg-muted/10">
+                            <FolderKanban className="h-8 w-8 text-muted-foreground/40" />
+                            <p className='text-[13px] text-muted-foreground font-medium'>
+                              No projects found for this client.
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
-                  </CardContent>
+                  </div>
                 </Card>
               ) : (
-                <Card className='flex items-center justify-center h-96'>
-                  <p className='text-muted-foreground'>
+                <Card className='flex flex-col items-center justify-center h-full min-h-[500px] border-dashed border-border/60 bg-muted/5 shadow-none'>
+                  <User className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                  <p className='text-muted-foreground font-bold'>
                     Select a client to see details
                   </p>
                 </Card>
@@ -1180,25 +1343,29 @@ export function ClientList({ tasks }: ClientListProps) {
         ) : (
           <div className='grid gap-8 lg:grid-cols-3'>
             <div className='lg:col-span-1'>
-              <Card>
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4'>
-                  <CardTitle>Companies</CardTitle>
+              <Card className="border-border/40 shadow-sm rounded-2xl bg-card overflow-hidden">
+                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4 bg-muted/20 border-b border-border/30'>
+                  <CardTitle className="text-lg font-black">Companies</CardTitle>
                 </CardHeader>
-                <CardContent className="px-2 sm:px-4">
-                  {isLoading ? (
+                <CardContent className="p-0">
+                  {(isLoadingClients || isLoadingCompanies) ? (
                     <div className='py-8 text-center text-sm text-muted-foreground'>
-                      Loading...
+                      <div className="animate-pulse flex flex-col items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-muted"></div>
+                        <div className="h-4 w-24 bg-muted rounded"></div>
+                      </div>
                     </div>
-                  ) : error ? (
-                    <div className='py-8 text-center text-sm text-destructive'>
+                  ) : (errorClients || errorCompanies) ? (
+                    <div className='py-8 text-center text-sm text-destructive font-medium'>
                       Error loading companies
                     </div>
                   ) : companiesList.length === 0 ? (
-                    <div className='py-8 text-center text-sm text-muted-foreground'>
-                      No companies found.
+                    <div className='py-12 text-center text-sm text-muted-foreground flex flex-col items-center gap-3'>
+                      <Building2 className="h-10 w-10 text-muted-foreground/30" />
+                      <span>No companies found.</span>
                     </div>
                   ) : (
-                    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                    <div className="divide-y divide-border/30 max-h-[700px] overflow-y-auto">
                       {companiesList.map((company) => {
                         const isSelected = selectedCompany === company.name;
 
@@ -1207,30 +1374,33 @@ export function ClientList({ tasks }: ClientListProps) {
                             key={company.name}
                             onClick={() => setSelectedCompany(company.name)}
                             className={cn(
-                              "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer",
+                              "flex items-center justify-between p-4 transition-all cursor-pointer group",
                               isSelected
-                                ? "border-primary/40 bg-primary/10 text-primary shadow-sm"
-                                : "border-border/60 bg-card hover:bg-muted/40 text-foreground"
+                                ? "bg-primary/5 relative"
+                                : "hover:bg-muted/30 bg-card"
                             )}
                           >
+                            {isSelected && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+                            )}
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="h-9 w-9 rounded-xl bg-primary/5 text-primary border border-primary/10 flex items-center justify-center shrink-0">
-                                <Building2 className="h-4.5 w-4.5" />
+                              <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-sm">
+                                <Building2 className="h-5 w-5" />
                               </div>
                               <div className="flex flex-col min-w-0">
-                                <span className="font-semibold text-sm truncate">{company.name}</span>
-                                <span className="text-[11px] text-muted-foreground">
+                                <span className={cn("font-bold text-[13px] truncate", isSelected ? "text-primary" : "text-foreground")}>{company.name}</span>
+                                <span className="text-[11px] text-muted-foreground font-medium">
                                   {company.clients.length} {company.clients.length === 1 ? 'contact' : 'contacts'}
                                 </span>
                               </div>
                             </div>
                             <span className={cn(
-                              "inline-flex items-center justify-center h-5 px-2 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 ml-2",
+                              "inline-flex items-center justify-center h-5 px-2 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 ml-2 shadow-sm border",
                               company.status === "Active"
-                                ? "bg-green-500/10 text-green-700"
+                                ? "bg-green-50 text-green-700 border-green-200/50 dark:bg-green-950/30 dark:border-green-900/50 dark:text-green-400"
                                 : company.status === "Pending"
-                                ? "bg-amber-500/10 text-amber-700"
-                                : "bg-muted text-muted-foreground"
+                                ? "bg-orange-50 text-orange-700 border-orange-200/50 dark:bg-orange-950/30 dark:border-orange-900/50 dark:text-orange-400"
+                                : "bg-muted text-muted-foreground border-border/50"
                             )}>
                               {company.status}
                             </span>
@@ -1245,144 +1415,171 @@ export function ClientList({ tasks }: ClientListProps) {
 
             <div className='lg:col-span-2'>
               {activeCompanyInfo ? (
-                <Card>
-                  <CardHeader>
-                    <div className='flex items-start justify-between gap-4'>
-                      <div className='flex items-center gap-4'>
-                        <div className='h-16 w-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-3xs shrink-0'>
-                          <Building2 className='h-8 w-8' />
+                <Card className="border-border/40 shadow-sm rounded-2xl bg-card overflow-hidden">
+                  {/* COVER PHOTO */}
+                  <div className="h-32 w-full bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 relative">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+                  </div>
+
+                  <div className="px-6 relative">
+                    <div className='flex flex-col sm:flex-row items-start justify-between gap-4 -mt-12 mb-6'>
+                      <div className='flex flex-col sm:flex-row items-center sm:items-end gap-4'>
+                        <div className='h-24 w-24 rounded-2xl bg-card text-primary flex items-center justify-center border-4 border-card shadow-md shrink-0 relative'>
+                          <div className="absolute inset-0 bg-primary/10 rounded-xl m-1"></div>
+                          <Building2 className='h-10 w-10 relative z-10' />
                         </div>
-                        <div>
+                        <div className="text-center sm:text-left mb-1">
                           <CardTitle className='text-2xl font-black tracking-tight text-foreground'>
                             {activeCompanyInfo.name}
                           </CardTitle>
-                          <p className='mt-1 text-muted-foreground text-sm font-medium flex items-center gap-2'>
+                          <div className='mt-2 flex items-center justify-center sm:justify-start gap-2'>
                             <span className={cn(
-                              "inline-flex items-center justify-center h-5 px-2.5 rounded-full text-[9px] font-black uppercase tracking-wider",
+                              "inline-flex items-center justify-center h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-wider border shadow-sm",
                               activeCompanyInfo.status === "Active"
-                                ? "bg-green-500/10 text-green-700"
+                                ? "bg-green-50 text-green-700 border-green-200/50 dark:bg-green-950/30 dark:border-green-900/50 dark:text-green-400"
                                 : activeCompanyInfo.status === "Pending"
-                                ? "bg-amber-500/10 text-amber-700"
-                                : "bg-muted text-muted-foreground"
+                                ? "bg-orange-50 text-orange-700 border-orange-200/50 dark:bg-orange-950/30 dark:border-orange-900/50 dark:text-orange-400"
+                                : "bg-muted text-muted-foreground border-border/50"
                             )}>
                               {activeCompanyInfo.status}
                             </span>
-                            &bull; {activeCompanyInfo.clients.length} {activeCompanyInfo.clients.length === 1 ? 'contact' : 'contacts'}
-                          </p>
+                            <span className="text-[12px] text-muted-foreground font-medium">
+                              &bull; {activeCompanyInfo.clients.length} {activeCompanyInfo.clients.length === 1 ? 'contact' : 'contacts'}
+                            </span>
+                          </div>
                         </div>
                       </div>
+                      <div className="w-full sm:w-auto mt-2 sm:mt-12 flex items-center justify-center sm:justify-end gap-2">
+                        <Button
+                          variant='default'
+                          size='sm'
+                          onClick={() => setEditingCompany(activeCompanyInfo)}
+                          className="rounded-xl font-bold text-xs h-9 shadow-sm"
+                        >
+                          <Pencil className="mr-1.5 h-4 w-4" /> Edit Company
+                        </Button>
+                      </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className='space-y-6'>
-                    <Separator />
+                    
+                    <Separator className="bg-border/40" />
                     
                     {/* Contacts List */}
-                    <div>
-                      <h4 className='mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-2'>
-                        <User className="h-4.5 w-4.5 text-muted-foreground" />
-                        Associated Contacts
-                      </h4>
+                    <div className="py-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className='text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5'>
+                          <User className="h-3.5 w-3.5" />
+                          Associated Contacts
+                        </h4>
+                      </div>
                       <div className='grid gap-4 sm:grid-cols-2'>
-                        {activeCompanyInfo.clients.map((client) => (
-                          <Card key={client._id} className="border-border/60 bg-muted/5 shadow-2xs">
-                            <CardContent className="p-4 flex items-center gap-3">
-                              <Avatar className="h-10 w-10 shrink-0">
+                        {activeCompanyInfo.clients.map((client: Client) => (
+                          <div 
+                            key={client._id} 
+                            className="group flex items-center justify-between p-3 rounded-xl border border-border/40 bg-card hover:bg-muted/20 hover:border-primary/30 transition-all shadow-sm"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-10 w-10 shrink-0 border border-border/50 shadow-sm">
                                 <AvatarImage src={client.avatarUrl} alt={client.name} />
-                                <AvatarFallback className="bg-primary/5 text-primary font-bold text-sm">
+                                <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
                                   {client.name.charAt(0)}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="min-w-0 flex-1">
-                                <p className="font-bold text-sm truncate">{client.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{client.email}</p>
+                              <div className="flex flex-col min-w-0">
+                                <p className="font-bold text-[13px] truncate group-hover:text-primary transition-colors">{client.name}</p>
+                                <p className="text-[11px] text-muted-foreground font-medium truncate">{client.email}</p>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-primary hover:text-primary/95 text-xs font-bold shrink-0 hover:bg-primary/5 rounded-lg"
-                                onClick={() => {
-                                  setSelectedClient(client);
-                                  setActiveTab('people');
-                                  setViewMode('split');
-                                }}
-                              >
-                                View Profile
-                              </Button>
-                            </CardContent>
-                          </Card>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-primary hover:text-primary/95 text-xs font-bold shrink-0 rounded-lg h-8 px-3 opacity-0 group-hover:opacity-100 transition-opacity bg-primary/5"
+                              onClick={() => {
+                                setSelectedClient(client);
+                                setActiveTab('people');
+                                setViewMode('split');
+                              }}
+                            >
+                              View Profile
+                            </Button>
+                          </div>
                         ))}
                       </div>
                     </div>
 
-                    <Separator />
+                    <Separator className="bg-border/40" />
 
                     {/* Company Projects */}
-                    <div>
-                      <h4 className='mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-2'>
-                        <FolderKanban className="h-4.5 w-4.5 text-muted-foreground" />
-                        Company Projects
-                      </h4>
+                    <div className="py-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className='text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5'>
+                          <FolderKanban className="h-3.5 w-3.5" />
+                          Company Projects
+                        </h4>
+                      </div>
                       <div className='grid gap-4 sm:grid-cols-2'>
                         {(() => {
                           const companyProjects = projects.filter(p => 
-                            activeCompanyInfo.clients.some(c => c._id === p.clientId)
+                            activeCompanyInfo.clients.some((c: any) => c._id === p.clientId)
                           );
                           
                           return companyProjects.length > 0 ? (
                             companyProjects.map((project) => (
-                              <Card key={project.id} className="hover:border-primary/20 transition-all">
-                                <CardHeader className="pb-2">
-                                  <button
-                                    onClick={() => setProjectModal(project)}
-                                    className='text-left hover:underline w-full'
+                              <div 
+                                key={project.id} 
+                                className="group flex flex-col justify-between p-4 rounded-xl border border-border/40 bg-card hover:bg-muted/20 hover:border-primary/30 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                                onClick={() => setProjectModal(project)}
+                              >
+                                <div className="mb-3">
+                                  <h5 className='text-sm font-bold group-hover:text-primary transition-colors line-clamp-1'>
+                                    {project.title}
+                                  </h5>
+                                </div>
+                                <div className='flex items-center justify-between mt-auto mb-2'>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "rounded-md border-0 px-2 py-0.5 text-[9px] uppercase tracking-wider font-bold shadow-sm",
+                                      project.status === 'Completed' || project.status === 'Paid'
+                                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                        : "bg-muted text-muted-foreground"
+                                    )}
                                   >
-                                    <CardTitle className='text-base font-bold'>
-                                      {project.title}
-                                    </CardTitle>
-                                  </button>
-                                </CardHeader>
-                                <CardContent className='space-y-3'>
-                                  <div className='flex items-center justify-between text-xs'>
-                                    <Badge
-                                      variant={
-                                        project.status === 'Completed' ||
-                                        project.status === 'Paid'
-                                          ? 'default'
-                                          : 'secondary'
-                                      }
-                                      className="rounded-full border-0 px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-bold"
-                                    >
-                                      {project.status}
-                                    </Badge>
-                                    <span className='font-bold text-muted-foreground'>
-                                      {formatNumber(project.gross_price)}
-                                    </span>
-                                  </div>
-                                  {project.subTasks && project.subTasks.length > 0 && (
-                                    <div className="space-y-1">
-                                      <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
-                                        <span>Progress</span>
-                                        <span>{Math.round(calculateProgress(project.subTasks))}%</span>
-                                      </div>
-                                      <Progress value={calculateProgress(project.subTasks)} className="h-1" />
+                                    {project.status}
+                                  </Badge>
+                                  <span className='font-black text-sm text-foreground/80 group-hover:text-foreground transition-colors'>
+                                    {formatNumber(project.gross_price)}
+                                  </span>
+                                </div>
+                                {project.subTasks && project.subTasks.length > 0 && (
+                                  <div className="space-y-1.5 pt-2 border-t border-border/30 mt-1">
+                                    <div className="flex items-center justify-between text-[10px] text-muted-foreground font-black uppercase tracking-widest">
+                                      <span>Progress</span>
+                                      <span className={cn(
+                                        calculateProgress(project.subTasks) === 100 ? "text-emerald-500" : "text-primary"
+                                      )}>{Math.round(calculateProgress(project.subTasks))}%</span>
                                     </div>
-                                  )}
-                                </CardContent>
-                              </Card>
+                                    <Progress value={calculateProgress(project.subTasks)} className="h-1.5 bg-muted/50" />
+                                  </div>
+                                )}
+                              </div>
                             ))
                           ) : (
-                            <p className='text-sm text-muted-foreground col-span-2'>
-                              No projects found for this company.
-                            </p>
+                            <div className="col-span-2 py-8 flex flex-col items-center justify-center gap-2 border border-dashed border-border/60 rounded-xl bg-muted/10">
+                              <FolderKanban className="h-8 w-8 text-muted-foreground/40" />
+                              <p className='text-[13px] text-muted-foreground font-medium'>
+                                No projects found for this company.
+                              </p>
+                            </div>
                           );
                         })()}
                       </div>
                     </div>
-                  </CardContent>
+                  </div>
                 </Card>
               ) : (
-                <Card className='flex items-center justify-center h-96'>
-                  <p className='text-muted-foreground'>
+                <Card className='flex flex-col items-center justify-center h-full min-h-[500px] border-dashed border-border/60 bg-muted/5 shadow-none'>
+                  <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                  <p className='text-muted-foreground font-bold'>
                     Select a company to see details
                   </p>
                 </Card>
@@ -1405,6 +1602,7 @@ export function ClientList({ tasks }: ClientListProps) {
               submitLabel="Create profile"
               onCancel={() => setIsCreateOpen(false)}
               isLoading={isAddingClient}
+              companyList={companiesList.map((c: any) => c.name)}
             />
           </ScrollArea>
         </DialogContent>
@@ -1422,11 +1620,17 @@ export function ClientList({ tasks }: ClientListProps) {
           <ScrollArea className="max-h-[75vh] pr-2">
             <ClientForm
               mode="edit"
-              defaultValues={editingClient || undefined}
+              defaultValues={{
+                ...editingClient,
+                companyName: editingClient?.companyId 
+                  ? rawCompanies.find((c: any) => c._id === editingClient.companyId)?.name 
+                  : '',
+              }}
               onSubmit={handleEditClient}
               submitLabel="Save profile"
               onCancel={() => setEditingClient(null)}
               isLoading={isUpdatingClient || isAddingClient}
+              companyList={companiesList.map((c: any) => c.name)}
             />
           </ScrollArea>
         </DialogContent>

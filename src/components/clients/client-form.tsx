@@ -53,6 +53,7 @@ type ClientFormProps = {
   submitLabel: string;
   onCancel: () => void;
   isLoading?: boolean;
+  companyList?: string[];
 };
 
 // Plutio visual style helper classes
@@ -70,6 +71,7 @@ export function ClientForm({
   submitLabel,
   onCancel,
   isLoading,
+  companyList = [],
 }: ClientFormProps) {
   // Parsing defaults from the unstructured client notes field for backwards compatibility
   const fullName = defaultValues?.name || '';
@@ -205,7 +207,7 @@ export function ClientForm({
 
     // Compile compatibility notes block
     const notesLines: string[] = [];
-    if (formValues.companyName) {
+    if (formValues.companyName && formValues.companyName !== 'none') {
       notesLines.push(`company: ${formValues.companyName}`);
     }
     if (formValues.role) {
@@ -278,7 +280,7 @@ export function ClientForm({
       lastName: formValues.lastName || '',
       userRole: formValues.userRole,
       phone: formValues.phone || '',
-      companyName: formValues.companyName || '',
+      companyName: formValues.companyName === 'none' ? '' : (formValues.companyName || ''),
       role: formValues.role || '',
       manager: formValues.manager,
       inviteToWorkspace: formValues.inviteToWorkspace,
@@ -412,13 +414,24 @@ export function ClientForm({
             control={form.control}
             name="companyName"
             render={({ field }) => (
-              <FormItem className="space-y-0 p-3 py-2 flex flex-col justify-center">
+              <FormItem className="space-y-0 p-3 py-2 flex flex-col justify-center relative pr-8">
                 <span className={labelClass}>Company name</span>
-                <input
-                  className={inputClass}
-                  placeholder="Company name"
-                  {...field}
-                />
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value || undefined}
+                >
+                  <SelectTrigger className="border-none p-0 h-auto bg-transparent focus:ring-0 text-[13px] text-foreground shadow-none">
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="none" className="text-muted-foreground italic">None</SelectItem>
+                    {companyList.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage className="text-[11px] mt-1 text-destructive" />
               </FormItem>
             )}

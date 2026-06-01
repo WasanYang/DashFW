@@ -7,6 +7,7 @@ import { snippetApi } from './services/snippetApiSlice';
 import { timeLogApi } from './services/timeLogApi';
 import { invoiceApi } from './services/invoiceApi';
 import { proposalApi } from './services/proposalApi';
+import { companyApi } from './services/companyApi';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
     [timeLogApi.reducerPath]: timeLogApi.reducer,
     [invoiceApi.reducerPath]: invoiceApi.reducer,
     [proposalApi.reducerPath]: proposalApi.reducer,
+    [companyApi.reducerPath]: companyApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -29,9 +31,9 @@ export const store = configureStore({
       timeLogApi.middleware,
       invoiceApi.middleware,
       proposalApi.middleware,
+      companyApi.middleware,
     ),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
-

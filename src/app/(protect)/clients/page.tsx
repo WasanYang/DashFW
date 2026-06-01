@@ -11,7 +11,7 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col gap-4 w-full h-full p-4 sm:p-6">
       <ClientList tasks={tasks} />
     </div>
   );

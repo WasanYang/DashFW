@@ -11,11 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { Plus, Search, Calendar as CalendarIcon, Briefcase, Trash2, FolderOpen, ArrowRight, ExternalLink, LayoutGrid, Table, Archive, User } from 'lucide-react';
+import { Plus, Search, Calendar as CalendarIcon, Briefcase, Trash2, FolderOpen, ArrowRight, ExternalLink, LayoutGrid, Table, Archive, User, Settings2, Filter, ArrowUpDown, Download, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -33,21 +34,21 @@ export default function ProjectsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
-  // View mode and Archive states
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  // Archive state
   const [showArchived, setShowArchived] = useState(false);
 
   // Active (non-archived) projects for status counting
   const activeProjects = useMemo(() => projects.filter((p) => !p.archived), [projects]);
 
   const metrics = useMemo(() => {
-    const counts = {
+    const counts: Record<string, number> = {
       Total: activeProjects.length,
       New: 0,
       'In progress': 0,
       Pending: 0,
       Delayed: 0,
       Completed: 0,
+      Support: 0,
       Canceled: 0,
     };
     activeProjects.forEach((p) => {
@@ -92,6 +93,7 @@ export default function ProjectsPage() {
   const [newDeadline, setNewDeadline] = useState('');
   const [newColor, setNewColor] = useState('#3b82f6');
   const [newBillable, setNewBillable] = useState(true);
+  const [newRelatedProjectIds, setNewRelatedProjectIds] = useState<string[]>([]);
 
   const handleToggleArchive = async (id: string, currentArchived: boolean) => {
     try {
@@ -112,7 +114,9 @@ export default function ProjectsPage() {
   // Filter projects by search query and archive status
   const filteredProjects = useMemo(() => {
     let list = projects;
-    if (!showArchived) {
+    if (showArchived) {
+      list = list.filter((p) => p.archived);
+    } else {
       list = list.filter((p) => !p.archived);
     }
     const query = searchQuery.toLowerCase().trim();
@@ -142,8 +146,8 @@ export default function ProjectsPage() {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newClientId) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: 'กรุณากรอกชื่อโครงการและเลือกลูกค้า', variant: 'destructive' });
+    if (!newTitle.trim()) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'กรุณากรอกชื่อโครงการ', variant: 'destructive' });
       return;
     }
 
@@ -151,7 +155,7 @@ export default function ProjectsPage() {
       await addProject({
         title: newTitle.trim(),
         subtitle: newSubtitle.trim() || undefined,
-        clientId: newClientId,
+        clientId: newClientId && newClientId !== 'none' ? newClientId : undefined,
         details: newDetails.trim() || undefined,
         startDate: newStartDate ? new Date(newStartDate) : undefined,
         deadline: newDeadline ? new Date(newDeadline) : undefined,
@@ -162,6 +166,7 @@ export default function ProjectsPage() {
         billable: newBillable,
         archived: false,
         status: 'New',
+        relatedProjectIds: newRelatedProjectIds.length > 0 ? newRelatedProjectIds : undefined,
       }).unwrap();
 
       toast({ title: 'สำเร็จ!', description: 'สร้างโครงการใหม่เรียบร้อยแล้ว' });
@@ -195,6 +200,7 @@ export default function ProjectsPage() {
     setNewDeadline('');
     setNewColor('#3b82f6');
     setNewBillable(true);
+    setNewRelatedProjectIds([]);
   };
 
   if (loadingProjects || loadingClients || loadingTasks || loadingTimeLogs) {
@@ -202,108 +208,65 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 max-w-7xl mx-auto w-full">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-6 rounded-2xl border border-border/80 shadow-xs">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground/90">Projects Workspace</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            พื้นที่เก็บโครงการระดับบนสไตล์ Plutio จัดการเวลา งาน และใบแจ้งหนี้แบบรายเดือนแยกแต่ละโครงการ
-          </p>
+    <div className="flex flex-col gap-4 w-full h-full p-4 sm:p-6">
+
+
+      {/* TITLE */}
+      <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Projects</h1>
+
+      {/* TOOLBAR */}
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-1 px-1">
+        <div className="relative w-48 shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+          <Input
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 rounded-full border-dashed border-border/60 bg-transparent text-sm focus-visible:ring-0 shadow-none w-full"
+          />
         </div>
-        <Button onClick={() => setIsCreateOpen(true)} className="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 shrink-0 shadow-sm">
-          <Plus className="w-4 h-4" /> New Project Container
-        </Button>
+        <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><Table className="w-4 h-4" /> Table</Button>
+        <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><Settings2 className="w-4 h-4" /> Edit view</Button>
+        <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><Filter className="w-4 h-4" /> Filter</Button>
+        <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><LayoutGrid className="w-4 h-4" /> Group</Button>
+        <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><ArrowUpDown className="w-4 h-4" /> Order</Button>
+        <Button variant="outline" size="sm" onClick={() => setShowArchived(!showArchived)} className={cn("h-9 rounded-full border-dashed text-sm font-medium px-4 shrink-0 shadow-none gap-2", showArchived ? "bg-muted text-primary border-primary/30" : "border-border/60 text-muted-foreground/80 bg-transparent")}><Archive className="w-4 h-4" /> Archived</Button>
+        <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><Download className="w-4 h-4" /> Import / Export</Button>
       </div>
 
       {/* STATUS METRICS BAR */}
-      <div className="flex flex-wrap sm:flex-nowrap w-full rounded-xl overflow-hidden border border-border/40 select-none shadow-2xs">
-        <div className="flex-1 min-w-[120px] bg-[#334155] text-white py-3 px-4 flex items-center justify-center gap-2 border-r border-b sm:border-b-0 border-white/10 text-xs font-bold transition-all">
-          <span className="bg-black/20 text-white px-2 py-0.5 rounded-md min-w-[20px] text-center">{metrics.Total}</span>
-          <span>Projects</span>
+      <div className="flex w-full rounded-md overflow-hidden select-none px-1 mb-3 mt-1">
+        <div className="flex-1 bg-[#475b75] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics.Total}</span>
+          <span className="truncate">Projects</span>
         </div>
-        <div className="flex-1 min-w-[120px] bg-[#3b82f6] text-white py-3 px-4 flex items-center justify-center gap-2 border-r border-b sm:border-b-0 border-white/10 text-xs font-bold transition-all">
-          <span className="bg-black/20 text-white px-2 py-0.5 rounded-md min-w-[20px] text-center">{metrics.New}</span>
-          <span>New</span>
+        <div className="flex-1 bg-[#3b82f6] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics.New}</span>
+          <span className="truncate">New</span>
         </div>
-        <div className="flex-1 min-w-[120px] bg-[#22c55e] text-white py-3 px-4 flex items-center justify-center gap-2 border-r border-b sm:border-b-0 border-white/10 text-xs font-bold transition-all">
-          <span className="bg-black/20 text-white px-2 py-0.5 rounded-md min-w-[20px] text-center">{metrics['In progress']}</span>
-          <span>In progress</span>
+        <div className="flex-1 bg-[#22c55e] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics['In progress']}</span>
+          <span className="truncate">In progress</span>
         </div>
-        <div className="flex-1 min-w-[120px] bg-[#f97316] text-white py-3 px-4 flex items-center justify-center gap-2 border-r border-b sm:border-b-0 border-white/10 text-xs font-bold transition-all">
-          <span className="bg-black/20 text-white px-2 py-0.5 rounded-md min-w-[20px] text-center">{metrics.Pending}</span>
-          <span>Pending</span>
+        <div className="flex-1 bg-[#f97316] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics.Pending}</span>
+          <span className="truncate">Pending</span>
         </div>
-        <div className="flex-1 min-w-[120px] bg-[#ef4444] text-white py-3 px-4 flex items-center justify-center gap-2 border-r border-b sm:border-b-0 border-white/10 text-xs font-bold transition-all">
-          <span className="bg-black/20 text-white px-2 py-0.5 rounded-md min-w-[20px] text-center">{metrics.Delayed}</span>
-          <span>Delayed</span>
+        <div className="flex-1 bg-[#e11d48] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics.Delayed}</span>
+          <span className="truncate">Delayed</span>
         </div>
-        <div className="flex-1 min-w-[120px] bg-[#475569] text-white py-3 px-4 flex items-center justify-center gap-2 border-r border-white/10 text-xs font-bold transition-all">
-          <span className="bg-black/20 text-white px-2 py-0.5 rounded-md min-w-[20px] text-center">{metrics.Completed}</span>
-          <span>Completed</span>
+        <div className="flex-1 bg-[#64748b] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics.Completed}</span>
+          <span className="truncate">Completed</span>
         </div>
-        <div className="flex-1 min-w-[120px] bg-[#64748b] text-white py-3 px-4 flex items-center justify-center gap-2 text-xs font-bold transition-all">
-          <span className="bg-black/20 text-white px-2 py-0.5 rounded-md min-w-[20px] text-center">{metrics.Canceled}</span>
-          <span>Canceled</span>
+        <div className="flex-1 bg-[#0ea5e9] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics.Support}</span>
+          <span className="truncate">Support</span>
         </div>
-      </div>
-
-      {/* TOOLBAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/75" />
-          <Input
-            placeholder="ค้นหาชื่อโครงการ, ลูกค้า..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 rounded-xl border-border/70 bg-background/50 w-full"
-          />
-        </div>
-
-        {/* View Switcher & Archived toggle */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Show/Hide Archived button */}
-          <Button
-            variant={showArchived ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowArchived(!showArchived)}
-            className={cn(
-              "h-9 rounded-xl border-border/70 text-xs font-semibold gap-1.5 shrink-0 transition-all",
-              showArchived ? "bg-muted text-primary border-primary/45" : "bg-background/50 shadow-2xs"
-            )}
-          >
-            <Archive className="w-3.5 h-3.5" /> {showArchived ? 'Hide Archived' : 'Show Archived'}
-          </Button>
-
-          {/* View switcher */}
-          <div className="flex bg-muted p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
-              className={cn(
-                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                viewMode === 'grid'
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> Card Grid
-            </Button>
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              className={cn(
-                "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                viewMode === 'table'
-                  ? "bg-background text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setViewMode('table')}
-            >
-              <Table className="mr-1.5 h-3.5 w-3.5" /> Table View
-            </Button>
-          </div>
+        <div className="flex-1 bg-[#475569] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold">
+          <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{metrics.Canceled}</span>
+          <span className="truncate">Canceled</span>
         </div>
       </div>
 
@@ -321,114 +284,20 @@ export default function ProjectsPage() {
             </Button>
           </CardContent>
         </Card>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => {
-            const client = clients.find(c => c._id === project.clientId);
-            const stats = projectStats.get(project.id) || { total: 0, completed: 0, progress: 0 };
-            
-            return (
-              <Card 
-                key={project.id} 
-                className="overflow-hidden border border-border/60 hover:shadow-md transition-all duration-200 bg-card rounded-2xl flex flex-col group relative"
-                style={{ borderTop: project.color ? `5px solid ${project.color}` : undefined }}
-              >
-                {/* Archived Banner */}
-                {project.archived && (
-                  <Badge variant="destructive" className="absolute top-3 right-3 text-[9px] font-bold uppercase py-0.5 px-2 rounded h-5">
-                    Archived
-                  </Badge>
-                )}
-
-                <CardHeader className="p-5 pb-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="min-w-0">
-                      <h3 className="font-black text-lg text-foreground truncate group-hover:text-primary transition-colors">
-                        {project.title}
-                      </h3>
-                      {project.subtitle && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">{project.subtitle}</p>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="p-5 pt-0 flex-grow flex flex-col gap-4">
-                  {/* Client Info */}
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6 border shadow-3xs">
-                      <AvatarImage src={client?.avatarUrl} />
-                      <AvatarFallback className="text-[10px] font-bold bg-primary/5 text-primary">
-                        {client?.name ? client.name.charAt(0) : '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-bold text-foreground/80">{client?.name || 'Unknown Client'}</span>
-                  </div>
-
-                  {/* Date details */}
-                  <div className="grid grid-cols-2 gap-2 text-xs border-t border-border/30 pt-3">
-                    <div className="text-muted-foreground">
-                      <span className="block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Start Date</span>
-                      <span className="font-semibold text-foreground/80">
-                        {project.startDate ? format(new Date(project.startDate), 'dd MMM yyyy') : 'No date'}
-                      </span>
-                    </div>
-                    <div className="text-muted-foreground">
-                      <span className="block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Deadline</span>
-                      <span className="font-semibold text-foreground/80">
-                        {project.deadline ? format(new Date(project.deadline), 'dd MMM yyyy') : 'No date'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Progress details */}
-                  <div className="space-y-1.5 mt-2">
-                    <div className="flex justify-between text-xs font-bold text-muted-foreground">
-                      <span>Progress</span>
-                      <span>{stats.progress}% ({stats.completed}/{stats.total} Tasks)</span>
-                    </div>
-                    <Progress value={stats.progress} className="h-1.5" />
-                  </div>
-
-                  {/* Pricing detail */}
-                  <div className="flex items-center justify-between border-t border-border/30 pt-3 mt-1 text-xs">
-                    <div>
-                      <span className="block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Project Value</span>
-                      <span className="font-black text-sm text-foreground/80">
-                        {project.gross_price ? `${project.currency === 'USD' ? '$' : '฿'}${project.gross_price.toLocaleString()}` : 'Free/Hourly'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "h-8 w-8 text-muted-foreground transition-colors hover:bg-muted rounded-lg",
-                          project.archived ? "text-destructive hover:text-destructive/80" : "hover:text-primary"
-                        )}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleToggleArchive(project.id, !!project.archived);
-                        }}
-                        title={project.archived ? "Restore from Archive" : "Archive Project"}
-                      >
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                 ) : (
-        <Card className="border border-border/50 shadow-sm overflow-hidden bg-card rounded-2xl">
+      ) : (
+        <Card className="border border-border/50 shadow-none overflow-hidden bg-card rounded-xl mx-1 mb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-border/30 bg-muted/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80 text-left">
-                  <th className="py-3 px-5 w-12 text-center"></th>
-                  <th className="py-3 px-5">Project</th>
-                  <th className="py-3 px-5">Project Client</th>
-                  <th className="py-3 px-5 w-44">Status</th>
-                  <th className="py-3 px-5 w-20">Members</th>
-                  <th className="py-3 px-5 w-48">Progress</th>
-                  <th className="py-3 px-5">Budget</th>
-                  <th className="py-3 px-5 w-32 text-right pr-8">Actions</th>
+                <tr className="border-b border-border/30 bg-transparent text-xs font-semibold text-muted-foreground/80 text-left">
+                  <th className="py-3 px-4 w-12 text-center"></th>
+                  <th className="py-3 px-4"></th>
+                  <th className="py-3 px-4 border-l border-border/30">Project client</th>
+                  <th className="py-3 px-4 w-44 border-l border-border/30">Status</th>
+                  <th className="py-3 px-4 w-24 border-l border-border/30">Members</th>
+                  <th className="py-3 px-4 w-52 border-l border-border/30">Progress</th>
+                  <th className="py-3 px-4 border-l border-border/30">Budget</th>
+                  <th className="py-3 px-4 w-16 text-right border-l border-border/30"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
@@ -443,37 +312,49 @@ export default function ProjectsPage() {
                       className="hover:bg-muted/15 transition-all duration-150 group"
                     >
                       {/* Checkbox Circle */}
-                      <td className="py-4 px-5 text-center align-middle">
-                        <div className="w-4 h-4 rounded-full border border-muted-foreground/35 hover:border-primary/80 hover:bg-primary/5 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-105" />
+                      <td className="py-3 px-4 text-center align-middle">
+                        <div className="w-4 h-4 rounded-full border border-muted-foreground/30 hover:border-primary/80 transition-all cursor-pointer mx-auto flex items-center justify-center" />
                       </td>
 
                       {/* Project Title */}
-                      <td className="py-4 px-5 align-middle font-bold text-foreground">
-                        <Link href={`/board/${project.id}`} className="hover:text-primary hover:underline flex items-center gap-2">
-                          <span className="truncate max-w-[200px]">{project.title}</span>
+                      <td className="py-3 px-4 align-middle font-bold text-foreground text-sm">
+                        <Link href={`/board/${project.id}`} className="hover:text-primary flex items-center gap-2">
+                          <span className="truncate max-w-[240px]">{project.title}</span>
                           {project.archived && (
-                            <Badge variant="outline" className="text-[9px] font-bold text-destructive bg-destructive/10 border-destructive/20 uppercase shrink-0 py-0 px-1.5 h-4">
+                            <Badge variant="outline" className="text-[10px] font-bold text-destructive bg-destructive/10 border-destructive/20 uppercase shrink-0 py-0 px-2 h-5">
                               Archived
                             </Badge>
                           )}
                         </Link>
-                        {project.subtitle && (
-                          <span className="block text-xs text-muted-foreground font-normal mt-0.5 truncate max-w-[200px]">
-                            {project.subtitle}
-                          </span>
-                        )}
                       </td>
 
                       {/* Project Client badge */}
-                      <td className="py-4 px-5 align-middle">
-                        <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-lg text-xs font-semibold select-none">
-                          <User className="w-3.5 h-3.5 text-slate-500" />
-                          <span>{client?.name || 'Unknown Client'}</span>
-                        </div>
+                      <td className="py-3 px-4 align-middle border-l border-border/30">
+                        <Select
+                          value={project.clientId || 'none'}
+                          onValueChange={(val) => {
+                            const newClientId = val === 'none' ? undefined : val;
+                            updateProject({ id: project.id, data: { clientId: newClientId } });
+                            toast({ title: 'สำเร็จ!', description: 'อัปเดตลูกค้าเรียบร้อยแล้ว' });
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-auto inline-flex px-2.5 py-0.5 rounded-xl bg-slate-100/80 hover:bg-slate-200 text-slate-700 text-[11px] font-medium border border-transparent hover:border-dashed hover:border-slate-400 shadow-none [&>svg]:hidden focus:ring-0 focus-visible:ring-0 transition-all">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <User className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{client?.name || 'Unknown'}</span>
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl text-xs max-w-[200px]">
+                            <SelectItem value="none">No Client</SelectItem>
+                            {clients.map(c => (
+                              <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </td>
 
                       {/* Status Dropdown badge select */}
-                      <td className="py-4 px-5 align-middle">
+                      <td className="py-3 px-4 align-middle border-l border-border/30">
                         <Select
                           value={project.status || 'New'}
                           onValueChange={(val) => {
@@ -483,83 +364,59 @@ export default function ProjectsPage() {
                         >
                           <SelectTrigger
                             className={cn(
-                              "h-8 w-32 font-bold text-[11px] rounded-lg border-0 text-white shadow-3xs uppercase tracking-wider transition-all duration-200 focus:ring-0 focus-visible:ring-0 justify-between",
+                              "h-8 w-32 font-semibold text-xs rounded border-0 text-white shadow-none transition-all duration-200 focus:ring-0 focus-visible:ring-0 justify-between",
                               (!project.status || project.status === 'New') && "bg-[#3b82f6] hover:bg-[#2563eb]",
                               project.status === 'In progress' && "bg-[#22c55e] hover:bg-[#16a34a]",
                               project.status === 'Pending' && "bg-[#f97316] hover:bg-[#ea580c]",
-                              project.status === 'Delayed' && "bg-[#ef4444] hover:bg-[#dc2626]",
-                              project.status === 'Completed' && "bg-[#475569] hover:bg-[#334155]",
-                              project.status === 'Canceled' && "bg-[#64748b] hover:bg-[#4b5563]"
+                              project.status === 'Delayed' && "bg-[#e11d48] hover:bg-[#be123c]",
+                              project.status === 'Completed' && "bg-[#64748b] hover:bg-[#475569]",
+                              project.status === 'Support' && "bg-[#0ea5e9] hover:bg-[#0284c7]",
+                              project.status === 'Canceled' && "bg-[#475569] hover:bg-[#334155]"
                             )}
                           >
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="rounded-xl">
+                          <SelectContent className="rounded-xl text-xs">
                             <SelectItem value="New">New</SelectItem>
                             <SelectItem value="In progress">In progress</SelectItem>
                             <SelectItem value="Pending">Pending</SelectItem>
                             <SelectItem value="Delayed">Delayed</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="Support">Support</SelectItem>
                             <SelectItem value="Canceled">Canceled</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>
 
                       {/* Members */}
-                      <td className="py-4 px-5 align-middle">
+                      <td className="py-3 px-4 align-middle border-l border-border/30">
                         <div className="flex -space-x-1 overflow-hidden">
-                          <Avatar className="h-6.5 w-6.5 border-2 border-background shadow-3xs shrink-0">
-                            <AvatarFallback className="text-[9px] font-black bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100">
-                              RY
-                            </AvatarFallback>
+                          <Avatar className="h-6 w-6 border border-background shadow-none shrink-0 bg-muted flex items-center justify-center rounded-full">
+                            <span className="text-[10px] font-bold text-muted-foreground">RY</span>
                           </Avatar>
                         </div>
                       </td>
 
                       {/* Progress */}
-                      <td className="py-4 px-5 align-middle w-48">
-                        <div className="flex items-center gap-3">
-                          <Progress value={stats.total > 0 ? stats.progress : 0} className="h-1.5 w-24 bg-muted/80" />
-                          <span className="text-[10px] font-bold text-muted-foreground/85 whitespace-nowrap">
+                      <td className="py-3 px-4 align-middle w-52 border-l border-border/30">
+                        <div className="flex items-center justify-between gap-3">
+                          <Progress value={stats.total > 0 ? stats.progress : 0} className="h-1.5 flex-grow bg-muted/80 rounded-none" />
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
                             {stats.total > 0 ? `${stats.completed}/${stats.total} (${stats.progress}%)` : "No tasks"}
                           </span>
                         </div>
                       </td>
 
                       {/* Budget */}
-                      <td className="py-4 px-5 align-middle font-bold text-foreground text-xs whitespace-nowrap">
+                      <td className="py-3 px-4 align-middle font-medium text-muted-foreground text-xs whitespace-nowrap border-l border-border/30">
                         {budgetStats.formatted}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4 px-5 text-right align-middle pr-8">
+                      <td className="py-3 px-4 text-right align-middle opacity-0 group-hover:opacity-100 transition-opacity border-l border-border/30">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                              "h-8 w-8 text-muted-foreground transition-colors hover:bg-muted rounded-lg",
-                              project.archived ? "text-destructive hover:text-destructive/80" : "hover:text-primary"
-                            )}
-                            onClick={() => handleToggleArchive(project.id, !!project.archived)}
-                            title={project.archived ? "Restore from Archive" : "Archive Project"}
-                          >
-                            <Archive className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
-                            onClick={() => setProjectToDelete(project.id)}
-                            title="Delete Project"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                          <Link href={`/board/${project.id}`}>
-                            <Button size="sm" className="h-8 rounded-lg font-bold gap-1 text-xs bg-muted text-foreground hover:bg-primary hover:text-primary-foreground ml-1">
-                              Open Workspace <ArrowRight className="w-3 h-3" />
-                            </Button>
-                          </Link>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-md" onClick={() => handleToggleArchive(project.id, !!project.archived)}><Archive className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md" onClick={() => setProjectToDelete(project.id)}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </td>
                     </tr>
@@ -567,11 +424,11 @@ export default function ProjectsPage() {
                 })}
 
                 {/* Inline Create project button */}
-                <tr className="bg-muted/5 hover:bg-muted/10 transition-colors">
-                  <td colSpan={8} className="p-0">
+                <tr className="bg-transparent hover:bg-muted/5 transition-colors">
+                  <td colSpan={8} className="p-0 border-t border-border/30">
                     <div
                       onClick={() => setIsCreateOpen(true)}
-                      className="px-8 py-4 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
+                      className="px-5 py-3.5 cursor-pointer flex items-center gap-2.5 text-primary/80 hover:text-primary font-semibold text-sm transition-colors"
                     >
                       <Plus className="h-4 w-4" /> Create project
                     </div>
@@ -581,149 +438,208 @@ export default function ProjectsPage() {
             </table>
           </div>
         </Card>
-
+      )}
 
       {/* CREATE DIALOG */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-xl rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-black text-xl">Create New Project Container</DialogTitle>
-            <DialogDescription>
-              สร้างโครงการระดับบนสำหรับจัดเก็บงานย่อยและตั้งรอบ Invoice รายเดือน
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border border-border/50 shadow-2xl rounded-[24px] bg-background">
+          <div className="bg-muted/30 px-6 py-5 border-b border-border/40">
+            <DialogHeader>
+              <DialogTitle className="font-bold text-xl flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-primary" /> Create New Project
+              </DialogTitle>
+              <DialogDescription className="text-sm mt-1 text-muted-foreground/80">
+                สร้างโครงการระดับบนสำหรับจัดเก็บงานย่อยและตั้งรอบ Invoice
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <form onSubmit={handleCreateProject} className="space-y-4 py-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Title */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Project Title*</span>
-                <Input
-                  placeholder="เช่น SEO & Support รายเดือน"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="rounded-xl h-9"
-                  required
-                />
-              </div>
+          <form onSubmit={handleCreateProject} className="px-6 py-5">
+            <div className="space-y-5">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Title */}
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-xs font-semibold text-foreground/80">Project Title <span className="text-destructive">*</span></span>
+                  <Input
+                    placeholder="e.g. Website Redesign Q3"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="rounded-xl h-10 border-border/60 bg-transparent text-sm focus-visible:ring-primary shadow-sm"
+                    required
+                  />
+                </div>
 
-              {/* Subtitle */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Subtitle</span>
-                <Input
-                  placeholder="เช่น รอบปี 2569"
-                  value={newSubtitle}
-                  onChange={(e) => setNewSubtitle(e.target.value)}
-                  className="rounded-xl h-9"
-                />
-              </div>
-            </div>
+                {/* Subtitle */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-foreground/80">Subtitle</span>
+                  <Input
+                    placeholder="e.g. Scope phase 1"
+                    value={newSubtitle}
+                    onChange={(e) => setNewSubtitle(e.target.value)}
+                    className="rounded-xl h-10 border-border/60 bg-transparent text-sm shadow-sm"
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Client Selection */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Client*</span>
-                <Select onValueChange={setNewClientId} value={newClientId}>
-                  <SelectTrigger className="rounded-xl h-9">
-                    <SelectValue placeholder="เลือกลูกค้าคู่สัญญา" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {clients.map(c => (
-                      <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Tag Color */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Project Color Tag</span>
-                <div className="flex items-center gap-1.5 h-9">
-                  {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#64748b'].map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setNewColor(c)}
-                      className={cn(
-                        "w-5 h-5 rounded-full border transition-all",
-                        newColor === c ? "ring-2 ring-primary ring-offset-2 scale-110" : "opacity-80"
-                      )}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
+                {/* Client Selection */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground/80">Client</span>
+                    <span className="text-[10px] text-muted-foreground">Optional</span>
+                  </div>
+                  <Select onValueChange={setNewClientId} value={newClientId}>
+                    <SelectTrigger className="rounded-xl h-10 border-border/60 shadow-sm text-sm bg-transparent">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="none">No Client</SelectItem>
+                      {clients.map(c => (
+                        <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Start Date */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Start Date</span>
-                <Input
-                  type="date"
-                  value={newStartDate}
-                  onChange={(e) => setNewStartDate(e.target.value)}
-                  className="rounded-xl h-9 text-xs"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Timeline */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-foreground/80">Timeline</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={newStartDate}
+                      onChange={(e) => setNewStartDate(e.target.value)}
+                      className="rounded-xl h-10 text-xs border-border/60 shadow-sm bg-transparent"
+                    />
+                    <span className="text-muted-foreground/50 text-xs">-</span>
+                    <Input
+                      type="date"
+                      value={newDeadline}
+                      onChange={(e) => setNewDeadline(e.target.value)}
+                      className="rounded-xl h-10 text-xs border-border/60 shadow-sm bg-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Financials & Tag */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-foreground/80">Budget & Tag</span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={newGrossPrice || ''}
+                        onChange={(e) => setNewGrossPrice(Number(e.target.value))}
+                        className="rounded-xl h-10 pl-16 text-sm border-border/60 shadow-sm bg-transparent"
+                      />
+                      <div className="absolute left-0 top-0 bottom-0 flex items-center border-r border-border/60">
+                        <Select onValueChange={setNewCurrency} value={newCurrency}>
+                          <SelectTrigger className="h-full border-0 rounded-l-xl bg-muted/30 text-xs font-medium w-[60px] px-2 shadow-none focus:ring-0 focus:ring-offset-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl min-w-[80px]">
+                            <SelectItem value="THB">THB</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="h-10 px-2.5 flex items-center bg-muted/10 border border-border/60 rounded-xl shadow-sm shrink-0">
+                      <div className="flex items-center gap-1">
+                        {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#64748b'].map(c => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setNewColor(c)}
+                            className={cn(
+                              "w-3.5 h-3.5 rounded-full transition-all",
+                              newColor === c ? "ring-2 ring-primary ring-offset-1 scale-110" : "opacity-60 hover:opacity-100"
+                            )}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Project Details */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-foreground/80">Project Details</span>
+                <textarea
+                  placeholder="รายละเอียดเงื่อนไขสัญญา, ขอบเขตงานรายเดือน..."
+                  value={newDetails}
+                  onChange={(e) => setNewDetails(e.target.value)}
+                  className="flex min-h-[80px] w-full rounded-xl border border-border/60 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground/50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
 
-              {/* Deadline */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Deadline</span>
-                <Input
-                  type="date"
-                  value={newDeadline}
-                  onChange={(e) => setNewDeadline(e.target.value)}
-                  className="rounded-xl h-9 text-xs"
-                />
+              {/* Related Projects */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground/80">Related Projects</span>
+                  <span className="text-[10px] text-muted-foreground">Optional</span>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between h-10 rounded-xl border-border/60 bg-transparent shadow-sm text-sm font-normal">
+                      {newRelatedProjectIds.length > 0
+                        ? `${newRelatedProjectIds.length} project(s) selected`
+                        : <span className="text-muted-foreground">Select related projects</span>}
+                      <ChevronDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[300px] sm:w-[500px] max-h-60 overflow-y-auto rounded-xl">
+                    {projects.map((p) => (
+                      <DropdownMenuCheckboxItem
+                        key={p.id}
+                        checked={newRelatedProjectIds.includes(p.id)}
+                        onCheckedChange={(checked) => {
+                          setNewRelatedProjectIds(prev => 
+                            checked ? [...prev, p.id] : prev.filter(id => id !== p.id)
+                          )
+                        }}
+                      >
+                        {p.title}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                {/* Render selected pills */}
+                {newRelatedProjectIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {newRelatedProjectIds.map(id => {
+                      const proj = projects.find(p => p.id === id);
+                      return proj ? (
+                        <Badge key={id} variant="secondary" className="text-[10px] font-normal px-2.5 py-0.5 rounded-full flex items-center gap-1.5 bg-muted/50 border-border/50">
+                          <FolderOpen className="w-3 h-3 text-muted-foreground" />
+                          <span className="truncate max-w-[150px]">{proj.title}</span>
+                          <button
+                            type="button"
+                            onClick={() => setNewRelatedProjectIds(prev => prev.filter(pid => pid !== id))}
+                            className="ml-0.5 text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 border-t border-border/30 pt-3">
-              {/* Currency */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Currency</span>
-                <Select onValueChange={setNewCurrency} value={newCurrency}>
-                  <SelectTrigger className="rounded-xl h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="THB">THB (฿)</SelectItem>
-                    <SelectItem value="USD">USD ($)</SelectItem>
-                    <SelectItem value="EUR">EUR (€)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Fixed Budget */}
-              <div className="flex flex-col gap-1.5 col-span-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gross Project Price / Retainer Rate</span>
-                <Input
-                  type="number"
-                  placeholder="เช่น 10000"
-                  value={newGrossPrice || ''}
-                  onChange={(e) => setNewGrossPrice(Number(e.target.value))}
-                  className="rounded-xl h-9"
-                />
-              </div>
-            </div>
-
-            {/* Project Details */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Project Details</span>
-              <textarea
-                placeholder="รายละเอียดเงื่อนไขสัญญา, ขอบเขตงานรายเดือน..."
-                value={newDetails}
-                onChange={(e) => setNewDetails(e.target.value)}
-                className="flex min-h-[60px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-xs shadow-2xs placeholder:text-muted-foreground/50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-
-            <DialogFooter className="pt-3 gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} className="rounded-xl h-9 text-xs">
+            <DialogFooter className="mt-6 gap-3 sm:justify-between pt-5 border-t border-border/40">
+              <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="rounded-xl h-10 text-sm hover:bg-muted/50">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isCreating} className="rounded-xl h-9 text-xs font-bold">
+              <Button type="submit" disabled={isCreating} className="rounded-xl h-10 px-8 text-sm font-bold shadow-md">
                 {isCreating ? 'Creating...' : 'Create Project'}
               </Button>
             </DialogFooter>
