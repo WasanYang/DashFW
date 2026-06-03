@@ -30,6 +30,7 @@ const aiChecklistCreatorPrompt = ai.definePrompt({
   output: { schema: AiChecklistCreatorOutputSchema },
   prompt: `You are an expert in creating comprehensive and actionable checklists for professional services and project types.
 Given the following description, generate a detailed and customizable checklist. Each item in the checklist should be a clear, distinct step.
+You must write all checklist items in Thai (ภาษาไทย).
 The output should be a JSON object with a single key 'checklistItems' which is an array of strings.
 
 Description: {{{description}}}`,

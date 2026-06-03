@@ -3,7 +3,7 @@
 import { useState, useEffect, DragEvent, useMemo } from 'react';
 import { Task, SubTask } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { JobType } from '@/app/(protect)/job-types/page';
+import type { JobType } from '@/lib/types';
 import { useGetJobTypesQuery } from '@/services/jobTypeApiSlice';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

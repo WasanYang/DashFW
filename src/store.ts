@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { clientApi } from './services/clientApi';
 import { projectApi } from './services/projectApi';
 import { taskApi } from './services/taskApi';
+import { taskTemplateApi } from './services/taskTemplateApiSlice';
 import { jobTypeApi } from './services/jobTypeApiSlice';
 import { snippetApi } from './services/snippetApiSlice';
 import { timeLogApi } from './services/timeLogApi';
@@ -12,6 +13,7 @@ import { companyApi } from './services/companyApi';
 export const store = configureStore({
   reducer: {
     [clientApi.reducerPath]: clientApi.reducer,
+    [taskTemplateApi.reducerPath]: taskTemplateApi.reducer,
     [jobTypeApi.reducerPath]: jobTypeApi.reducer,
     [projectApi.reducerPath]: projectApi.reducer,
     [taskApi.reducerPath]: taskApi.reducer,
@@ -24,6 +26,7 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
       clientApi.middleware,
+      taskTemplateApi.middleware,
       jobTypeApi.middleware,
       projectApi.middleware,
       taskApi.middleware,

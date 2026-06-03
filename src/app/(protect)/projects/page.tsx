@@ -424,7 +424,6 @@ export default function ProjectsPage() {
                       {renderSortIcon('priority')}
                     </span>
                   </th>
-                  <th className="py-3 px-4 w-24 border-l border-border/30">Members</th>
                   <th className="py-3 px-4 w-52 border-l border-border/30">Progress</th>
                   <th className="py-3 px-4 border-l border-border/30">Budget</th>
                   <th className="py-3 px-4 w-16 text-right border-l border-border/30"></th>
@@ -545,15 +544,6 @@ export default function ProjectsPage() {
                             <SelectItem value="Low">Low</SelectItem>
                           </SelectContent>
                         </Select>
-                      </td>
-
-                      {/* Members */}
-                      <td className="py-3 px-4 align-middle border-l border-border/30">
-                        <div className="flex -space-x-1 overflow-hidden">
-                          <Avatar className="h-6 w-6 border border-background shadow-none shrink-0 bg-muted flex items-center justify-center rounded-full">
-                            <span className="text-[10px] font-bold text-muted-foreground">RY</span>
-                          </Avatar>
-                        </div>
                       </td>
 
                       {/* Progress */}

@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -43,7 +44,8 @@ import {
   UserCircle,
   MoreHorizontal,
   GripVertical,
-  Play
+  Play,
+  FolderOpen
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
@@ -55,6 +57,7 @@ import { useGetInvoicesQuery } from '@/services/invoiceApi';
 import { useToast } from '@/hooks/use-toast';
 import { createAiChecklist } from '@/ai/flows/ai-checklist-creator-flow';
 import { generateAiProjectNotes } from '@/ai/flows/ai-project-notes-flow';
+import { useGetTaskTemplatesQuery } from '@/services/taskTemplateApiSlice';
 import { formatNumber } from '@/lib/number-format';
 import { cn } from '@/lib/utils';
 import type { Client, SubTask } from '@/lib/types';
@@ -195,6 +198,112 @@ export default function ProjectDetailsPage() {
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถบันทึกข้อมูลโน้ตเข้าโครงการได้",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Templates Import states & handler
+  const [isImportTemplateOpen, setIsImportTemplateOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [targetGroupIdForChecklist, setTargetGroupIdForChecklist] = useState<string>('');
+  const { data: allTemplates = [] } = useGetTaskTemplatesQuery();
+
+  const handleImportTemplate = async () => {
+    if (!selectedTemplateId || !project) return;
+    const template = allTemplates.find((t: any) => t._id === selectedTemplateId || t.id === selectedTemplateId);
+    if (!template) return;
+
+    try {
+      if (template.type === 'project') {
+        const groups = template.data.groups || [];
+        for (const group of groups) {
+          const formattedSubTasks = (group.tasks || []).map((task: any, taskIdx: number) => ({
+            id: `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`,
+            text: task.title,
+            description: task.details || '',
+            completed: false,
+            children: (task.subTasks || []).map((sub: any, subIdx: number) => ({
+              id: `imported-sub-${Date.now()}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
+              text: sub.text,
+              completed: false
+            }))
+          }));
+
+          await addTask({
+            title: group.title,
+            projectId: id,
+            clientId: project.clientId,
+            status: 'Backlog',
+            gross_price: 0,
+            deadline: new Date(),
+            revisions: 0,
+            subTasks: formattedSubTasks,
+            boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
+          }).unwrap();
+        }
+      } else if (template.type === 'group') {
+        const group = template.data.groups?.[0];
+        if (group) {
+          const formattedSubTasks = (group.tasks || []).map((task: any, taskIdx: number) => ({
+            id: `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`,
+            text: task.title,
+            description: task.details || '',
+            completed: false,
+            children: (task.subTasks || []).map((sub: any, subIdx: number) => ({
+              id: `imported-sub-${Date.now()}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
+              text: sub.text,
+              completed: false
+            }))
+          }));
+
+          await addTask({
+            title: group.title,
+            projectId: id,
+            clientId: project.clientId,
+            status: 'Backlog',
+            gross_price: 0,
+            deadline: new Date(),
+            revisions: 0,
+            subTasks: formattedSubTasks,
+            boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
+          }).unwrap();
+        }
+      } else if (template.type === 'task') {
+        if (!targetGroupIdForChecklist) {
+          toast({
+            title: "โปรดเลือกกลุ่มงาน",
+            description: "คุณต้องเลือกกลุ่มงานเป้าหมายเพื่อนำเช็คลิสต์นี้ไปบันทึก",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        const targetTask = projectTasks.find(t => t.id === targetGroupIdForChecklist);
+        if (targetTask) {
+          const newSubTasks = (template.data.subTasks || []).map((sub: any, subIdx: number) => ({
+            id: `imported-checklist-${Date.now()}-${subIdx}`,
+            text: sub.text,
+            completed: false
+          }));
+
+          const updatedSubTasks = [...(targetTask.subTasks || []), ...newSubTasks];
+          await updateTask({ id: targetGroupIdForChecklist, data: { subTasks: updatedSubTasks } }).unwrap();
+        }
+      }
+
+      toast({
+        title: "สำเร็จ!",
+        description: `นำแม่แบบ "${template.name}" ไปใช้งานเรียบร้อยแล้ว`,
+      });
+      setIsImportTemplateOpen(false);
+      setSelectedTemplateId('');
+      setTargetGroupIdForChecklist('');
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถนำแม่แบบไปติดตั้งได้",
         variant: "destructive"
       });
     }
@@ -916,11 +1025,19 @@ export default function ProjectDetailsPage() {
                       if (e.key === 'Enter') handleAddTaskGroup();
                     }}
                   />
-                  <Button
+                   <Button
                     onClick={handleAddTaskGroup}
                     className="h-9 rounded-xl bg-primary text-primary-foreground font-semibold px-3 gap-1 text-xs shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Group
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setIsImportTemplateOpen(true)}
+                    className="h-9 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 hover:text-primary transition-all font-semibold px-3 gap-1 text-xs shrink-0"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+                    ใช้เทมเพลต (Templates)
                   </Button>
                 </div>
               </div>
@@ -2009,6 +2126,95 @@ export default function ProjectDetailsPage() {
             )}
           </div>
         )}
+
+        {/* Import Template Dialog */}
+        <Dialog open={isImportTemplateOpen} onOpenChange={setIsImportTemplateOpen}>
+          <DialogContent className="rounded-2xl max-w-lg bg-background border border-border">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-primary" />
+                เลือกเทมเพลตที่ต้องการใช้งาน
+              </DialogTitle>
+              <DialogDescription>
+                เลือกแผนเทมเพลตเพื่อนำเข้าไปสร้างในโครงการนี้
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">เทมเพลต (Template)</Label>
+                <Select value={selectedTemplateId} onValueChange={(val) => {
+                  setSelectedTemplateId(val);
+                  const tpl = allTemplates.find((t: any) => t._id === val || t.id === val);
+                  if (tpl && tpl.type !== 'task') {
+                    setTargetGroupIdForChecklist('');
+                  }
+                }}>
+                  <SelectTrigger className="rounded-xl h-10">
+                    <SelectValue placeholder="เลือกเทมเพลต" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {allTemplates.length === 0 ? (
+                      <SelectItem value="none" disabled>ไม่มีเทมเพลตในระบบ</SelectItem>
+                    ) : (
+                      allTemplates.map((tpl: any) => (
+                        <SelectItem key={tpl._id || tpl.id} value={tpl._id || tpl.id}>
+                          {tpl.name} ({tpl.type === 'project' ? 'Project' : tpl.type === 'group' ? 'Group' : 'Checklist'})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* If selected template is a task checklist, prompt user to select target group */}
+              {(() => {
+                const tpl = allTemplates.find((t: any) => t._id === selectedTemplateId || t.id === selectedTemplateId);
+                if (tpl && tpl.type === 'task') {
+                  return (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <Label className="text-xs font-semibold text-muted-foreground">เลือกกลุ่มงานเป้าหมาย (Target Group)</Label>
+                      <Select value={targetGroupIdForChecklist} onValueChange={setTargetGroupIdForChecklist}>
+                        <SelectTrigger className="rounded-xl h-10">
+                          <SelectValue placeholder="เลือกกลุ่มงานในโครงการนี้" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          {projectTasks.length === 0 ? (
+                            <SelectItem value="none" disabled>ไม่มีกลุ่มงานในโครงการนี้</SelectItem>
+                          ) : (
+                            projectTasks.map((t: any) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.title}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+
+            <DialogFooter className="gap-2 border-t border-border/40 pt-3">
+              <Button variant="outline" onClick={() => {
+                setIsImportTemplateOpen(false);
+                setSelectedTemplateId('');
+                setTargetGroupIdForChecklist('');
+              }} className="rounded-xl h-10">
+                ยกเลิก
+              </Button>
+              <Button
+                onClick={handleImportTemplate}
+                disabled={!selectedTemplateId}
+                className="rounded-xl h-10 px-6 font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                นำเข้าเทมเพลต
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* AI Notes Generator Dialog */}
         <Dialog open={isAiNotesOpen} onOpenChange={setIsAiNotesOpen}>

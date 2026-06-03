@@ -75,7 +75,7 @@ import {
 import { EditableNovelField } from '../ui/editable-novel-field';
 import { formatNumber } from '@/lib/number-format';
 import { fetchJobTypes } from '@/services/jobTypeClient';
-import type { JobType } from '@/app/(protect)/job-types/page';
+import type { JobType } from '@/lib/types';
 
 interface KanbanBoardProps {
   initialTasks: Task[];

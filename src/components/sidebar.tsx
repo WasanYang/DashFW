@@ -67,14 +67,14 @@ const navGroups = [
     id: 'planning',
     items: [
       { href: '/dashboard', label: 'Calendar', icon: Calendar, wip: true },
-      { href: '/checklists', label: 'Schedulers', icon: Clock, wip: true },
+      { href: '/templates', label: 'Schedulers', icon: Clock, wip: true },
       { href: '/dashboard', label: 'Timesheets', icon: Timer, wip: true },
     ]
   },
   {
     id: 'tools',
     items: [
-      { href: '/checklists', label: 'Forms', icon: ClipboardList, wip: true },
+      { href: '/templates', label: 'Forms', icon: ClipboardList, wip: true },
       { href: '/board', label: 'Files', icon: FolderOpen, wip: true },
     ]
   },
@@ -82,8 +82,7 @@ const navGroups = [
     id: 'ai',
     items: [
       { href: '/snippets', label: 'AI Snippets', icon: BotMessageSquare },
-      { href: '/checklists', label: 'AI Checklists', icon: ListChecks },
-      { href: '/job-types', label: 'Templates', icon: Settings2 },
+      { href: '/templates', label: 'Templates', icon: Settings2 },
     ]
   }
 ];
@@ -94,12 +93,22 @@ export function AppSidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>('Freelancer');
+  const [userInitial, setUserInitial] = useState<string>('F');
 
   useEffect(() => {
     setIsMounted(true);
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUserEmail(user?.email ?? null);
+      if (user?.displayName) {
+        setUserName(user.displayName);
+        setUserInitial(user.displayName.charAt(0).toUpperCase());
+      } else if (user?.email) {
+        const localPart = user.email.split('@')[0];
+        setUserName(localPart);
+        setUserInitial(localPart.charAt(0).toUpperCase());
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -122,11 +131,10 @@ export function AppSidebar() {
     if (pathname === '/projects') return label === 'Projects';
     if (pathname === '/board') return label === 'Tasks';
     if (pathname === '/snippets') return label === 'AI Snippets';
-    if (pathname === '/checklists') return label === 'AI Checklists';
+    if (pathname === '/templates') return label === 'Templates';
     if (pathname === '/invoices') return label === 'Proposals';
     if (pathname === '/clients') return label === 'Contacts';
     if (pathname === '/financials') return label === 'Financials';
-    if (pathname === '/job-types') return label === 'Templates';
     return pathname === href;
   };
 
@@ -147,7 +155,7 @@ export function AppSidebar() {
             )}
           >
             <div className='h-9 w-9 rounded-full bg-[#6b21a8] flex items-center justify-center text-white font-extrabold text-sm select-none shrink-0 shadow-xs'>
-              W
+              {userInitial}
             </div>
             <div
               className={cn(
@@ -155,7 +163,7 @@ export function AppSidebar() {
                 isCollapsed && 'scale-x-0 opacity-0 hidden'
               )}
             >
-              <span className='font-bold text-sm text-foreground truncate'>wasan</span>
+              <span className='font-bold text-sm text-foreground truncate'>{userName}</span>
               <span className='text-[10px] text-muted-foreground truncate'>freelancer</span>
             </div>
           </div>
@@ -257,7 +265,7 @@ export function AppSidebar() {
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href='/job-types'>
+              <Link href='/templates'>
                 <Button
                   variant='ghost'
                   className={cn(

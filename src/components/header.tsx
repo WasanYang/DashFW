@@ -52,9 +52,8 @@ const navItems = [
   { href: '/board', label: 'Projects', icon: Columns3 },
   { href: '/clients', label: 'Clients', icon: Users },
   { href: '/invoices', label: 'Invoices & Proposals', icon: FileText },
-  { href: '/job-types', label: 'Job Templates', icon: Settings },
+  { href: '/templates', label: 'Templates', icon: Settings },
   { href: '/snippets', label: 'AI Snippets', icon: BotMessageSquare },
-  { href: '/checklists', label: 'AI Checklists', icon: ListChecks },
 ];
 
 const breadcrumbLabels: { [key: string]: string } = {
@@ -62,9 +61,8 @@ const breadcrumbLabels: { [key: string]: string } = {
   board: 'Projects',
   clients: 'Clients',
   invoices: 'Invoices & Proposals',
-  'job-types': 'Job Templates',
+  templates: 'Templates',
   snippets: 'AI Snippets',
-  checklists: 'AI Checklists',
 };
 
 export function Header() {

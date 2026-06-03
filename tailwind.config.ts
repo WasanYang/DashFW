@@ -19,9 +19,9 @@ const config = {
     },
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
-        code: ['"Source Code Pro"', 'monospace'],
+        body: ['Inter', '"Noto Sans Thai"', 'sans-serif'],
+        headline: ['Inter', '"Noto Sans Thai"', 'sans-serif'],
+        code: ['"Source Code Pro"', '"Noto Sans Thai"', 'monospace'],
       },
       colors: {
         border: 'hsl(var(--border))',

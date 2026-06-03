@@ -26,6 +26,10 @@ import {
   Trash2,
   HelpCircle,
   Archive,
+  Settings2,
+  Filter,
+  ArrowUpDown,
+  Download,
 } from 'lucide-react';
 import { Client, Company, Project, Social, SubTask, Task } from '@/lib/types';
 import {
@@ -580,178 +584,150 @@ export function ClientList({ tasks }: ClientListProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="mx-auto max-w-7xl mb-8 space-y-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground/90">
-            <span>Contacts</span>
-            <span>/</span>
-            <span className="text-foreground/90">{activeTab === 'people' ? 'People' : 'Companies'}</span>
+      <div className="w-full mb-4 space-y-4">
+        {/* HEADER SECTION */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Contacts</h1>
+            <p className="text-xs text-muted-foreground px-1">
+              จัดการรายชื่อผู้ติดต่อ ลูกค้า และข้อมูลบริษัทสำหรับการมอบหมายงานและออกเอกสารใบแจ้งหนี้
+            </p>
           </div>
           
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowArchived(!showArchived)}
+              className={cn(
+                "h-10 rounded-xl border border-border bg-card text-xs font-semibold px-4 gap-1.5 shadow-xs",
+                showArchived ? "text-primary border-primary/30 bg-primary/5" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Archive className="w-4 h-4" /> {showArchived ? 'Show Active' : 'Show Archived'}
+            </Button>
+            <Button
+              onClick={() => {
+                if (activeTab === 'companies') {
+                  setIsCompanyCreateOpen(true);
+                } else {
+                  setIsCreateOpen(true);
+                }
+              }}
+              className="rounded-xl shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-1.5 h-10 px-4 text-xs"
+            >
+              <Plus className="w-4 h-4" /> Add {activeTab === 'companies' ? 'Company' : 'Person'}
+            </Button>
+          </div>
+        </div>
+
+        {/* ACTIONS & FILTERS TOOLBAR */}
+        <div className="flex items-center gap-2 px-1 mb-2 overflow-x-auto pb-1.5 scrollbar-thin">
+          <div className="relative w-48 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+            <Input
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 rounded-full border-dashed border-border/60 bg-transparent text-sm focus-visible:ring-0 shadow-none w-full"
+            />
+          </div>
           <Button
-            onClick={() => {
-              if (activeTab === 'companies') {
-                setIsCompanyCreateOpen(true);
-              } else {
-                setIsCreateOpen(true);
-              }
-            }}
-            className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-sm shrink-0"
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-9 rounded-full border-dashed text-sm font-medium px-4 shrink-0 shadow-none gap-2",
+              activeTab === 'people' ? "bg-primary/5 text-primary border-primary/30" : "border-border/60 text-muted-foreground/80 bg-transparent"
+            )}
+            onClick={() => setActiveTab('people')}
           >
-            <Plus className="mr-1.5 h-4 w-4" /> Add {activeTab === 'companies' ? 'company' : 'someone'}
+            <User className="w-4 h-4" /> People
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-9 rounded-full border-dashed text-sm font-medium px-4 shrink-0 shadow-none gap-2",
+              activeTab === 'companies' ? "bg-primary/5 text-primary border-primary/30" : "border-border/60 text-muted-foreground/80 bg-transparent"
+            )}
+            onClick={() => setActiveTab('companies')}
+          >
+            <Building2 className="w-4 h-4" /> Companies
+          </Button>
+          <div className="w-px h-6 bg-border/40 mx-1 shrink-0"></div>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-9 rounded-full border-dashed text-sm font-medium px-4 shrink-0 shadow-none gap-2",
+              viewMode === 'table' ? "bg-primary/5 text-primary border-primary/30" : "border-border/60 text-muted-foreground/80 bg-transparent"
+            )}
+            onClick={() => setViewMode('table')}
+          >
+            <Table className="w-4 h-4" /> Table
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-9 rounded-full border-dashed text-sm font-medium px-4 shrink-0 shadow-none gap-2",
+              viewMode === 'split' ? "bg-primary/5 text-primary border-primary/30" : "border-border/60 text-muted-foreground/80 bg-transparent"
+            )}
+            onClick={() => setViewMode('split')}
+          >
+            <LayoutGrid className="w-4 h-4" /> CRM View
+          </Button>
+          <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2">
+            <Filter className="w-4 h-4" /> Filter
+          </Button>
+          <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2">
+            <ArrowUpDown className="w-4 h-4" /> Order
+          </Button>
+          <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2">
+            <Download className="w-4 h-4" /> Import / Export
           </Button>
         </div>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex bg-muted/60 p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs select-none">
-              <Button
-                variant={activeTab === 'people' ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  "h-8 px-4 rounded-lg text-xs font-bold transition-all duration-200",
-                  activeTab === 'people'
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                )}
-                onClick={() => setActiveTab('people')}
-              >
-                People
-              </Button>
-              <Button
-                variant={activeTab === 'companies' ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  "h-8 px-4 rounded-lg text-xs font-bold transition-all duration-200",
-                  activeTab === 'companies'
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                )}
-                onClick={() => setActiveTab('companies')}
-              >
-                Companies
-              </Button>
-            </div>
-
-            <div className="w-px h-6 bg-border/50 mx-1 hidden md:block"></div>
-
-            <div className="flex bg-muted/60 p-1 rounded-xl text-xs border border-border/40 shrink-0 shadow-2xs">
-              <Button
-                variant={viewMode === 'table' ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                  viewMode === 'table'
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                )}
-                onClick={() => setViewMode('table')}
-              >
-                <Table className="mr-1.5 h-3.5 w-3.5" /> Table
-              </Button>
-              <Button
-                variant={viewMode === 'split' ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  "h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200",
-                  viewMode === 'split'
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                )}
-                onClick={() => setViewMode('split')}
-              >
-                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" /> CRM View
-              </Button>
-            </div>
-            
-            <div className="flex items-center gap-1.5 bg-card p-1 rounded-xl border border-border/40 shadow-sm shrink-0">
-              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Filter</Button>
-              <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Sort</Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => setShowArchived(!showArchived)}
-                className={cn("h-8 text-xs font-semibold px-2.5", showArchived ? "bg-muted text-primary" : "text-muted-foreground")}
-              >
-                <Archive className="w-3.5 h-3.5 mr-1.5" />
-                {showArchived ? 'Hide Archived' : 'Show Archived'}
-              </Button>
-            </div>
+        {/* CONTIGUOUS METRICS BAR */}
+        <div className="flex w-full rounded-md overflow-hidden select-none px-1 mb-3 mt-1">
+          <div className="flex-1 bg-[#475b75] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+            <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{statusCounts.Total}</span>
+            <span className="truncate">{activeTab === 'people' ? 'Total Contacts' : 'Total Companies'}</span>
           </div>
-          
-          <div className="relative w-full md:w-64 shrink-0">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/75" />
-            <Input
-              placeholder="Search contacts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 rounded-xl border-border/70 focus-visible:ring-primary w-full bg-background/50 shadow-2xs transition-all hover:bg-background"
-            />
+          <div className="flex-1 bg-[#f97316] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+            <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{statusCounts.Pending}</span>
+            <span className="truncate">Pending</span>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap select-none pt-2">
-          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
-            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Total</span>
-              <span className="text-sm leading-none mt-0.5">{statusCounts.Total}</span>
-            </div>
+          <div className="flex-1 bg-[#22c55e] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold border-r border-white/20">
+            <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{statusCounts.Active}</span>
+            <span className="truncate">Active</span>
           </div>
-
-          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
-            <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center border border-orange-100 dark:border-orange-900/50">
-              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Pending</span>
-              <span className="text-sm leading-none mt-0.5">{statusCounts.Pending}</span>
-            </div>
-          </div>
-
-          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/50">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Active</span>
-              <span className="text-sm leading-none mt-0.5">{statusCounts.Active}</span>
-            </div>
-          </div>
-
-          <div className="bg-card text-foreground border border-border/50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm hover:shadow-md transition-all">
-            <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-900 flex items-center justify-center border border-slate-200 dark:border-slate-800">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-black">Inactive</span>
-              <span className="text-sm leading-none mt-0.5">{statusCounts.Inactive}</span>
-            </div>
+          <div className="flex-1 bg-[#64748b] text-white h-9 flex items-center px-3 gap-2 text-xs font-semibold">
+            <span className="bg-black/20 px-1.5 py-0.5 rounded text-white min-w-[20px] text-center text-[11px]">{statusCounts.Inactive}</span>
+            <span className="truncate">Inactive</span>
           </div>
         </div>
       </div>
 
       {viewMode === 'table' ? (
         activeTab === 'people' ? (
-          <div className="mx-auto max-w-7xl bg-card border border-border/40 shadow-sm rounded-2xl overflow-hidden mb-8">
+          <Card className="border border-border/50 shadow-none overflow-hidden bg-card rounded-xl mx-1 mb-4">
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-border/30 bg-muted/30 text-[10px] uppercase tracking-widest font-black text-muted-foreground/70 text-left">
-                    <th className="py-3.5 px-5 w-12 text-center"></th>
-                    <th className="py-3.5 px-5">Contact</th>
-                    <th className="py-3.5 px-5">Role</th>
-                    <th className="py-3.5 px-5">Company</th>
-                    <th className="py-3.5 px-5 w-32">Status</th>
-                    <th className="py-3.5 px-5">Email Address</th>
-                    <th className="py-3.5 px-5 w-24 text-right pr-8">Actions</th>
+                  <tr className="border-b border-border/30 bg-transparent text-xs font-semibold text-muted-foreground/80 text-left select-none">
+                    <th className="py-3 px-4 w-12 text-center"></th>
+                    <th className="py-3 px-4">Contact</th>
+                    <th className="py-3 px-4 border-l border-border/30">Company</th>
+                    <th className="py-3 px-4 border-l border-border/30 w-32">Status</th>
+                    <th className="py-3 px-4 border-l border-border/30">Email Address</th>
+                    <th className="py-3 px-4 border-l border-border/30 w-24 text-right pr-6"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
                   {filteredClients.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-16 text-center text-sm font-medium text-muted-foreground">
+                      <td colSpan={6} className="py-16 text-center text-sm font-medium text-muted-foreground">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <User className="h-10 w-10 text-muted-foreground/30" />
                           <span>No contacts found.</span>
@@ -761,17 +737,17 @@ export function ClientList({ tasks }: ClientListProps) {
                   ) : (
                     filteredClients.map((client) => {
                       const clientInfo = clientStatusMap[client._id] || { status: 'Inactive', projectsCount: 0 };
-
+ 
                       return (
                         <tr
                           key={client._id}
-                          className={cn("hover:bg-muted/30 transition-all duration-200 group bg-card", client.archived ? "opacity-60" : "")}
+                          className={cn("hover:bg-muted/15 transition-all duration-150 group bg-card", client.archived ? "opacity-60" : "")}
                         >
-                          <td className="py-3 px-5 text-center align-middle">
+                          <td className="py-3 px-4 text-center align-middle">
                             <div className="w-4 h-4 rounded-full border border-muted-foreground/30 hover:border-primary hover:bg-primary/10 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-110" />
                           </td>
-
-                          <td className="py-3 px-5 align-middle">
+ 
+                          <td className="py-3 px-4 align-middle">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-8 w-8 border border-border shadow-sm shrink-0">
                                 <AvatarImage src={client.avatarUrl} alt={client.name} />
@@ -794,14 +770,8 @@ export function ClientList({ tasks }: ClientListProps) {
                               />
                             </div>
                           </td>
-
-                          <td className="py-3 px-5 align-middle">
-                            <span className="inline-flex items-center bg-slate-100/80 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-[9px] px-2 py-0.5 rounded uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm">
-                              Client
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-5 align-middle">
+ 
+                          <td className="py-3 px-4 align-middle border-l border-border/30">
                             <CompanyInlineEdit 
                               client={client} 
                               companyList={rawCompanies.map((c: any) => c.name)} 
@@ -809,8 +779,8 @@ export function ClientList({ tasks }: ClientListProps) {
                               updateClient={updateClient} 
                             />
                           </td>
-
-                          <td className="py-3 px-5 align-middle">
+ 
+                          <td className="py-3 px-4 align-middle border-l border-border/30">
                             <span
                               className={cn(
                                 "inline-flex items-center justify-center h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm border",
@@ -824,8 +794,8 @@ export function ClientList({ tasks }: ClientListProps) {
                               {clientInfo.status}
                             </span>
                           </td>
-
-                          <td className="py-3 px-5 align-middle">
+ 
+                          <td className="py-3 px-4 align-middle border-l border-border/30">
                             <input
                               type="email"
                               defaultValue={client.email}
@@ -840,13 +810,13 @@ export function ClientList({ tasks }: ClientListProps) {
                               className="text-muted-foreground text-[13px] font-medium bg-transparent border border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary rounded px-2 py-1 -mx-2 transition-all w-full"
                             />
                           </td>
-
-                          <td className="py-4 px-5 text-right align-middle pr-8">
+ 
+                          <td className="py-3 px-4 text-right align-middle pr-6 border-l border-border/30">
                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
+                                className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-md"
                                 onClick={() => setEditingClient(client)}
                                 aria-label="Edit client"
                               >
@@ -855,7 +825,7 @@ export function ClientList({ tasks }: ClientListProps) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className={cn("h-8 w-8 text-muted-foreground rounded-lg", client.archived ? "hover:text-destructive hover:bg-destructive/10 text-destructive" : "hover:text-amber-600 hover:bg-amber-600/10")}
+                                className={cn("h-7 w-7 text-muted-foreground rounded-md", client.archived ? "hover:text-destructive hover:bg-destructive/10 text-destructive" : "hover:bg-muted")}
                                 onClick={() => updateClient({ _id: client._id, data: { archived: !client.archived } })}
                                 aria-label="Archive client"
                               >
@@ -864,7 +834,7 @@ export function ClientList({ tasks }: ClientListProps) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md"
                                 onClick={() => {
                                   if(window.confirm('Are you sure you want to permanently delete this contact?')) {
                                     deleteClient({ _id: client._id });
@@ -874,35 +844,18 @@ export function ClientList({ tasks }: ClientListProps) {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                              {client.fastwork_link && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
-                                  asChild
-                                >
-                                  <a
-                                    href={client.fastwork_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label="Fastwork profile"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </Button>
-                              )}
                             </div>
                           </td>
                         </tr>
                       );
                     })
                   )}
-
-                  <tr className="bg-muted/10 hover:bg-muted/30 transition-colors">
-                    <td colSpan={7} className="p-0 border-t border-border/40">
+ 
+                  <tr className="bg-transparent hover:bg-muted/5 transition-colors">
+                    <td colSpan={6} className="p-0 border-t border-border/30">
                       <div
                         onClick={() => setIsCreateOpen(true)}
-                        className="px-8 py-3 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
+                        className="px-5 py-3.5 cursor-pointer flex items-center gap-2.5 text-primary/80 hover:text-primary font-semibold text-sm transition-colors"
                       >
                         <Plus className="h-4 w-4" /> Add someone
                       </div>
@@ -911,20 +864,20 @@ export function ClientList({ tasks }: ClientListProps) {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         ) : (
-          <div className="mx-auto max-w-7xl bg-card border border-border/40 shadow-sm rounded-2xl overflow-hidden mb-8">
+          <Card className="border border-border/50 shadow-none overflow-hidden bg-card rounded-xl mx-1 mb-4">
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-border/40 bg-muted/30 text-[10px] uppercase tracking-widest font-black text-muted-foreground/70 text-left">
-                    <th className="py-3.5 px-5 w-12 text-center"></th>
-                    <th className="py-3.5 px-5">Company</th>
-                    <th className="py-3.5 px-5">Team / Contacts</th>
-                    <th className="py-3.5 px-5">Projects</th>
-                    <th className="py-3.5 px-5 w-32">Status</th>
-                    <th className="py-3.5 px-5">Primary Contact</th>
-                    <th className="py-3.5 px-5 w-24 text-right pr-8">Actions</th>
+                  <tr className="border-b border-border/30 bg-transparent text-xs font-semibold text-muted-foreground/80 text-left select-none">
+                    <th className="py-3 px-4 w-12 text-center"></th>
+                    <th className="py-3 px-4">Company</th>
+                    <th className="py-3 px-4 border-l border-border/30">Team / Contacts</th>
+                    <th className="py-3 px-4 border-l border-border/30">Projects</th>
+                    <th className="py-3 px-4 border-l border-border/30 w-32">Status</th>
+                    <th className="py-3 px-4 border-l border-border/30">Primary Contact</th>
+                    <th className="py-3 px-4 border-l border-border/30 w-24 text-right pr-6"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
@@ -945,13 +898,13 @@ export function ClientList({ tasks }: ClientListProps) {
                       return (
                         <tr
                           key={company.name}
-                          className="hover:bg-muted/30 transition-all duration-200 group bg-card"
+                          className="hover:bg-muted/15 transition-all duration-150 group bg-card"
                         >
-                          <td className="py-3 px-5 text-center align-middle">
+                          <td className="py-3 px-4 text-center align-middle">
                             <div className="w-4 h-4 rounded-full border border-muted-foreground/30 hover:border-primary hover:bg-primary/10 transition-all cursor-pointer mx-auto flex items-center justify-center group-hover:scale-110" />
                           </td>
 
-                          <td className="py-3 px-5 align-middle">
+                          <td className="py-3 px-4 align-middle">
                             <div className="flex items-center gap-3">
                               <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20 shadow-sm">
                                 <Building2 className="h-4 w-4" />
@@ -968,7 +921,7 @@ export function ClientList({ tasks }: ClientListProps) {
                             </div>
                           </td>
 
-                          <td className="py-3 px-5 align-middle">
+                          <td className="py-3 px-4 align-middle border-l border-border/30">
                             <div className="flex -space-x-2 overflow-hidden">
                               {actualClients.length === 0 ? (
                                 <span className="text-[11px] text-muted-foreground/75 font-medium italic bg-muted/50 px-2 py-0.5 rounded-md border border-border/50">No contacts</span>
@@ -992,14 +945,14 @@ export function ClientList({ tasks }: ClientListProps) {
                             </div>
                           </td>
 
-                          <td className="py-3 px-5 align-middle">
+                          <td className="py-3 px-4 align-middle border-l border-border/30">
                             <span className="inline-flex items-center gap-1.5 bg-primary/5 text-primary border border-primary/20 font-bold text-[10px] px-2.5 py-0.5 rounded-md tracking-wide shadow-sm">
                               {company.projectsCount} {company.projectsCount === 1 ? 'Project' : 'Projects'}
                             </span>
                           </td>
 
                           {/* Status */}
-                          <td className="py-3 px-5 align-middle">
+                          <td className="py-3 px-4 align-middle border-l border-border/30">
                             <span
                               className={cn(
                                 "inline-flex items-center justify-center h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm border",
@@ -1015,17 +968,17 @@ export function ClientList({ tasks }: ClientListProps) {
                           </td>
 
                           {/* Primary Contact Email */}
-                          <td className="py-3 px-5 text-muted-foreground align-middle text-[13px] font-medium">
+                          <td className="py-3 px-4 text-muted-foreground align-middle text-[13px] font-medium border-l border-border/30">
                             {primaryClient ? `${primaryClient.name} (${primaryClient.email})` : '-'}
                           </td>
 
                           {/* Actions */}
-                          <td className="py-4 px-5 text-right align-middle pr-8">
+                          <td className="py-3 px-4 text-right align-middle pr-6 border-l border-border/30">
                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
+                                className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-md"
                                 onClick={() => setEditingCompany(company)}
                                 aria-label="Edit company"
                               >
@@ -1034,7 +987,7 @@ export function ClientList({ tasks }: ClientListProps) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-amber-600 hover:bg-amber-600/10 rounded-lg"
+                                className="h-7 w-7 text-muted-foreground hover:text-amber-600 hover:bg-amber-600/10 rounded-md"
                                 onClick={() => {
                                   // Archive all clients belonging to this company
                                   company.clients.forEach((c: any) => {
@@ -1048,7 +1001,7 @@ export function ClientList({ tasks }: ClientListProps) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md"
                                 onClick={() => {
                                   if(window.confirm('Are you sure you want to permanently delete this company and all its contacts?')) {
                                     company.clients.forEach((c: any) => deleteClient({ _id: c._id }));
@@ -1066,11 +1019,11 @@ export function ClientList({ tasks }: ClientListProps) {
                   )}
 
                   {/* Footer row: Add company */}
-                  <tr className="bg-muted/10 hover:bg-muted/30 transition-colors">
-                    <td colSpan={7} className="p-0 border-t border-border/40">
+                  <tr className="bg-transparent hover:bg-muted/5 transition-colors">
+                    <td colSpan={7} className="p-0 border-t border-border/30">
                       <div
                         onClick={() => setIsCompanyCreateOpen(true)}
-                        className="px-8 py-3 cursor-pointer flex items-center gap-2 text-primary/80 hover:text-primary font-bold text-xs transition-colors"
+                        className="px-5 py-3.5 cursor-pointer flex items-center gap-2.5 text-primary/80 hover:text-primary font-semibold text-sm transition-colors"
                       >
                         <Plus className="h-4 w-4" /> Add company
                       </div>
@@ -1079,7 +1032,7 @@ export function ClientList({ tasks }: ClientListProps) {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         )
       ) : (
         activeTab === 'people' ? (
