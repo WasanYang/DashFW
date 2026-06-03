@@ -68,7 +68,7 @@ export default function DashboardPage() {
   const [addTimeLog] = useAddTimeLogMutation();
   const [deleteTimeLog] = useDeleteTimeLogMutation();
 
-
+  const showTimeTracker = false;
 
   // Time Tracker state
   const [isTracking, setIsTracking] = useState(false);
@@ -397,168 +397,170 @@ export default function DashboardPage() {
   return (
     <div className='flex flex-col gap-6 p-1'>
       {/* TIME TRACKER WIDGET */}
-      <Card className="border border-border/80 shadow-sm overflow-hidden bg-gradient-to-r from-card to-primary/5">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto flex-1">
-              <div className="flex items-center gap-2 shrink-0">
-                <Clock className={`w-5 h-5 text-primary shrink-0 ${isTracking ? 'animate-pulse' : ''}`} />
-                <span className="font-semibold text-sm text-foreground">Time Tracker</span>
-              </div>
-              <Input
-                type="text"
-                placeholder="What are you working on?"
-                value={trackerTaskName}
-                onChange={(e) => setTrackerTaskName(e.target.value)}
-                disabled={isTracking}
-                className="bg-background border-border/60 focus-visible:ring-primary w-full md:max-w-md h-10 rounded-xl"
-              />
-              <Select
-                value={trackerProjectId}
-                onValueChange={setTrackerProjectId}
-                disabled={isTracking}
-              >
-                <SelectTrigger className="w-full sm:w-[220px] bg-background border-border/60 h-10 rounded-xl">
-                  <SelectValue placeholder="Select Project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">General Time</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0 border-t md:border-t-0 pt-3 md:pt-0">
-              <span className="font-mono text-2xl font-bold tracking-wider text-foreground select-none mr-2">
-                {formatDuration(elapsedSeconds)}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowSettings((prev) => !prev)}
-                className={cn(
-                  "h-10 w-10 rounded-xl border border-border/60 transition-colors",
-                  showSettings && "bg-muted text-primary"
-                )}
-                title="Timer Settings"
-              >
-                <Settings className="w-4.5 h-4.5" />
-              </Button>
-              {isTracking ? (
-                <Button
-                  onClick={handleStopTimer}
-                  variant="destructive"
-                  className="w-28 h-10 rounded-xl font-semibold gap-2 shadow-sm shrink-0"
-                >
-                  <Square className="w-4 h-4 fill-current" /> Stop
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleStartTimer}
-                  className="w-28 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold gap-2 shadow-sm shrink-0"
-                >
-                  <Play className="w-4 h-4 fill-current" /> Start
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Collapsible Plutio-style settings drawer */}
-          {showSettings && (
-            <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
-              {/* Member / Contact */}
-              <div className="space-y-1">
-                <Label htmlFor="trackerContact" className="text-xs font-semibold text-muted-foreground">Assignee / Member</Label>
+      {showTimeTracker && (
+        <Card className="border border-border/80 shadow-sm overflow-hidden bg-gradient-to-r from-card to-primary/5">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto flex-1">
+                <div className="flex items-center gap-2 shrink-0">
+                  <Clock className={`w-5 h-5 text-primary shrink-0 ${isTracking ? 'animate-pulse' : ''}`} />
+                  <span className="font-semibold text-sm text-foreground">Time Tracker</span>
+                </div>
+                <Input
+                  type="text"
+                  placeholder="What are you working on?"
+                  value={trackerTaskName}
+                  onChange={(e) => setTrackerTaskName(e.target.value)}
+                  disabled={isTracking}
+                  className="bg-background border-border/60 focus-visible:ring-primary w-full md:max-w-md h-10 rounded-xl"
+                />
                 <Select
-                  value={trackerContactId}
-                  onValueChange={setTrackerContactId}
+                  value={trackerProjectId}
+                  onValueChange={setTrackerProjectId}
                   disabled={isTracking}
                 >
-                  <SelectTrigger id="trackerContact" className="bg-background border-border/60 h-10 rounded-xl text-xs">
-                    <SelectValue placeholder="Select Member" />
+                  <SelectTrigger className="w-full sm:w-[220px] bg-background border-border/60 h-10 rounded-xl">
+                    <SelectValue placeholder="Select Project" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">General (No Assignee)</SelectItem>
-                    {clients.map((c) => (
-                      <SelectItem key={c._id} value={c._id} className="text-xs">
-                        {c.name}
+                    <SelectItem value="none">General Time</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.title}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Category */}
-              <div className="space-y-1">
-                <Label htmlFor="trackerCategory" className="text-xs font-semibold text-muted-foreground">Category</Label>
-                <Select
-                  value={trackerCategory}
-                  onValueChange={setTrackerCategory}
-                  disabled={isTracking}
+              
+              <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0 border-t md:border-t-0 pt-3 md:pt-0">
+                <span className="font-mono text-2xl font-bold tracking-wider text-foreground select-none mr-2">
+                  {formatDuration(elapsedSeconds)}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowSettings((prev) => !prev)}
+                  className={cn(
+                    "h-10 w-10 rounded-xl border border-border/60 transition-colors",
+                    showSettings && "bg-muted text-primary"
+                  )}
+                  title="Timer Settings"
                 >
-                  <SelectTrigger id="trackerCategory" className="bg-background border-border/60 h-10 rounded-xl text-xs">
-                    <SelectValue placeholder="Select Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Development" className="text-xs">Development</SelectItem>
-                    <SelectItem value="Design" className="text-xs">Design</SelectItem>
-                    <SelectItem value="Marketing" className="text-xs">Marketing</SelectItem>
-                    <SelectItem value="Consulting" className="text-xs">Consulting</SelectItem>
-                    <SelectItem value="Writing" className="text-xs">Writing</SelectItem>
-                    <SelectItem value="Support" className="text-xs">Support</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Billing Rate */}
-              <div className="space-y-1">
-                <Label htmlFor="trackerBillingRate" className="text-xs font-semibold text-muted-foreground">Billing Rate (/hr)</Label>
-                <Input
-                  id="trackerBillingRate"
-                  type="number"
-                  placeholder="e.g. 50"
-                  value={trackerBillingRate}
-                  onChange={(e) => setTrackerBillingRate(e.target.value)}
-                  disabled={isTracking}
-                  className="bg-background border-border/60 h-10 rounded-xl text-xs"
-                />
-              </div>
-
-              {/* Cost Rate */}
-              <div className="space-y-1">
-                <Label htmlFor="trackerCostRate" className="text-xs font-semibold text-muted-foreground">Cost Rate (/hr)</Label>
-                <Input
-                  id="trackerCostRate"
-                  type="number"
-                  placeholder="e.g. 30"
-                  value={trackerCostRate}
-                  onChange={(e) => setTrackerCostRate(e.target.value)}
-                  disabled={isTracking}
-                  className="bg-background border-border/60 h-10 rounded-xl text-xs"
-                />
-              </div>
-
-              {/* Billable Checkbox */}
-              <div className="flex flex-col justify-center items-center h-full pt-4 md:pt-0">
-                <Label htmlFor="trackerBillable" className="text-xs font-semibold text-muted-foreground mb-1.5">Billable Time</Label>
-                <input
-                  id="trackerBillable"
-                  type="checkbox"
-                  checked={trackerBillable}
-                  onChange={(e) => setTrackerBillable(e.target.checked)}
-                  disabled={isTracking}
-                  className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
-                />
+                  <Settings className="w-4.5 h-4.5" />
+                </Button>
+                {isTracking ? (
+                  <Button
+                    onClick={handleStopTimer}
+                    variant="destructive"
+                    className="w-28 h-10 rounded-xl font-semibold gap-2 shadow-sm shrink-0"
+                  >
+                    <Square className="w-4 h-4 fill-current" /> Stop
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleStartTimer}
+                    className="w-28 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold gap-2 shadow-sm shrink-0"
+                  >
+                    <Play className="w-4 h-4 fill-current" /> Start
+                  </Button>
+                )}
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Collapsible Plutio-style settings drawer */}
+            {showSettings && (
+              <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Member / Contact */}
+                <div className="space-y-1">
+                  <Label htmlFor="trackerContact" className="text-xs font-semibold text-muted-foreground">Assignee / Member</Label>
+                  <Select
+                    value={trackerContactId}
+                    onValueChange={setTrackerContactId}
+                    disabled={isTracking}
+                  >
+                    <SelectTrigger id="trackerContact" className="bg-background border-border/60 h-10 rounded-xl text-xs">
+                      <SelectValue placeholder="Select Member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">General (No Assignee)</SelectItem>
+                      {clients.map((c) => (
+                        <SelectItem key={c._id} value={c._id} className="text-xs">
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Category */}
+                <div className="space-y-1">
+                  <Label htmlFor="trackerCategory" className="text-xs font-semibold text-muted-foreground">Category</Label>
+                  <Select
+                    value={trackerCategory}
+                    onValueChange={setTrackerCategory}
+                    disabled={isTracking}
+                  >
+                    <SelectTrigger id="trackerCategory" className="bg-background border-border/60 h-10 rounded-xl text-xs">
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Development" className="text-xs">Development</SelectItem>
+                      <SelectItem value="Design" className="text-xs">Design</SelectItem>
+                      <SelectItem value="Marketing" className="text-xs">Marketing</SelectItem>
+                      <SelectItem value="Consulting" className="text-xs">Consulting</SelectItem>
+                      <SelectItem value="Writing" className="text-xs">Writing</SelectItem>
+                      <SelectItem value="Support" className="text-xs">Support</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Billing Rate */}
+                <div className="space-y-1">
+                  <Label htmlFor="trackerBillingRate" className="text-xs font-semibold text-muted-foreground">Billing Rate (/hr)</Label>
+                  <Input
+                    id="trackerBillingRate"
+                    type="number"
+                    placeholder="e.g. 50"
+                    value={trackerBillingRate}
+                    onChange={(e) => setTrackerBillingRate(e.target.value)}
+                    disabled={isTracking}
+                    className="bg-background border-border/60 h-10 rounded-xl text-xs"
+                  />
+                </div>
+
+                {/* Cost Rate */}
+                <div className="space-y-1">
+                  <Label htmlFor="trackerCostRate" className="text-xs font-semibold text-muted-foreground">Cost Rate (/hr)</Label>
+                  <Input
+                    id="trackerCostRate"
+                    type="number"
+                    placeholder="e.g. 30"
+                    value={trackerCostRate}
+                    onChange={(e) => setTrackerCostRate(e.target.value)}
+                    disabled={isTracking}
+                    className="bg-background border-border/60 h-10 rounded-xl text-xs"
+                  />
+                </div>
+
+                {/* Billable Checkbox */}
+                <div className="flex flex-col justify-center items-center h-full pt-4 md:pt-0">
+                  <Label htmlFor="trackerBillable" className="text-xs font-semibold text-muted-foreground mb-1.5">Billable Time</Label>
+                  <input
+                    id="trackerBillable"
+                    type="checkbox"
+                    checked={trackerBillable}
+                    onChange={(e) => setTrackerBillable(e.target.checked)}
+                    disabled={isTracking}
+                    className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* SECTION 1: CALENDAR (Top) */}
       <DashboardCalendar tasks={tasks} />
@@ -647,8 +649,11 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* SECTION 3: 3-COLUMN DETAIL CHARTS GRID (Bottom) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* SECTION 3: CHARTS GRID */}
+      <div className={cn(
+        "grid grid-cols-1 gap-6",
+        showTimeTracker ? "md:grid-cols-3" : "md:grid-cols-2"
+      )}>
         {/* Projects status (Donut) */}
         <Card className="border border-border/80 shadow-sm">
           <CardHeader className="pb-2">
@@ -705,92 +710,99 @@ export default function DashboardPage() {
         </Card>
 
         {/* Timesheet (Line) */}
-        <Card className="border border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-bold">Timesheet (Monthly Velocity)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={timesheetData}>
-                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip />
-                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {showTimeTracker && (
+          <Card className="border border-border/80 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-bold">Timesheet (Monthly Velocity)</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timesheetData}>
+                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* SECTION 4: RECENT TIME LOGS & BILLING OVERVIEW */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary animate-spin-[20s]" /> Recent Time Logs
-            </CardTitle>
-            <CardDescription>Records of your tracked freelance hours</CardDescription>
-          </CardHeader>
-          <CardContent className="max-h-[300px] overflow-y-auto pr-1">
-            {timeLogs.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">
-                No time logs recorded yet. Start tracking above!
-              </div>
-            ) : (
-              <div className="divide-y divide-border/40">
-                {timeLogs.map((log) => (
-                  <div key={log.id} className="py-3 flex items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate">{log.taskName}</p>
-                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 flex-wrap mt-0.5">
-                        <span>{log.projectTitle || 'General Time'}</span>
-                        <span>&bull;</span>
-                        <span>{format(new Date(log.startTime), 'MMM d, h:mm a')}</span>
-                        {log.category && (
-                          <>
-                            <span>&bull;</span>
-                            <span className="bg-primary/5 text-primary text-[10px] px-1.5 py-0.5 rounded font-medium">{log.category}</span>
-                          </>
-                        )}
-                        {log.billable && (
-                          <>
-                            <span>&bull;</span>
-                            <span className="text-green-600 bg-green-500/10 text-[10px] px-1.5 py-0.5 rounded font-semibold">
-                              Billable{log.billingRate ? ` ($${log.billingRate}/hr)` : ''}
-                            </span>
-                          </>
-                        )}
-                        {log.contactId && (
-                          <>
-                            <span>&bull;</span>
-                            <span className="text-slate-500 text-[10px]">
-                              Member: {clients.find(c => c._id === log.contactId)?.name || 'Unknown'}
-                            </span>
-                          </>
-                        )}
-                      </p>
+      <div className={cn(
+        "grid grid-cols-1 gap-6",
+        showTimeTracker ? "lg:grid-cols-3" : "grid-cols-1"
+      )}>
+        {showTimeTracker && (
+          <Card className="lg:col-span-2 border border-border/80 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary animate-spin-[20s]" /> Recent Time Logs
+              </CardTitle>
+              <CardDescription>Records of your tracked freelance hours</CardDescription>
+            </CardHeader>
+            <CardContent className="max-h-[300px] overflow-y-auto pr-1">
+              {timeLogs.length === 0 ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  No time logs recorded yet. Start tracking above!
+                </div>
+              ) : (
+                <div className="divide-y divide-border/40">
+                  {timeLogs.map((log) => (
+                    <div key={log.id} className="py-3 flex items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm truncate">{log.taskName}</p>
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span>{log.projectTitle || 'General Time'}</span>
+                          <span>&bull;</span>
+                          <span>{format(new Date(log.startTime), 'MMM d, h:mm a')}</span>
+                          {log.category && (
+                            <>
+                              <span>&bull;</span>
+                              <span className="bg-primary/5 text-primary text-[10px] px-1.5 py-0.5 rounded font-medium">{log.category}</span>
+                            </>
+                          )}
+                          {log.billable && (
+                            <>
+                              <span>&bull;</span>
+                              <span className="text-green-600 bg-green-500/10 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                                Billable{log.billingRate ? ` ($${log.billingRate}/hr)` : ''}
+                              </span>
+                            </>
+                          )}
+                          {log.contactId && (
+                            <>
+                              <span>&bull;</span>
+                              <span className="text-slate-500 text-[10px]">
+                                Member: {clients.find(c => c._id === log.contactId)?.name || 'Unknown'}
+                              </span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs font-mono font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-md">
+                          {formatDuration(log.duration)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => deleteTimeLog({ id: log.id! })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs font-mono font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-md">
-                        {formatDuration(log.duration)}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => deleteTimeLog({ id: log.id! })}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
         
-        <Card className="lg:col-span-1 border border-border/80 shadow-sm">
+        <Card className={cn("border border-border/80 shadow-sm", showTimeTracker ? "lg:col-span-1" : "w-full")}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" /> Billing Overview

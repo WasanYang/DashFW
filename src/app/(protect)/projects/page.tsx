@@ -11,12 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { Plus, Search, Calendar as CalendarIcon, Briefcase, Trash2, FolderOpen, ArrowRight, ExternalLink, LayoutGrid, Table, Archive, User, Settings2, Filter, ArrowUpDown, Download, ChevronDown } from 'lucide-react';
+import { Plus, Search, Calendar as CalendarIcon, Briefcase, Trash2, FolderOpen, ArrowRight, ExternalLink, LayoutGrid, Table, Archive, User, Settings2, Filter, ArrowUpDown, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -94,6 +94,35 @@ export default function ProjectsPage() {
   const [newColor, setNewColor] = useState('#3b82f6');
   const [newBillable, setNewBillable] = useState(true);
   const [newRelatedProjectIds, setNewRelatedProjectIds] = useState<string[]>([]);
+  const [newPriority, setNewPriority] = useState<string>('Medium');
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'title' | 'client' | 'status' | 'priority' | 'none'>('none');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (field: 'title' | 'client' | 'status' | 'priority') => {
+    if (sortBy === field) {
+      if (sortOrder === 'asc') {
+        setSortOrder('desc');
+      } else {
+        setSortBy('none');
+      }
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'priority' ? 'desc' : 'asc');
+    }
+  };
+
+  const renderSortIcon = (field: 'title' | 'client' | 'status' | 'priority') => {
+    if (sortBy !== field) {
+      return <ArrowUpDown className="w-3 h-3 ml-1 text-muted-foreground/30 inline-block opacity-0 group-hover/header:opacity-100 transition-opacity" />;
+    }
+    return sortOrder === 'asc' ? (
+      <ChevronDown className="w-3 h-3 ml-1 text-primary inline-block shrink-0" />
+    ) : (
+      <ChevronUp className="w-3 h-3 ml-1 text-primary inline-block shrink-0" />
+    );
+  };
 
   const handleToggleArchive = async (id: string, currentArchived: boolean) => {
     try {
@@ -111,7 +140,7 @@ export default function ProjectsPage() {
     }
   };
 
-  // Filter projects by search query and archive status
+  // Filter projects by search query, archive status, and sort them
   const filteredProjects = useMemo(() => {
     let list = projects;
     if (showArchived) {
@@ -120,16 +149,56 @@ export default function ProjectsPage() {
       list = list.filter((p) => !p.archived);
     }
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return list;
-    return list.filter((p) => {
-      const client = clients.find((c) => c._id === p.clientId);
-      return (
-        p.title.toLowerCase().includes(query) ||
-        (p.subtitle && p.subtitle.toLowerCase().includes(query)) ||
-        (client && client.name.toLowerCase().includes(query))
-      );
-    });
-  }, [projects, searchQuery, clients, showArchived]);
+    if (query) {
+      list = list.filter((p) => {
+        const client = clients.find((c) => c._id === p.clientId);
+        return (
+          p.title.toLowerCase().includes(query) ||
+          (p.subtitle && p.subtitle.toLowerCase().includes(query)) ||
+          (client && client.name.toLowerCase().includes(query))
+        );
+      });
+    }
+
+    // Apply Sorting
+    if (sortBy !== 'none') {
+      list = [...list].sort((a, b) => {
+        let valA = '';
+        let valB = '';
+
+        if (sortBy === 'title') {
+          valA = a.title.toLowerCase();
+          valB = b.title.toLowerCase();
+        } else if (sortBy === 'client') {
+          const clientA = clients.find((c) => c._id === a.clientId);
+          const clientB = clients.find((c) => c._id === b.clientId);
+          valA = (clientA?.name || '').toLowerCase();
+          valB = (clientB?.name || '').toLowerCase();
+        } else if (sortBy === 'status') {
+          valA = (a.status || 'New').toLowerCase();
+          valB = (b.status || 'New').toLowerCase();
+        } else if (sortBy === 'priority') {
+          const priorityWeight: Record<string, number> = {
+            'Urgent': 4,
+            'High': 3,
+            'Medium': 2,
+            'Low': 1,
+            'none': 0,
+            '': 0
+          };
+          const weightA = priorityWeight[a.priority || 'Medium'] || 0;
+          const weightB = priorityWeight[b.priority || 'Medium'] || 0;
+          return sortOrder === 'asc' ? weightA - weightB : weightB - weightA;
+        }
+
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return list;
+  }, [projects, searchQuery, clients, showArchived, sortBy, sortOrder]);
 
   // Calculate task counts and progress for each project
   const projectStats = useMemo(() => {
@@ -166,6 +235,7 @@ export default function ProjectsPage() {
         billable: newBillable,
         archived: false,
         status: 'New',
+        priority: newPriority,
         relatedProjectIds: newRelatedProjectIds.length > 0 ? newRelatedProjectIds : undefined,
       }).unwrap();
 
@@ -201,6 +271,7 @@ export default function ProjectsPage() {
     setNewColor('#3b82f6');
     setNewBillable(true);
     setNewRelatedProjectIds([]);
+    setNewPriority('Medium');
   };
 
   if (loadingProjects || loadingClients || loadingTasks || loadingTimeLogs) {
@@ -229,7 +300,33 @@ export default function ProjectsPage() {
         <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><Settings2 className="w-4 h-4" /> Edit view</Button>
         <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><Filter className="w-4 h-4" /> Filter</Button>
         <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><LayoutGrid className="w-4 h-4" /> Group</Button>
-        <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><ArrowUpDown className="w-4 h-4" /> Order</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("h-9 rounded-full border-dashed text-sm font-medium px-4 shrink-0 shadow-none gap-2", sortBy !== 'none' ? "bg-primary/5 text-primary border-primary/30" : "border-border/60 text-muted-foreground/80 bg-transparent")}>
+              <ArrowUpDown className="w-4 h-4" /> 
+              {sortBy === 'none' && 'Order'}
+              {sortBy === 'title' && `Order: Name (${sortOrder.toUpperCase()})`}
+              {sortBy === 'client' && `Order: Client (${sortOrder.toUpperCase()})`}
+              {sortBy === 'status' && `Order: Status (${sortOrder.toUpperCase()})`}
+              {sortBy === 'priority' && `Order: Priority (${sortOrder.toUpperCase()})`}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="rounded-xl w-56">
+            <DropdownMenuCheckboxItem checked={sortBy === 'title' && sortOrder === 'asc'} onCheckedChange={() => { setSortBy('title'); setSortOrder('asc'); }}>ชื่อโครงการ (A-Z)</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={sortBy === 'title' && sortOrder === 'desc'} onCheckedChange={() => { setSortBy('title'); setSortOrder('desc'); }}>ชื่อโครงการ (Z-A)</DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem checked={sortBy === 'client' && sortOrder === 'asc'} onCheckedChange={() => { setSortBy('client'); setSortOrder('asc'); }}>ลูกค้า (A-Z)</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={sortBy === 'client' && sortOrder === 'desc'} onCheckedChange={() => { setSortBy('client'); setSortOrder('desc'); }}>ลูกค้า (Z-A)</DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem checked={sortBy === 'status' && sortOrder === 'asc'} onCheckedChange={() => { setSortBy('status'); setSortOrder('asc'); }}>สถานะ (A-Z)</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={sortBy === 'status' && sortOrder === 'desc'} onCheckedChange={() => { setSortBy('status'); setSortOrder('desc'); }}>สถานะ (Z-A)</DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem checked={sortBy === 'priority' && sortOrder === 'desc'} onCheckedChange={() => { setSortBy('priority'); setSortOrder('desc'); }}>ความสำคัญ (Urgent First)</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={sortBy === 'priority' && sortOrder === 'asc'} onCheckedChange={() => { setSortBy('priority'); setSortOrder('asc'); }}>ความสำคัญ (Low First)</DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem checked={sortBy === 'none'} onCheckedChange={() => { setSortBy('none'); }}>Default Order</DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button variant="outline" size="sm" onClick={() => setShowArchived(!showArchived)} className={cn("h-9 rounded-full border-dashed text-sm font-medium px-4 shrink-0 shadow-none gap-2", showArchived ? "bg-muted text-primary border-primary/30" : "border-border/60 text-muted-foreground/80 bg-transparent")}><Archive className="w-4 h-4" /> Archived</Button>
         <Button variant="outline" size="sm" disabled className="h-9 rounded-full border-dashed border-border/60 text-sm text-muted-foreground/80 font-medium px-4 shrink-0 bg-transparent shadow-none gap-2"><Download className="w-4 h-4" /> Import / Export</Button>
       </div>
@@ -289,11 +386,44 @@ export default function ProjectsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-border/30 bg-transparent text-xs font-semibold text-muted-foreground/80 text-left">
+                <tr className="border-b border-border/30 bg-transparent text-xs font-semibold text-muted-foreground/80 text-left select-none">
                   <th className="py-3 px-4 w-12 text-center"></th>
-                  <th className="py-3 px-4"></th>
-                  <th className="py-3 px-4 border-l border-border/30">Project client</th>
-                  <th className="py-3 px-4 w-44 border-l border-border/30">Status</th>
+                  <th 
+                    className="py-3 px-4 cursor-pointer group/header hover:bg-muted/10 transition-colors animate-fade-in"
+                    onClick={() => toggleSort('title')}
+                  >
+                    <span className="flex items-center">
+                      Project name
+                      {renderSortIcon('title')}
+                    </span>
+                  </th>
+                  <th 
+                    className="py-3 px-4 border-l border-border/30 cursor-pointer group/header hover:bg-muted/10 transition-colors"
+                    onClick={() => toggleSort('client')}
+                  >
+                    <span className="flex items-center">
+                      Project client
+                      {renderSortIcon('client')}
+                    </span>
+                  </th>
+                  <th 
+                    className="py-3 px-4 w-40 border-l border-border/30 cursor-pointer group/header hover:bg-muted/10 transition-colors"
+                    onClick={() => toggleSort('status')}
+                  >
+                    <span className="flex items-center">
+                      Status
+                      {renderSortIcon('status')}
+                    </span>
+                  </th>
+                  <th 
+                    className="py-3 px-4 w-32 border-l border-border/30 cursor-pointer group/header hover:bg-muted/10 transition-colors"
+                    onClick={() => toggleSort('priority')}
+                  >
+                    <span className="flex items-center">
+                      Priority
+                      {renderSortIcon('priority')}
+                    </span>
+                  </th>
                   <th className="py-3 px-4 w-24 border-l border-border/30">Members</th>
                   <th className="py-3 px-4 w-52 border-l border-border/30">Progress</th>
                   <th className="py-3 px-4 border-l border-border/30">Budget</th>
@@ -388,6 +518,35 @@ export default function ProjectsPage() {
                         </Select>
                       </td>
 
+                      {/* Priority Dropdown Select */}
+                      <td className="py-3 px-4 align-middle border-l border-border/30">
+                        <Select
+                          value={project.priority || 'Medium'}
+                          onValueChange={(val) => {
+                            updateProject({ id: project.id, data: { priority: val } });
+                            toast({ title: 'สำเร็จ!', description: `อัปเดตความสำคัญเป็น ${val} เรียบร้อยแล้ว` });
+                          }}
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              "h-8 w-28 font-semibold text-xs rounded border-0 text-white shadow-none transition-all duration-200 focus:ring-0 focus-visible:ring-0 justify-between",
+                              project.priority === 'Urgent' && "bg-rose-500 hover:bg-rose-600",
+                              project.priority === 'High' && "bg-amber-500 hover:bg-amber-600",
+                              (!project.priority || project.priority === 'Medium') && "bg-blue-500 hover:bg-blue-600",
+                              project.priority === 'Low' && "bg-slate-500 hover:bg-slate-600"
+                            )}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl text-xs">
+                            <SelectItem value="Urgent">Urgent</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="Low">Low</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+
                       {/* Members */}
                       <td className="py-3 px-4 align-middle border-l border-border/30">
                         <div className="flex -space-x-1 overflow-hidden">
@@ -425,7 +584,7 @@ export default function ProjectsPage() {
 
                 {/* Inline Create project button */}
                 <tr className="bg-transparent hover:bg-muted/5 transition-colors">
-                  <td colSpan={8} className="p-0 border-t border-border/30">
+                  <td colSpan={9} className="p-0 border-t border-border/30">
                     <div
                       onClick={() => setIsCreateOpen(true)}
                       className="px-5 py-3.5 cursor-pointer flex items-center gap-2.5 text-primary/80 hover:text-primary font-semibold text-sm transition-colors"
@@ -457,9 +616,9 @@ export default function ProjectsPage() {
           <form onSubmit={handleCreateProject} className="px-6 py-5">
             <div className="space-y-5">
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {/* Title */}
-                <div className="flex flex-col gap-2 md:col-span-2">
+                <div className="flex flex-col gap-2 md:col-span-3">
                   <span className="text-xs font-semibold text-foreground/80">Project Title <span className="text-destructive">*</span></span>
                   <Input
                     placeholder="e.g. Website Redesign Q3"
@@ -496,6 +655,22 @@ export default function ProjectsPage() {
                       {clients.map(c => (
                         <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Priority Selection */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-foreground/80">Priority</span>
+                  <Select onValueChange={setNewPriority} value={newPriority}>
+                    <SelectTrigger className="rounded-xl h-10 border-border/60 shadow-sm text-sm bg-transparent">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="Urgent">Urgent</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

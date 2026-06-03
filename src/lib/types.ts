@@ -52,6 +52,7 @@ export type Project = {
   client?: Client | null;
   company?: Company | null;
   status?: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Urgent' | string;
   relatedProjectIds?: string[];
   boardViews?: string[];
   detailsSections?: {

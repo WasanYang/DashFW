@@ -60,31 +60,38 @@
 }
 
 @layer base {
-  .tiptap table {
+  .tiptap table,
+  .tiptap-read-only table {
     border-collapse: collapse;
-    margin: 0;
+    margin: 1rem 0;
     overflow: hidden;
     table-layout: fixed;
     width: 100%;
+    border: 1px solid #d1d5db;
   }
 
   .tiptap table td,
-  .tiptap table th {
-    border: 1px solid hsl(var(--border));
+  .tiptap table th,
+  .tiptap-read-only table td,
+  .tiptap-read-only table th {
+    border: 1px solid #d1d5db;
     box-sizing: border-box;
     min-width: 1em;
-    padding: 3px 5px;
+    padding: 6px 10px;
     position: relative;
     vertical-align: top;
-  }
-
-  .tiptap table th {
-    background-color: hsl(var(--muted));
-    font-weight: bold;
     text-align: left;
   }
 
-  .tiptap table .selectedCell:after {
+  .tiptap table th,
+  .tiptap-read-only table th {
+    background-color: #f3f4f6;
+    color: #1f2937;
+    font-weight: bold;
+  }
+
+  .tiptap table .selectedCell:after,
+  .tiptap-read-only table .selectedCell:after {
     background: rgba(200, 200, 255, 0.4);
     content: "";
     left: 0;
@@ -96,7 +103,8 @@
     z-index: 2;
   }
 
-  .tiptap table .column-resize-handle {
+  .tiptap table .column-resize-handle,
+  .tiptap-read-only table .column-resize-handle {
     background-color: #adf;
     bottom: -2px;
     position: absolute;

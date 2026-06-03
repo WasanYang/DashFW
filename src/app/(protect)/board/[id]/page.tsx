@@ -58,6 +58,8 @@ import { cn } from '@/lib/utils';
 import type { Client, SubTask } from '@/lib/types';
 
 export default function ProjectDetailsPage() {
+  const showTimeTracker = false;
+
   const { data: projects = [], isLoading: loadingProjects } = useGetProjectsQuery();
   const { data: tasks = [], isLoading: loadingTasks } = useGetTasksQuery();
   const { data: clients = [], isLoading: loadingClients } = useGetClientsQuery();
@@ -96,6 +98,25 @@ export default function ProjectDetailsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
 
+  // Active Details Section Tab State
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTabTitle, setEditingTabTitle] = useState('');
+
+  // Helper to add template sections
+  const addTemplateSection = async (title: string, defaultContent: string) => {
+    if (!project) return;
+    const newSectionId = `sec-${Date.now()}`;
+    const newSection = {
+      id: newSectionId,
+      title: title,
+      content: defaultContent
+    };
+    const currentSections = project.detailsSections || [];
+    await updateProject({ id: project.id, data: { detailsSections: [...currentSections, newSection] } }).unwrap();
+    setActiveSectionId(newSectionId);
+  };
+
   // Task Details Sidebar State
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<{ groupId: string, task: SubTask } | null>(null);
 
@@ -117,6 +138,7 @@ export default function ProjectDetailsPage() {
   const [editCurrency, setEditCurrency] = useState('USD');
   const [editColor, setEditColor] = useState('');
   const [editArchived, setEditArchived] = useState(false);
+  const [editPriority, setEditPriority] = useState('Medium');
 
   useEffect(() => {
     if (project) {
@@ -131,8 +153,20 @@ export default function ProjectDetailsPage() {
       setEditCurrency(project.currency || 'USD');
       setEditColor(project.color || '');
       setEditArchived(!!project.archived);
+      setEditPriority(project.priority || 'Medium');
     }
   }, [project]);
+
+  // Synchronize active details section tab
+  useEffect(() => {
+    if (project?.detailsSections && project.detailsSections.length > 0) {
+      if (!activeSectionId || !project.detailsSections.some(s => s.id === activeSectionId)) {
+        setActiveSectionId(project.detailsSections[0].id);
+      }
+    } else {
+      setActiveSectionId(null);
+    }
+  }, [project, activeSectionId]);
 
   if (loadingProjects || loadingTasks || loadingClients || loadingTimeLogs || loadingInvoices) {
     return <div className="p-8 text-center text-muted-foreground">Loading workspace...</div>;
@@ -553,7 +587,8 @@ export default function ProjectDetailsPage() {
           hourlyRate: editHourlyRate === '' ? undefined : editHourlyRate,
           currency: editCurrency,
           color: editColor,
-          archived: editArchived
+          archived: editArchived,
+          priority: editPriority
         }
       }).unwrap();
       toast({
@@ -629,7 +664,7 @@ export default function ProjectDetailsPage() {
 
       {/* 2. SUB-NAVIGATION TABS (Lavender horizontal tab row) */}
       <div className="flex bg-primary/5 p-1.5 rounded-2xl border border-primary/10 overflow-x-auto print:hidden shrink-0">
-        {(['Tasks', 'Notes', 'Calendar', 'Timesheet', 'Invoices', 'Edit'] as const).map((tab) => {
+        {((['Tasks', 'Notes', 'Calendar', 'Timesheet', 'Invoices', 'Edit'] as const).filter(t => showTimeTracker || t !== 'Timesheet')).map((tab) => {
           const isAct = activeTab === tab;
           return (
             <Button
@@ -1246,7 +1281,7 @@ export default function ProjectDetailsPage() {
         )}
 
         {/* VIEW C: TIMESHEET TAB */}
-        {activeTab === 'Timesheet' && (
+        {activeTab === 'Timesheet' && showTimeTracker && (
           <div className="space-y-6">
             {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1603,6 +1638,23 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
 
+              {/* Priority Setting */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 rounded-[14px]">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">Project Priority</span>
+                  <select
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value)}
+                    className="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-[13px] text-foreground font-semibold w-full h-5 cursor-pointer"
+                  >
+                    <option value="Urgent">Urgent</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Archive Project Setting */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col border border-[#d0d0eb] dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 rounded-[14px] justify-center col-span-3">
@@ -1633,134 +1685,229 @@ export default function ProjectDetailsPage() {
           </Card>
         )}
 
-        {/* ---------------- NOTES TAB (Accordions) ---------------- */}
+        {/* ---------------- NOTES TAB (Horizontal Tabs) ---------------- */}
         {activeTab === 'Notes' && (
           <div className="bg-card border border-border/60 rounded-2xl p-6 shadow-sm flex flex-col gap-6">
             <div className="flex justify-between items-center border-b border-border/40 pb-4">
               <div>
-                <h2 className="text-lg font-bold flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /> Project Notes & Details</h2>
-                <p className="text-sm text-muted-foreground">Manage OTA details, Google Ads keywords, and other notes here.</p>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" /> Project Notes & Details
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Manage OTA details, Google Ads keywords, and other notes here.
+                </p>
               </div>
-              <Button onClick={async () => {
-                const newSection = {
-                  id: `sec-${Date.now()}`,
-                  title: 'New Section',
-                  content: ''
-                };
-                await updateProject({ id: project.id, data: { detailsSections: [...(project.detailsSections || []), newSection] } }).unwrap();
-              }} size="sm" className="gap-2 h-9 px-4 rounded-xl shadow-sm">
-                <Plus className="w-4 h-4" /> Add Section
-              </Button>
             </div>
 
             {(!project.detailsSections || project.detailsSections.length === 0) ? (
-              <div className="text-center py-12 bg-muted/20 border border-dashed rounded-xl">
-                <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
-                <p className="text-sm text-muted-foreground mb-4">No notes or details added yet.</p>
-                <Button variant="outline" onClick={async () => {
-                  const newSection = {
-                    id: `sec-${Date.now()}`,
-                    title: 'New Section',
-                    content: ''
-                  };
-                  await updateProject({ id: project.id, data: { detailsSections: [newSection] } }).unwrap();
-                }}>
-                  Create First Section
+              <div className="text-center py-12 bg-muted/20 border border-dashed rounded-xl max-w-xl mx-auto w-full px-6">
+                <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <h3 className="font-semibold text-base mb-1">ยังไม่มีหัวข้อโน้ตย่อหรือรายละเอียด</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  เริ่มต้นบันทึกข้อมูลและจัดกลุ่มด้วยแท็บต่างๆ โดยใช้เทมเพลตเริ่มต้นด้านล่าง หรือสร้างแท็บเปล่าขึ้นใหม่
+                </p>
+                
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="justify-start gap-2 h-10 px-3 rounded-lg border-primary/20 hover:border-primary/50 text-foreground"
+                    onClick={() => addTemplateSection(
+                      'General Notes',
+                      '<h3>General Notes</h3><p>Start recording general information, notes, and instructions here...</p>'
+                    )}
+                  >
+                    <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span className="truncate text-xs">General Notes</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="justify-start gap-2 h-10 px-3 rounded-lg border-primary/20 hover:border-primary/50 text-foreground"
+                    onClick={() => addTemplateSection(
+                      'OTA Setup',
+                      '<h3>OTA Setup Checklist</h3><p>Use this area to track credentials, URLs, and properties setup status.</p><table style="width: 100%; border-collapse: collapse; margin-top: 10px;"><thead style="background-color: #f3f4f6;"><tr><th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Platform</th><th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Username / ID</th><th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Status</th></tr></thead><tbody><tr><td style="border: 1px solid #d1d5db; padding: 8px;">Booking.com</td><td style="border: 1px solid #d1d5db; padding: 8px;">-</td><td style="border: 1px solid #d1d5db; padding: 8px;">Pending</td></tr><tr><td style="border: 1px solid #d1d5db; padding: 8px;">Agoda</td><td style="border: 1px solid #d1d5db; padding: 8px;">-</td><td style="border: 1px solid #d1d5db; padding: 8px;">Pending</td></tr><tr><td style="border: 1px solid #d1d5db; padding: 8px;">Trip.com</td><td style="border: 1px solid #d1d5db; padding: 8px;">-</td><td style="border: 1px solid #d1d5db; padding: 8px;">Pending</td></tr></tbody></table>'
+                    )}
+                  >
+                    <Building2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="truncate text-xs">OTA Setup</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="justify-start gap-2 h-10 px-3 rounded-lg border-primary/20 hover:border-primary/50 text-foreground"
+                    onClick={() => addTemplateSection(
+                      'SEO Keywords',
+                      '<h3>SEO Keyword Strategy</h3><p>Define target search keywords, competition level, and search volume goals.</p><table style="width: 100%; border-collapse: collapse; margin-top: 10px;"><thead style="background-color: #f3f4f6;"><tr><th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Target Keyword</th><th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Search Volume</th><th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Difficulty</th></tr></thead><tbody><tr><td style="border: 1px solid #d1d5db; padding: 8px;">example keyword</td><td style="border: 1px solid #d1d5db; padding: 8px;">1,200/mo</td><td style="border: 1px solid #d1d5db; padding: 8px;">Low</td></tr></tbody></table>'
+                    )}
+                  >
+                    <Search className="w-4 h-4 text-purple-500 shrink-0" />
+                    <span className="truncate text-xs">SEO Keywords</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="justify-start gap-2 h-10 px-3 rounded-lg border-primary/20 hover:border-primary/50 text-foreground"
+                    onClick={() => addTemplateSection(
+                      'Client Brief',
+                      '<h3>Client Project Brief</h3><p>Summarize key objectives, milestones, and deliverable targets.</p><ul><li><strong>Project Scope:</strong> </li><li><strong>Design Preferences:</strong> </li><li><strong>Key Deliverables:</strong> </li><li><strong>Important Assets Links:</strong> </li></ul>'
+                    )}
+                  >
+                    <MessageSquare className="w-4 h-4 text-orange-500 shrink-0" />
+                    <span className="truncate text-xs">Client Brief</span>
+                  </Button>
+                </div>
+
+                <Button 
+                  onClick={async () => {
+                    const newSectionId = `sec-${Date.now()}`;
+                    const newSection = {
+                      id: newSectionId,
+                      title: 'New Section',
+                      content: ''
+                    };
+                    await updateProject({ id: project.id, data: { detailsSections: [newSection] } }).unwrap();
+                    setActiveSectionId(newSectionId);
+                  }}
+                  className="gap-2 px-6 rounded-xl shadow-sm"
+                >
+                  <Plus className="w-4 h-4" /> สร้างแท็บเปล่า
                 </Button>
               </div>
             ) : (
-              <DragDropContext onDragEnd={onDragEndSections}>
-                <Droppable droppableId="details-sections" type="section">
-                  {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef}>
-                      <Accordion type="multiple" className="w-full space-y-4">
-                        {(project.detailsSections || []).map((section, index) => (
-                          <Draggable key={section.id} draggableId={section.id} index={index}>
-                            {(provided) => (
-                              <div ref={provided.innerRef} {...provided.draggableProps} style={provided.draggableProps.style}>
-                                <AccordionItem value={section.id} className="border border-border/50 rounded-xl px-4 bg-background shadow-sm overflow-hidden mb-4">
-                                  <div className="flex items-center w-full group">
-                                    <div {...provided.dragHandleProps} className="p-2 -ml-2 cursor-grab text-muted-foreground hover:text-foreground opacity-50 hover:opacity-100">
-                                      <GripVertical className="h-4 w-4" />
-                                    </div>
-                                    {editingId === section.id ? (
-                                      <div className="flex items-center gap-2 flex-1 py-4">
-                                        <Input
-                                          autoFocus
-                                          value={editingText}
-                                          onChange={e => setEditingText(e.target.value)}
-                                          onKeyDown={async e => {
-                                            if (e.key === 'Enter' && editingText.trim()) {
-                                              const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, title: editingText } : s);
-                                              await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
-                                              setEditingId(null);
-                                            }
-                                          }}
-                                          className="h-8 min-w-[200px]"
-                                        />
-                                        <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700 text-white rounded" onClick={async () => {
-                                          if (!editingText.trim()) return;
-                                          const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, title: editingText } : s);
+              <div className="flex flex-col gap-4">
+                {/* Horizontal Tab strip with drag and drop */}
+                <DragDropContext onDragEnd={onDragEndSections}>
+                  <Droppable droppableId="details-sections-tabs" direction="horizontal">
+                    {(provided) => (
+                      <div 
+                        ref={provided.innerRef} 
+                        {...provided.droppableProps}
+                        className="flex items-center gap-1 border-b border-border/80 px-1 -mb-px overflow-x-auto scrollbar-none"
+                      >
+                        {(project.detailsSections || []).map((section, index) => {
+                          const isActive = activeSectionId === section.id;
+                          return (
+                            <Draggable key={section.id} draggableId={section.id} index={index}>
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  onClick={() => setActiveSectionId(section.id)}
+                                  className={`
+                                    flex items-center gap-1.5 px-4 py-2 border rounded-t-xl select-none cursor-pointer transition-all duration-150 shrink-0
+                                    ${isActive 
+                                      ? 'bg-background border-border border-b-transparent text-primary font-bold shadow-[0_-3px_8px_-3px_rgba(0,0,0,0.08)]' 
+                                      : 'bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                                    }
+                                  `}
+                                >
+                                  <GripVertical className="w-3.5 h-3.5 text-muted-foreground/30 cursor-grab shrink-0" />
+                                  {editingTabId === section.id ? (
+                                    <Input
+                                      autoFocus
+                                      value={editingTabTitle}
+                                      onChange={(e) => setEditingTabTitle(e.target.value)}
+                                      onBlur={async () => {
+                                        if (editingTabTitle.trim()) {
+                                          const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, title: editingTabTitle.trim() } : s);
                                           await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
-                                          setEditingId(null);
-                                        }}>
-                                          <Check className="w-4 h-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded" onClick={() => setEditingId(null)}>
-                                          <X className="w-4 h-4" />
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      <AccordionTrigger className="hover:no-underline py-4 flex-none text-left pr-2">
-                                        <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">{section.title}</h3>
-                                      </AccordionTrigger>
-                                    )}
-                                    {editingId !== section.id && (
-                                      <>
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => {
-                                            e.stopPropagation();
-                                            setEditingId(section.id);
-                                            setEditingText(section.title);
-                                          }}>
-                                            <Edit2 className="w-4 h-4" />
-                                          </Button>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={async (e) => {
-                                            e.stopPropagation();
-                                            if (!window.confirm(`Are you sure you want to delete "${section.title}"?`)) return;
-                                            const newSections = project.detailsSections!.filter(s => s.id !== section.id);
+                                        }
+                                        setEditingTabId(null);
+                                      }}
+                                      onKeyDown={async (e) => {
+                                        if (e.key === 'Enter') {
+                                          if (editingTabTitle.trim()) {
+                                            const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, title: editingTabTitle.trim() } : s);
                                             await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
-                                          }}>
-                                            <Trash2 className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                        <div className="flex-1" />
-                                      </>
-                                    )}
-                                  </div>
-                                  <AccordionContent className="pt-0 pb-6">
-                                    <div className="bg-muted/10 rounded-xl p-2 border border-border/30">
-                                      <EditableNovelField
-                                        value={section.content}
-                                        onChange={async (newContent) => {
-                                          const newSections = project.detailsSections!.map(s => s.id === section.id ? { ...s, content: newContent } : s);
-                                          await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
-                                        }}
-                                        placeholder={`Start typing details for ${section.title}... (Supports tables and rich text formatting)`}
-                                      />
-                                    </div>
-                                  </AccordionContent>
-                                </AccordionItem>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                      </Accordion>
-                      {provided.placeholder}
+                                          }
+                                          setEditingTabId(null);
+                                        } else if (e.key === 'Escape') {
+                                          setEditingTabId(null);
+                                        }
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-6 py-0.5 px-2 text-xs w-28 border border-primary/50 focus-visible:ring-1 focus-visible:ring-primary rounded-md bg-background"
+                                    />
+                                  ) : (
+                                    <span 
+                                      onDoubleClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingTabId(section.id);
+                                        setEditingTabTitle(section.title);
+                                      }}
+                                      className="text-sm font-semibold select-none truncate max-w-[120px]"
+                                      title="Double-click to rename"
+                                    >
+                                      {section.title}
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!window.confirm(`Are you sure you want to delete "${section.title}"?`)) return;
+                                      const newSections = project.detailsSections!.filter(s => s.id !== section.id);
+                                      await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
+                                      if (activeSectionId === section.id) {
+                                        setActiveSectionId(newSections.length > 0 ? newSections[0].id : null);
+                                      }
+                                    }}
+                                    className="p-0.5 rounded-full hover:bg-muted-foreground/15 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
+
+                        {/* Add Section Button */}
+                        <Button 
+                          onClick={async () => {
+                            const newSectionId = `sec-${Date.now()}`;
+                            const newSection = {
+                              id: newSectionId,
+                              title: 'New Tab',
+                              content: ''
+                            };
+                            await updateProject({ id: project.id, data: { detailsSections: [...(project.detailsSections || []), newSection] } }).unwrap();
+                            setActiveSectionId(newSectionId);
+                          }} 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground shrink-0 ml-1 hover:bg-muted/40"
+                          title="Add new note tab"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+
+                {/* Tab content area */}
+                {(() => {
+                  const activeSection = project.detailsSections.find(s => s.id === activeSectionId) || project.detailsSections[0];
+                  if (!activeSection) return null;
+
+                  return (
+                    <div className="bg-muted/10 rounded-xl p-2 border border-border/30 mt-2">
+                      <EditableNovelField
+                        key={activeSection.id}
+                        value={activeSection.content}
+                        onChange={async (newContent) => {
+                          const newSections = project.detailsSections!.map(s => s.id === activeSection.id ? { ...s, content: newContent } : s);
+                          await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
+                        }}
+                        placeholder={`Start typing details for ${activeSection.title}... (Supports tables and rich text formatting)`}
+                      />
                     </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
+                  );
+                })()}
+              </div>
             )}
           </div>
         )}
