@@ -12,6 +12,7 @@ export default function ClientsPage() {
 
   return (
     <div className="flex flex-col gap-4 w-full h-full p-4 sm:p-6">
+      <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Contacts</h1>
       <ClientList tasks={tasks} />
     </div>
   );

@@ -38,7 +38,7 @@ export default function BoardPage() {
   }
   
   return (
-    <div className='flex flex-col h-full'>
+    <div className='flex flex-col h-full w-full p-4 sm:p-6'>
       <KanbanBoard 
         initialTasks={tasks} 
         projects={projects} 

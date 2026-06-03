@@ -104,110 +104,113 @@ export default function JobTypeManager() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-      {/* Column 1: Add/Edit Form */}
-      <div className="lg:col-span-1">
-        <Card className="sticky top-24">
-          <CardHeader>
-            <CardTitle>{editing ? "แก้ไขประเภทงาน" : "เพิ่มประเภทงานใหม่"}</CardTitle>
-            <CardDescription>
-              {editing ? "ทำการแก้ไขข้อมูลประเภทงานด้านล่าง" : "กรอกข้อมูลเพื่อระบุประเภทงานใหม่ในระบบ"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">ชื่อประเภทงาน</label>
-                <Input
-                  placeholder="เช่น Facebook Page, Website Design"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">รายละเอียดเพิ่มเติม (คำอธิบาย)</label>
-                <Input
-                  placeholder="เช่น บริการตั้งค่าและเขียนคอนเทนต์"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" className="flex-grow">
-                  {editing ? "บันทึกการแก้ไข" : "เพิ่มประเภทงาน"}
-                </Button>
-                {editing && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditing(null);
-                      setName("");
-                      setDescription("");
-                    }}
-                  >
-                    ยกเลิก
+    <div className="flex flex-col gap-4 w-full h-full p-4 sm:p-6">
+      <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Templates</h1>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Column 1: Add/Edit Form */}
+        <div className="lg:col-span-1">
+          <Card className="sticky top-24">
+            <CardHeader>
+              <CardTitle>{editing ? "แก้ไขประเภทงาน" : "เพิ่มประเภทงานใหม่"}</CardTitle>
+              <CardDescription>
+                {editing ? "ทำการแก้ไขข้อมูลประเภทงานด้านล่าง" : "กรอกข้อมูลเพื่อระบุประเภทงานใหม่ในระบบ"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">ชื่อประเภทงาน</label>
+                  <Input
+                    placeholder="เช่น Facebook Page, Website Design"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">รายละเอียดเพิ่มเติม (คำอธิบาย)</label>
+                  <Input
+                    placeholder="เช่น บริการตั้งค่าและเขียนคอนเทนต์"
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button type="submit" className="flex-grow">
+                    {editing ? "บันทึกการแก้ไข" : "เพิ่มประเภทงาน"}
                   </Button>
-                )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Column 2: Cards Grid View */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">ประเภทของงาน</h1>
-          <Button variant="outline" size="icon" onClick={fetchJobTypes} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
+                  {editing && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditing(null);
+                        setName("");
+                        setDescription("");
+                      }}
+                    >
+                      ยกเลิก
+                    </Button>
+                  )}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
 
-        {isLoading && jobTypes.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">กำลังโหลดข้อมูล...</div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {jobTypes.length === 0 && (
-              <p className="text-muted-foreground text-center col-span-2 py-12 border border-dashed rounded-xl">
-                ยังไม่มีข้อมูลประเภทงานในฐานข้อมูล
-              </p>
-            )}
-            {jobTypes.map(jt => (
-              <Card key={jt._id} className="hover:shadow-md transition border border-border/60 bg-card">
-                <CardHeader className="flex flex-row items-start justify-between pb-2 space-y-0">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg font-bold">{jt.name}</CardTitle>
-                    {jt.description && (
-                      <CardDescription className="text-sm line-clamp-3">{jt.description}</CardDescription>
-                    )}
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary"
-                      onClick={() => handleEdit(jt)}
-                      title="แก้ไข"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
-                      onClick={() => handleDelete(jt._id)}
-                      title="ลบ"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-              </Card>
-            ))}
+        {/* Column 2: Cards Grid View */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold tracking-tight text-foreground/90">ประเภทของงาน</h2>
+            <Button variant="outline" size="icon" onClick={fetchJobTypes} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
           </div>
-        )}
+
+          {isLoading && jobTypes.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">กำลังโหลดข้อมูล...</div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {jobTypes.length === 0 && (
+                <p className="text-muted-foreground text-center col-span-2 py-12 border border-dashed rounded-xl">
+                  ยังไม่มีข้อมูลประเภทงานในฐานข้อมูล
+                </p>
+              )}
+              {jobTypes.map(jt => (
+                <Card key={jt._id} className="hover:shadow-md transition border border-border/60 bg-card">
+                  <CardHeader className="flex flex-row items-start justify-between pb-2 space-y-0">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg font-bold">{jt.name}</CardTitle>
+                      {jt.description && (
+                        <CardDescription className="text-sm line-clamp-3">{jt.description}</CardDescription>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary"
+                        onClick={() => handleEdit(jt)}
+                        title="แก้ไข"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                        onClick={() => handleDelete(jt._id)}
+                        title="ลบ"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

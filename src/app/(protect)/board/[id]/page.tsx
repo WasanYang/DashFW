@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -53,6 +54,7 @@ import { useGetTimeLogsQuery } from '@/services/timeLogApi';
 import { useGetInvoicesQuery } from '@/services/invoiceApi';
 import { useToast } from '@/hooks/use-toast';
 import { createAiChecklist } from '@/ai/flows/ai-checklist-creator-flow';
+import { generateAiProjectNotes } from '@/ai/flows/ai-project-notes-flow';
 import { formatNumber } from '@/lib/number-format';
 import { cn } from '@/lib/utils';
 import type { Client, SubTask } from '@/lib/types';
@@ -115,6 +117,87 @@ export default function ProjectDetailsPage() {
     const currentSections = project.detailsSections || [];
     await updateProject({ id: project.id, data: { detailsSections: [...currentSections, newSection] } }).unwrap();
     setActiveSectionId(newSectionId);
+  };
+
+  // AI Notes Generator states & handlers
+  const [isAiNotesOpen, setIsAiNotesOpen] = useState(false);
+  const [aiNotesRawText, setAiNotesRawText] = useState('');
+  const [isGeneratingAiNotes, setIsGeneratingAiNotes] = useState(false);
+  const [aiNotesPreviewSections, setAiNotesPreviewSections] = useState<{ title: string; content: string; }[] | null>(null);
+  const [aiNotesPreviewActiveTab, setAiNotesPreviewActiveTab] = useState<number>(0);
+
+  const handleGenerateAiNotes = async () => {
+    if (!aiNotesRawText.trim()) return;
+    setIsGeneratingAiNotes(true);
+    try {
+      const res = await generateAiProjectNotes({ rawText: aiNotesRawText.trim() });
+      if (res.sections && res.sections.length > 0) {
+        setAiNotesPreviewSections(res.sections);
+        setAiNotesPreviewActiveTab(0);
+      } else {
+        toast({
+          title: "ไม่พบข้อมูล",
+          description: "AI ไม่สามารถจัดระเบียบข้อมูลตามที่ส่งเข้าไปได้ กรุณาลองใหม่อีกครั้ง",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "เกิดข้อผิดพลาดในการประมวลผล",
+        description: "โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือคีย์ API",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingAiNotes(false);
+    }
+  };
+
+  const handleSaveAiNotes = async (overwrite: boolean) => {
+    if (!aiNotesPreviewSections || aiNotesPreviewSections.length === 0 || !project) return;
+    
+    // Structure new sections
+    const formattedSections = aiNotesPreviewSections.map((sec, idx) => ({
+      id: `ai-sec-${Date.now()}-${idx}`,
+      title: sec.title,
+      content: sec.content
+    }));
+    
+    let updatedSections = [];
+    if (overwrite) {
+      updatedSections = formattedSections;
+    } else {
+      updatedSections = [...(project.detailsSections || []), ...formattedSections];
+    }
+    
+    try {
+      await updateProject({
+        id: project.id,
+        data: { detailsSections: updatedSections }
+      }).unwrap();
+      
+      toast({
+        title: "สำเร็จ!",
+        description: overwrite ? "สร้างแท็บใหม่เรียบร้อยแล้ว" : "เพิ่มแท็บใหม่เรียบร้อยแล้ว",
+      });
+      
+      // Select the first newly added/replaced tab as the active one
+      if (formattedSections.length > 0) {
+        setActiveSectionId(formattedSections[0].id);
+      }
+      
+      // Reset state and close modal
+      setIsAiNotesOpen(false);
+      setAiNotesPreviewSections(null);
+      setAiNotesRawText('');
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถบันทึกข้อมูลโน้ตเข้าโครงการได้",
+        variant: "destructive"
+      });
+    }
   };
 
   // Task Details Sidebar State
@@ -1697,6 +1780,13 @@ export default function ProjectDetailsPage() {
                   Manage OTA details, Google Ads keywords, and other notes here.
                 </p>
               </div>
+              <Button
+                onClick={() => setIsAiNotesOpen(true)}
+                className="gap-2 rounded-xl shadow-sm bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 hover:text-primary transition-all font-semibold text-xs h-9"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" />
+                สร้างแท็บด้วย AI
+              </Button>
             </div>
 
             {(!project.detailsSections || project.detailsSections.length === 0) ? (
@@ -1758,21 +1848,29 @@ export default function ProjectDetailsPage() {
                   </Button>
                 </div>
 
-                <Button 
-                  onClick={async () => {
-                    const newSectionId = `sec-${Date.now()}`;
-                    const newSection = {
-                      id: newSectionId,
-                      title: 'New Section',
-                      content: ''
-                    };
-                    await updateProject({ id: project.id, data: { detailsSections: [newSection] } }).unwrap();
-                    setActiveSectionId(newSectionId);
-                  }}
-                  className="gap-2 px-6 rounded-xl shadow-sm"
-                >
-                  <Plus className="w-4 h-4" /> สร้างแท็บเปล่า
-                </Button>
+                <div className="flex flex-col sm:flex-row justify-center gap-3">
+                  <Button 
+                    onClick={async () => {
+                      const newSectionId = `sec-${Date.now()}`;
+                      const newSection = {
+                        id: newSectionId,
+                        title: 'New Section',
+                        content: ''
+                      };
+                      await updateProject({ id: project.id, data: { detailsSections: [newSection] } }).unwrap();
+                      setActiveSectionId(newSectionId);
+                    }}
+                    className="gap-2 px-6 rounded-xl shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" /> สร้างแท็บเปล่า
+                  </Button>
+                  <Button 
+                    onClick={() => setIsAiNotesOpen(true)}
+                    className="gap-2 px-6 rounded-xl shadow-sm bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white font-semibold"
+                  >
+                    <Sparkles className="w-4 h-4 text-white animate-pulse" /> สร้างแท็บด้วย AI
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-4">
@@ -1911,6 +2009,139 @@ export default function ProjectDetailsPage() {
             )}
           </div>
         )}
+
+        {/* AI Notes Generator Dialog */}
+        <Dialog open={isAiNotesOpen} onOpenChange={setIsAiNotesOpen}>
+          <DialogContent className="rounded-2xl max-w-2xl h-[80vh] flex flex-col bg-background border border-border">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                สร้างและจัดระเบียบแท็บด้วย AI
+              </DialogTitle>
+              <DialogDescription>
+                วางข้อมูลดิบ เช่น รายละเอียดโครงการ, บรีฟลูกค้า, หรือรหัสเข้าสู่ระบบต่างๆ แล้ว AI จะทำการวิเคราะห์และสร้างแถบข้อมูลให้โดยอัตโนมัติ
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex-grow flex flex-col gap-4 overflow-hidden my-2">
+              {!aiNotesPreviewSections ? (
+                // STEP 1: Input text area
+                <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+                  <label className="text-xs font-semibold text-muted-foreground">ข้อมูลดิบโครงการ (Raw Data)</label>
+                  <textarea
+                    value={aiNotesRawText}
+                    onChange={(e) => setAiNotesRawText(e.target.value)}
+                    placeholder="ตัวอย่างเช่น:
+- ข้อมูลลูกค้า: บริษัท เทคโนโลยี จำกัด ผู้ติดต่อ คุณเอ โทร 081-xxxxxxx
+- รายละเอียดงาน: สร้างเว็บไซต์โปรโมทบริการขนาด 5 หน้า และตั้งค่าแคมเปญ Facebook Ads
+- ข้อมูลเข้าใช้งาน:
+  1. Hosting: Username: user123 / Password: password123 (Server IP: 122.11.2.1)
+  2. WordPress: URL: dev.tech.com/wp-admin, User: admin, Pass: passwp456
+- คีย์เวิร์ดต้องการเน้น: บริษัทพัฒนาเว็บ, ทำเว็บเชียงใหม่, รับทำระบบ"
+                    className="flex-1 w-full bg-background border border-border/80 rounded-xl p-3.5 text-sm font-medium outline-none focus-visible:ring-1 focus-visible:ring-primary resize-none font-mono"
+                    disabled={isGeneratingAiNotes}
+                  />
+                </div>
+              ) : (
+                // STEP 2: Preview generated sections
+                <div className="flex-grow flex flex-col gap-4 overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground">ผลลัพธ์การจัดระเบียบของ AI (AI Preview)</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs text-primary"
+                      onClick={() => {
+                        setAiNotesPreviewSections(null);
+                      }}
+                    >
+                      แก้ไขข้อมูลดิบใหม่
+                    </Button>
+                  </div>
+                  
+                  {/* Preview Tabs */}
+                  <div className="flex items-center gap-1.5 border-b border-border/80 pb-2 overflow-x-auto scrollbar-none shrink-0">
+                    {aiNotesPreviewSections.map((sec, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setAiNotesPreviewActiveTab(idx)}
+                        className={cn(
+                          "px-3 py-1.5 text-xs font-bold border rounded-lg transition-colors",
+                          aiNotesPreviewActiveTab === idx 
+                            ? "bg-primary/10 text-primary border-primary/20" 
+                            : "bg-muted/20 border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                        )}
+                      >
+                        {sec.title}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Preview Tab Content */}
+                  <div className="flex-1 overflow-y-auto border border-border/80 bg-muted/10 rounded-xl p-4">
+                    <div 
+                      className="prose prose-sm dark:prose-invert max-w-none text-xs leading-relaxed space-y-4"
+                      dangerouslySetInnerHTML={{ __html: aiNotesPreviewSections[aiNotesPreviewActiveTab]?.content || '' }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-border/40 shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAiNotesOpen(false);
+                  setAiNotesPreviewSections(null);
+                  setAiNotesRawText('');
+                }}
+                disabled={isGeneratingAiNotes}
+                className="rounded-xl h-10 px-5 text-sm"
+              >
+                ยกเลิก
+              </Button>
+              
+              {!aiNotesPreviewSections ? (
+                <Button
+                  onClick={handleGenerateAiNotes}
+                  disabled={!aiNotesRawText.trim() || isGeneratingAiNotes}
+                  className="rounded-xl h-10 px-6 text-sm font-semibold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white gap-2"
+                >
+                  {isGeneratingAiNotes ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      กำลังเรียบเรียงข้อมูล...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-white" />
+                      วิเคราะห์และสร้างแท็บ
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSaveAiNotes(false)}
+                    className="rounded-xl h-10 px-5 text-sm text-foreground gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    บันทึกต่อท้าย (Append)
+                  </Button>
+                  <Button
+                    onClick={() => handleSaveAiNotes(true)}
+                    className="rounded-xl h-10 px-5 text-sm bg-primary text-primary-foreground font-semibold gap-1.5"
+                  >
+                    <Check className="w-4 h-4" />
+                    บันทึกทับทั้งหมด (Overwrite)
+                  </Button>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
