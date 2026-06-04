@@ -11,7 +11,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Trash2, FolderOpen, Archive, User, Settings2, Filter, ArrowUpDown, Download, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Trash2, FolderOpen, Archive, User, Settings2, Filter, ArrowUpDown, Download, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Table, LayoutGrid } from 'lucide-react';
+
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ProjectCreateDialog } from './project-create-dialog';
