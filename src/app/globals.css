@@ -147,4 +147,49 @@
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
+
+  /* react-day-picker v9 dropdown styles */
+  .rdp-dropdowns {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+    background-color: transparent !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .rdp-dropdown_root .rdp-caption_label {
+    display: none !important;
+  }
+
+  .rdp-dropdown {
+    background-color: transparent !important;
+    border: none !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: hsl(var(--foreground)) !important;
+    cursor: pointer !important;
+    outline: none !important;
+    padding: 4px 8px !important;
+    border-radius: 6px !important;
+    transition: background-color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 20px !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+    background-position: right 4px center !important;
+    background-repeat: no-repeat !important;
+    background-size: 12px 12px !important;
+  }
+
+  .rdp-dropdown:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .rdp-dropdown option {
+    background-color: hsl(var(--card)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
 }
+

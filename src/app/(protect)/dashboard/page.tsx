@@ -564,7 +564,7 @@ export default function DashboardPage() {
       )}
 
       {/* SECTION 1: CALENDAR (Top) */}
-      <DashboardCalendar tasks={tasks} />
+      <DashboardCalendar projects={projects} />
 
       {/* SECTION 2: 3-COLUMN BAR CHARTS GRID (Middle) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

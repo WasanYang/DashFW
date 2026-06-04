@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
 
 import { cn } from '@/lib/utils';
@@ -13,49 +13,63 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  captionLayout = 'dropdown',
   ...props
 }: CalendarProps) {
+  const currentYear = new Date().getFullYear();
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      captionLayout={captionLayout}
+      startMonth={props.startMonth || new Date(currentYear - 10, 0)}
+      endMonth={props.endMonth || new Date(currentYear + 10, 11)}
       className={cn('p-3', className)}
       classNames={{
         months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
         month: 'space-y-4',
-        caption: 'flex justify-center pt-1 relative items-center',
-        caption_label: 'text-sm font-medium',
-        nav: 'space-x-1 flex items-center',
-        nav_button: cn(
-          buttonVariants({ variant: 'outline' }),
-          'h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100',
-        ),
-        nav_button_previous: 'absolute left-1',
-        nav_button_next: 'absolute right-1',
-        table: 'w-full border-collapse space-y-1',
-        head_row: 'flex',
-        head_cell:
-          'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
-        row: 'flex w-full mt-2',
-        cell: 'h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
-        day: cn(
+        month_caption: 'flex justify-start items-center h-9 relative pl-1',
+        caption_label: 'text-sm font-bold text-foreground',
+        nav: 'flex items-center gap-1 absolute right-1 top-1 h-9',
+        button_previous: cn(
           buttonVariants({ variant: 'ghost' }),
-          'h-9 w-9 p-0 font-normal aria-selected:opacity-100',
+          'h-7 w-7 p-0 opacity-50 hover:opacity-100',
         ),
-        day_range_end: 'day-range-end',
-        day_selected:
-          'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
-        day_today: 'bg-accent text-accent-foreground',
-        day_outside:
+        button_next: cn(
+          buttonVariants({ variant: 'ghost' }),
+          'h-7 w-7 p-0 opacity-50 hover:opacity-100',
+        ),
+        month_grid: 'w-full border-collapse space-y-1',
+        weekdays: 'flex',
+        weekday:
+          'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem] text-center',
+        week: 'flex w-full mt-2',
+        day: 'h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20',
+        day_button: cn(
+          buttonVariants({ variant: 'ghost' }),
+          'h-9 w-9 p-0 font-normal rounded-full aria-selected:opacity-100 aria-selected:bg-primary aria-selected:text-primary-foreground aria-selected:hover:bg-primary aria-selected:hover:text-primary-foreground aria-selected:focus:bg-primary aria-selected:focus:text-primary-foreground',
+        ),
+        selected: 'bg-transparent',
+        today: 'bg-accent text-accent-foreground rounded-full',
+        outside:
           'day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground',
-        day_disabled: 'text-muted-foreground opacity-50',
-        day_range_middle:
+        disabled: 'text-muted-foreground opacity-50',
+        range_middle:
           'aria-selected:bg-accent aria-selected:text-accent-foreground',
-        day_hidden: 'invisible',
+        hidden: 'invisible',
+        dropdowns: 'flex items-center gap-1.5',
+        dropdown_root: 'relative inline-flex items-center [&_span]:hidden',
+        dropdown: 'rdp-dropdown h-8 bg-transparent px-2 text-sm font-semibold focus-visible:outline-none cursor-pointer hover:bg-muted/80 rounded-lg transition-colors border-0',
+        dropdown_month: 'rdp-dropdown_month',
+        dropdown_year: 'rdp-dropdown_year',
         ...classNames,
       }}
       components={{
         Chevron: ({ orientation, className, ...props }: any) => {
-          const Component = orientation === 'left' ? ChevronLeft : ChevronRight;
+          let Component = ChevronRight;
+          if (orientation === 'left') Component = ChevronLeft;
+          if (orientation === 'right') Component = ChevronRight;
+          if (orientation === 'down') Component = ChevronDown;
+          if (orientation === 'up') Component = ChevronUp;
           return <Component className={cn('h-4 w-4', className)} {...props} />;
         },
       }}

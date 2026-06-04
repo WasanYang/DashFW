@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
-import { Task } from '@/lib/types';
+import { Project } from '@/lib/types';
 import {
   format,
   startOfWeek,
@@ -22,10 +22,10 @@ import {
 } from 'date-fns';
 
 interface DashboardCalendarProps {
-  tasks: Task[];
+  projects: Project[];
 }
 
-export function DashboardCalendar({ tasks }: DashboardCalendarProps) {
+export function DashboardCalendar({ projects }: DashboardCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
 
@@ -170,8 +170,8 @@ export function DashboardCalendar({ tasks }: DashboardCalendarProps) {
             <div className="grid grid-cols-7 divide-x divide-y divide-border/50 text-sm">
               {monthDays.map((day) => {
                 const dayKey = format(day, 'yyyy-MM-dd');
-                const dayTasks = tasks.filter(
-                  (t) => t.deadline && isSameDay(new Date(t.deadline), day)
+                const dayProjects = projects.filter(
+                  (p) => p.deadline && isSameDay(new Date(p.deadline), day)
                 );
                 const isCurrentMonth = day.getMonth() === currentDate.getMonth();
                 const isToday = isSameDay(day, new Date());
@@ -194,31 +194,36 @@ export function DashboardCalendar({ tasks }: DashboardCalendarProps) {
                       >
                         {format(day, 'd')}
                       </span>
-                      {dayTasks.length > 0 && (
+                      {dayProjects.length > 0 && (
                         <span className="text-[9px] font-bold text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded-full border border-primary/10">
-                          {dayTasks.length} task{dayTasks.length === 1 ? '' : 's'}
+                          {dayProjects.length} project{dayProjects.length === 1 ? '' : 's'}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex-1 flex flex-col gap-1 overflow-y-auto max-h-[85px] pr-0.5">
-                      {dayTasks.map((t) => (
+                    <div className="flex-1 flex flex-col gap-1 overflow-y-auto max-h-[85px] pr-0.5 animate-fade-in">
+                      {dayProjects.map((p) => (
                         <Link
-                          key={t.id}
-                          href={t.projectId ? `/board/${t.projectId}` : `/board`}
+                          key={p.id}
+                          href={`/board/${p.id}`}
                           className={cn(
                             "block text-[10px] px-2 py-1.5 rounded-lg font-semibold truncate border leading-tight transition-all duration-150 hover:scale-[1.01] hover:shadow-xs cursor-pointer",
-                            t.status === 'Completed' || t.status === 'Paid'
+                            p.status === 'Completed' || p.status === 'Paid'
                               ? 'bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/15'
-                              : t.status === 'Review'
-                              ? 'bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/15'
-                              : t.status === 'In Progress'
-                              ? 'bg-primary/10 text-primary border-primary/25 hover:bg-primary/15'
+                              : p.status === 'Delayed'
+                              ? 'bg-rose-500/10 text-rose-700 border-rose-500/20 hover:bg-rose-500/15'
+                              : p.status === 'In progress'
+                              ? 'bg-blue-500/10 text-blue-700 border-blue-500/25 hover:bg-blue-500/15'
                               : 'bg-muted text-muted-foreground border-muted-foreground/10 hover:bg-muted/90'
                           )}
-                          title={`${t.title} (${t.status})`}
+                          style={p.color ? {
+                            backgroundColor: `${p.color}15`,
+                            color: p.color,
+                            borderColor: `${p.color}30`
+                          } : undefined}
+                          title={`${p.title} (${p.status || 'New'})`}
                         >
-                          {t.title}
+                          {p.title}
                         </Link>
                       ))}
                     </div>
@@ -231,8 +236,8 @@ export function DashboardCalendar({ tasks }: DashboardCalendarProps) {
           <div className="min-w-[800px] grid grid-cols-7 divide-x divide-border/50 text-sm">
             {weekDays.map((day) => {
               const dayKey = format(day, 'yyyy-MM-dd');
-              const dayTasks = tasks.filter(
-                (t) => t.deadline && isSameDay(new Date(t.deadline), day)
+              const dayProjects = projects.filter(
+                (p) => p.deadline && isSameDay(new Date(p.deadline), day)
               );
               const isToday = isSameDay(day, new Date());
 
@@ -261,43 +266,48 @@ export function DashboardCalendar({ tasks }: DashboardCalendarProps) {
                     </span>
                   </div>
 
-                  {/* Task Deadlines list */}
-                  <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[190px] pr-0.5">
-                    {dayTasks.length === 0 ? (
+                  {/* Project Deadlines list */}
+                  <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[190px] pr-0.5 animate-fade-in">
+                    {dayProjects.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-muted-foreground/15 rounded-xl p-3 bg-muted/5 min-h-[70px]">
                         <span className="text-[10px] text-muted-foreground/50 font-medium">
                           No deadlines
                         </span>
                       </div>
                     ) : (
-                      dayTasks.map((t) => (
+                      dayProjects.map((p) => (
                         <Link
-                          key={t.id}
-                          href={t.projectId ? `/board/${t.projectId}` : `/board`}
+                          key={p.id}
+                          href={`/board/${p.id}`}
                           className={cn(
                             "block text-[11px] p-2.5 rounded-xl font-semibold border leading-tight transition-all duration-200 hover:scale-[1.02] hover:shadow-xs cursor-pointer",
-                            t.status === 'Completed' || t.status === 'Paid'
+                            p.status === 'Completed' || p.status === 'Paid'
                               ? 'bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/15'
-                              : t.status === 'Review'
-                              ? 'bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/15'
-                              : t.status === 'In Progress'
-                              ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
+                              : p.status === 'Delayed'
+                              ? 'bg-rose-500/10 text-rose-700 border-rose-500/20 hover:bg-rose-500/15'
+                              : p.status === 'In progress'
+                              ? 'bg-blue-500/10 text-blue-700 border-blue-500/20 hover:bg-blue-500/15'
                               : 'bg-muted text-muted-foreground border-muted-foreground/10 hover:bg-muted/90'
                           )}
-                          title={`${t.title} (${t.status})`}
+                          style={p.color ? {
+                            backgroundColor: `${p.color}15`,
+                            color: p.color,
+                            borderColor: `${p.color}30`
+                          } : undefined}
+                          title={`${p.title} (${p.status || 'New'})`}
                         >
                           <div className="font-bold text-foreground/90 mb-1.5 truncate">
-                            {t.title}
+                            {p.title}
                           </div>
                           <div className="flex justify-between items-center text-[9px] opacity-80 font-normal">
                             <span className="px-1.5 py-0.5 rounded-full bg-background/50 border text-[8px] font-bold uppercase tracking-wider">
-                              {t.status}
+                              {p.status || 'New'}
                             </span>
-                            {t.gross_price > 0 && (
+                            {p.gross_price && p.gross_price > 0 ? (
                               <span className="font-bold text-foreground/80">
-                                ฿{t.gross_price.toLocaleString()}
+                                ฿{p.gross_price.toLocaleString()}
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         </Link>
                       ))
