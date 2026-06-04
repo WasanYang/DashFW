@@ -35,6 +35,9 @@ import {
   FolderOpen,
   ChevronDown,
   AlignJustify,
+  BookOpen,
+  ExternalLink,
+  Copy,
 } from 'lucide-react';
 import { RepeatsPopover, formatRepeatSummary } from '@/components/board/repeats-popover';
 import {
@@ -72,6 +75,8 @@ import {
   useAddTaskMutation,
   useUpdateTaskMutation,
 } from '@/services/taskApi';
+import { useGetArticlesQuery } from '@/services/knowledgeBaseApiSlice';
+import { useToast } from '@/hooks/use-toast';
 import { EditableNovelField } from '../ui/editable-novel-field';
 import { formatNumber } from '@/lib/number-format';
 import { fetchJobTypes } from '@/services/jobTypeClient';
@@ -279,6 +284,13 @@ export function KanbanBoard({
 
   const [addTaskMutation] = useAddTaskMutation();
   const [updateTaskMutation] = useUpdateTaskMutation();
+  const { data: articles = [] } = useGetArticlesQuery();
+  const { toast } = useToast();
+
+  const activeArticle = useMemo(() => {
+    if (!modalContent || typeof modalContent !== 'object' || !modalContent.jobTypeId) return null;
+    return articles.find((art) => art.jobTypeId === modalContent.jobTypeId);
+  }, [modalContent, articles]);
 
   const filteredProjects = useMemo(() => {
     let list = projects;
@@ -1358,6 +1370,77 @@ export function KanbanBoard({
 
                 <ScrollArea className='flex-grow pr-6 -mr-6'>
                   <div className='space-y-6 pb-6'>
+                    {activeArticle && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
+                            <BookOpen className="h-4.5 w-4.5" />
+                            คู่มือและข้อกำหนด: {activeArticle.title}
+                          </h4>
+                          <Link
+                            href="/knowledge-base"
+                            className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold"
+                          >
+                            เปิดคลังความรู้แบบเต็ม
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </div>
+
+                        {activeArticle.quickCredentials && activeArticle.quickCredentials.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                            {activeArticle.quickCredentials.map((cred) => (
+                              <div
+                                key={cred.id}
+                                className="flex justify-between items-center p-2.5 bg-white rounded-lg border border-border/50 text-xs shadow-3xs"
+                              >
+                                <div className="min-w-0 pr-1">
+                                  <span className="block text-[9px] uppercase font-bold text-muted-foreground">
+                                    {cred.label}
+                                  </span>
+                                  <span className="block text-[11px] text-foreground font-medium truncate">
+                                    {cred.value || '(ยังไม่มีข้อมูล)'}
+                                  </span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-primary shrink-0"
+                                  onClick={() => {
+                                    if (cred.value) {
+                                      navigator.clipboard.writeText(cred.value);
+                                      toast({
+                                        title: "คัดลอกสำเร็จ",
+                                        description: `คัดลอก ${cred.label} เรียบร้อยแล้ว`,
+                                      });
+                                    } else {
+                                      toast({
+                                        title: "ไม่มีข้อความ",
+                                        description: "ไม่มีข้อมูลให้คัดลอก",
+                                        variant: "destructive"
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <Accordion type="single" collapsible className="bg-white rounded-lg border border-border/50 px-3 py-1">
+                          <AccordionItem value="guide-content" className="border-b-0">
+                            <AccordionTrigger className="py-2 text-xs font-semibold text-foreground/80 hover:no-underline">
+                              ดูคู่มือและหัวข้อทั้งหมดสิ่งที่ต้องขอจากลูกค้า
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2 text-xs text-muted-foreground prose max-w-none prose-sm leading-relaxed">
+                              <div dangerouslySetInnerHTML={{ __html: activeArticle.content }} />
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      </div>
+                    )}
+
                     <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                       <div className='flex items-center gap-3 p-4 rounded-lg bg-card border border-border/60 shadow-xs'>
                         {/* <DollarSign className='h-6 w-6 text-muted-foreground' /> */}

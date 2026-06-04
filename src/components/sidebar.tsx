@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   Settings,
   Lock,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -84,6 +85,7 @@ const navGroups = [
       { href: '/snippets', label: 'AI Snippets', icon: BotMessageSquare },
       { href: '/templates', label: 'Templates', icon: Settings2 },
       { href: '/job-types', label: 'Job Types', icon: ListChecks },
+      { href: '/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
     ]
   }
 ];
@@ -136,6 +138,7 @@ export function AppSidebar() {
     if (pathname === '/invoices') return label === 'Proposals';
     if (pathname === '/clients') return label === 'Contacts';
     if (pathname === '/financials') return label === 'Financials';
+    if (pathname === '/knowledge-base') return label === 'Knowledge Base';
     return pathname === href;
   };
 

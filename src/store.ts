@@ -9,6 +9,7 @@ import { timeLogApi } from './services/timeLogApi';
 import { invoiceApi } from './services/invoiceApi';
 import { proposalApi } from './services/proposalApi';
 import { companyApi } from './services/companyApi';
+import { knowledgeBaseApi } from './services/knowledgeBaseApiSlice';
 
 export const store = configureStore({
   reducer: {
@@ -22,6 +23,7 @@ export const store = configureStore({
     [invoiceApi.reducerPath]: invoiceApi.reducer,
     [proposalApi.reducerPath]: proposalApi.reducer,
     [companyApi.reducerPath]: companyApi.reducer,
+    [knowledgeBaseApi.reducerPath]: knowledgeBaseApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -35,6 +37,7 @@ export const store = configureStore({
       invoiceApi.middleware,
       proposalApi.middleware,
       companyApi.middleware,
+      knowledgeBaseApi.middleware,
     ),
 });
 

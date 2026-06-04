@@ -155,6 +155,23 @@ export type Snippet = {
   tags: string[];
 };
 
+export type QuickCredentialField = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+export type KnowledgeBaseArticle = {
+  id?: string;
+  _id?: string;
+  title: string;
+  content: string;
+  jobTypeId?: string;
+  tags: string[];
+  quickCredentials: QuickCredentialField[];
+  updatedAt?: string | Date;
+};
+
 export type Checklist = {
   id: string;
   title: string;
