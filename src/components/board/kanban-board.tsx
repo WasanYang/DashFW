@@ -919,7 +919,7 @@ export function KanbanBoard({
             </div>
 
             {/* View switcher */}
-            <div className="flex bg-muted/30 p-1 rounded-xl text-xs shrink-0">
+            <div className="flex bg-card p-1 rounded-xl border border-border/60 shadow-2xs text-xs shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-2 bg-background shadow-xs font-medium border-border/60 hover:bg-muted/50 rounded-lg">
@@ -975,7 +975,7 @@ export function KanbanBoard({
             </Button>
 
             {/* Static decoration buttons to match Plutio style header */}
-            <div className="hidden lg:flex items-center gap-1 bg-muted p-1 rounded-xl border border-border/40 shrink-0 shadow-2xs">
+            <div className="hidden lg:flex items-center gap-1 bg-card p-1 rounded-xl border border-border/60 shrink-0 shadow-2xs">
               <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Edit view</Button>
               <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Filter</Button>
               <Button variant="ghost" className="h-8 text-xs text-muted-foreground font-semibold px-2.5">Group</Button>
@@ -1359,7 +1359,7 @@ export function KanbanBoard({
                 <ScrollArea className='flex-grow pr-6 -mr-6'>
                   <div className='space-y-6 pb-6'>
                     <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                      <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
+                      <div className='flex items-center gap-3 p-4 rounded-lg bg-card border border-border/60 shadow-xs'>
                         {/* <DollarSign className='h-6 w-6 text-muted-foreground' /> */}
                         <div className='flex-grow'>
                           <p className='text-sm text-muted-foreground'>Price</p>
@@ -1408,7 +1408,7 @@ export function KanbanBoard({
                           </Button>
                         )}
                       </div>
-                      <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
+                      <div className='flex items-center gap-3 p-4 rounded-lg bg-card border border-border/60 shadow-xs'>
                         <MessageSquare className='h-6 w-6 text-muted-foreground' />
                         <div className='flex-grow'>
                           <p className='text-sm text-muted-foreground'>
@@ -1459,7 +1459,7 @@ export function KanbanBoard({
                           </Button>
                         )}
                       </div>
-                      <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
+                      <div className='flex items-center gap-3 p-4 rounded-lg bg-card border border-border/60 shadow-xs'>
                         <Clock className='h-6 w-6 text-muted-foreground' />
                         <div className='flex-grow'>
                           <p className='text-sm text-muted-foreground'>
@@ -1542,7 +1542,7 @@ export function KanbanBoard({
                     {/* Planning & Billing Grid */}
                     <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-4'>
                       {/* Start Date */}
-                      <div className='flex items-center gap-3 p-4 rounded-lg bg-muted'>
+                      <div className='flex items-center gap-3 p-4 rounded-lg bg-card border border-border/60 shadow-xs'>
                         <CalendarIcon className='h-6 w-6 text-muted-foreground' />
                         <div className='flex-grow'>
                           <p className='text-sm text-muted-foreground'>
@@ -1626,7 +1626,7 @@ export function KanbanBoard({
                       </div>
 
                       {/* Billing Settings */}
-                      <div className='flex flex-col gap-2 p-4 rounded-lg bg-muted justify-center'>
+                      <div className='flex flex-col gap-2 p-4 rounded-lg bg-card border border-border/60 shadow-xs justify-center'>
                         <div className='flex items-center justify-between w-full'>
                           <span className='text-sm font-medium text-muted-foreground'>Billable</span>
                           <input
@@ -1716,7 +1716,7 @@ export function KanbanBoard({
                       </div>
 
                       {/* Project Tag Color */}
-                      <div className='flex flex-col gap-2 p-4 rounded-lg bg-muted justify-center md:col-span-1'>
+                      <div className='flex flex-col gap-2 p-4 rounded-lg bg-card border border-border/60 shadow-xs justify-center md:col-span-1'>
                         <p className='text-sm text-muted-foreground font-medium'>
                           Project Tag Color
                         </p>
@@ -1871,7 +1871,7 @@ export function KanbanBoard({
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm border-collapse">
                       <thead>
-                        <tr className="border-b border-border/30 bg-muted/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80 text-left">
+                        <tr className="border-b border-border/30 bg-transparent text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80 text-left">
                           <th className="py-2.5 px-4 w-10 text-center"></th>
                           <th className="py-2.5 px-2 w-8 text-center"></th>
                           <th className="py-2.5 px-4">Task</th>
@@ -2011,7 +2011,7 @@ export function KanbanBoard({
                         })}
 
                         {/* Footer row: Create task */}
-                        <tr className="bg-muted/5 hover:bg-muted/10 transition-colors">
+                        <tr className="bg-transparent hover:bg-muted/10 transition-colors">
                           <td colSpan={8} className="p-0 border-t border-border/20">
                             <div
                               onClick={() => setModalContent("create")}

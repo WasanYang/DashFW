@@ -44,7 +44,7 @@ export const SubtaskItem: React.FC<SubtaskItemProps> = ({
     <>
       <AccordionItem
         value={subtask.id}
-        className='border rounded-md px-4 bg-muted/50'
+        className='border rounded-md px-4 bg-card shadow-2xs'
       >
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-3 flex-grow'>

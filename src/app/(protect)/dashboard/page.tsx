@@ -399,7 +399,7 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Dashboard</h1>
       {/* TIME TRACKER WIDGET */}
       {showTimeTracker && (
-        <Card className="border border-border/80 shadow-sm overflow-hidden bg-gradient-to-r from-card to-primary/5">
+        <Card className="border border-border/80 shadow-sm overflow-hidden bg-card">
           <CardContent className="p-4 sm:p-5">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto flex-1">
@@ -811,7 +811,7 @@ export default function DashboardPage() {
             <CardDescription>Quick summary of invoices & proposals</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3.5 bg-green-500/5 border border-green-500/10 rounded-2xl">
+            <div className="flex items-center justify-between p-3.5 bg-card border border-border/60 rounded-2xl shadow-xs">
               <div>
                 <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">PAID INVOICES</p>
                 <p className="text-xl font-bold text-green-700 mt-0.5">
@@ -821,7 +821,7 @@ export default function DashboardPage() {
               <FileText className="w-8 h-8 text-green-600 opacity-60" />
             </div>
             
-            <div className="flex items-center justify-between p-3.5 bg-primary/5 border border-primary/10 rounded-2xl">
+            <div className="flex items-center justify-between p-3.5 bg-card border border-border/60 rounded-2xl shadow-xs">
               <div>
                 <p className="text-[10px] text-primary font-bold uppercase tracking-wider">SENT PROPOSALS</p>
                 <p className="text-xl font-bold text-primary mt-0.5">

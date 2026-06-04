@@ -104,7 +104,7 @@ export function TemplateList() {
           <RefreshCw className="h-4 w-4 animate-spin" /> กำลังโหลดเทมเพลต...
         </div>
       ) : templates.length === 0 ? (
-        <Card className="border-dashed border-border/80 bg-transparent flex flex-col items-center justify-center p-16 text-center">
+        <Card className="border-dashed border-border/80 bg-card flex flex-col items-center justify-center p-16 text-center shadow-xs">
           <FolderOpen className="w-12 h-12 text-muted-foreground/30 mb-3" />
           <h2 className="text-base font-bold text-muted-foreground mb-1">ยังไม่มีเทมเพลตงานในระบบ</h2>
           <p className="text-xs text-muted-foreground/60 mb-6">สร้างเทมเพลตแรกของคุณด้วยตนเอง หรือสั่งการให้ AI ร่างแม่แบบให้ทันที</p>
@@ -138,7 +138,7 @@ export function TemplateList() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 border-t border-border/40 bg-muted/5 p-4 flex items-center justify-between">
+              <CardContent className="pt-0 border-t border-border/40 bg-card p-4 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">
                   {tpl.type === 'project' && `${tpl.data?.groups?.length || 0} Groups`}
                   {tpl.type === 'group' && `${tpl.data?.groups?.[0]?.tasks?.length || 0} Tasks`}

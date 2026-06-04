@@ -224,17 +224,26 @@ export default function ProjectDetailsPage() {
       if (template.type === 'project') {
         const groups = template.data.groups || [];
         for (const group of groups) {
-          const formattedSubTasks = (group.tasks || []).map((task: any, taskIdx: number) => ({
-            id: `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`,
-            text: task.title,
-            description: task.details || '',
-            completed: false,
-            children: (task.subTasks || []).map((sub: any, subIdx: number) => ({
-              id: `imported-sub-${Date.now()}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
-              text: sub.text,
+          const formattedSubTasks: SubTask[] = [];
+          (group.tasks || []).forEach((task: any, taskIdx: number) => {
+            // Add the main task from template
+            const parentSubTaskId = `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`;
+            formattedSubTasks.push({
+              id: parentSubTaskId,
+              text: task.title,
+              description: task.details || '',
               completed: false
-            }))
-          }));
+            });
+
+            // Flatten subtasks by adding them with two-space indentation
+            (task.subTasks || []).forEach((sub: any, subIdx: number) => {
+              formattedSubTasks.push({
+                id: `imported-sub-${Date.now()}-${taskIdx}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
+                text: `  ${sub.text}`,
+                completed: false
+              });
+            });
+          });
 
           await addTask({
             title: group.title,
@@ -251,17 +260,24 @@ export default function ProjectDetailsPage() {
       } else if (template.type === 'group') {
         const group = template.data.groups?.[0];
         if (group) {
-          const formattedSubTasks = (group.tasks || []).map((task: any, taskIdx: number) => ({
-            id: `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`,
-            text: task.title,
-            description: task.details || '',
-            completed: false,
-            children: (task.subTasks || []).map((sub: any, subIdx: number) => ({
-              id: `imported-sub-${Date.now()}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
-              text: sub.text,
+          const formattedSubTasks: SubTask[] = [];
+          (group.tasks || []).forEach((task: any, taskIdx: number) => {
+            const parentSubTaskId = `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`;
+            formattedSubTasks.push({
+              id: parentSubTaskId,
+              text: task.title,
+              description: task.details || '',
               completed: false
-            }))
-          }));
+            });
+
+            (task.subTasks || []).forEach((sub: any, subIdx: number) => {
+              formattedSubTasks.push({
+                id: `imported-sub-${Date.now()}-${taskIdx}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
+                text: `  ${sub.text}`,
+                completed: false
+              });
+            });
+          });
 
           await addTask({
             title: group.title,
@@ -399,11 +415,12 @@ export default function ProjectDetailsPage() {
     distinctViews.unshift('Main View');
   }
 
+  // Filter tasks in active view
+  const filteredTasksByView = projectTasks.filter(t => (t.boardView || 'Main View') === activeBoardView);
+
   // Map tasks to taskGroups format for UI checklist
   const taskGroups = (() => {
-    const filteredByView = projectTasks.filter(t => (t.boardView || 'Main View') === activeBoardView);
-    
-    let rawGroups = filteredByView.map((t) => ({
+    let rawGroups = filteredTasksByView.map((t) => ({
       id: t.id,
       text: t.title,
       completed: t.status === 'Completed' || t.status === 'Paid',
@@ -423,9 +440,9 @@ export default function ProjectDetailsPage() {
     })).filter(g => g.children.length > 0 || g.text.toLowerCase().includes(query));
   })();
 
-  // Calculate project statistics
-  const totalTasksCount = projectTasks.reduce((sum, t) => sum + (t.subTasks?.length || 0) + 1, 0);
-  const completedTasksCount = projectTasks.reduce((sum, t) => {
+  // Calculate statistics based on current active view
+  const totalTasksCount = filteredTasksByView.reduce((sum, t) => sum + (t.subTasks?.length || 0) + 1, 0);
+  const completedTasksCount = filteredTasksByView.reduce((sum, t) => {
     const completedSubs = (t.subTasks || []).filter(st => st.completed).length;
     const taskCompleted = (t.status === 'Completed' || t.status === 'Paid') ? 1 : 0;
     return sum + completedSubs + taskCompleted;
@@ -668,7 +685,48 @@ export default function ProjectDetailsPage() {
       return st;
     });
 
-    await updateTask({ id: parentTaskId, data: { subTasks: updatedSubTasks } }).unwrap();
+    // Check if all subtasks are completed
+    const allCompleted = updatedSubTasks.length > 0 && updatedSubTasks.every(st => st.completed);
+    
+    // Determine new status for parent task
+    let newStatus = targetTask.status;
+    if (allCompleted) {
+      newStatus = 'Completed';
+    } else if (!checked && targetTask.status === 'Completed') {
+      newStatus = 'In Progress';
+    }
+
+    await updateTask({ 
+      id: parentTaskId, 
+      data: { 
+        subTasks: updatedSubTasks,
+        status: newStatus
+      } 
+    }).unwrap();
+  };
+
+  // Toggle parent task (group) status directly
+  const handleToggleGroupStatus = async (groupId: string, checked: boolean) => {
+    const targetTask = projectTasks.find(t => t.id === groupId);
+    if (!targetTask) return;
+
+    const newStatus = checked ? 'Completed' : 'In Progress';
+    
+    // Also toggle all subtasks to match group checked state
+    const updatedSubTasks = (targetTask.subTasks || []).map(st => ({
+      ...st,
+      completed: checked
+    }));
+
+    await updateTask({ 
+      id: groupId, 
+      data: { 
+        status: newStatus,
+        subTasks: updatedSubTasks
+      } 
+    }).unwrap();
+
+    toast({ title: checked ? 'ทำเครื่องหมายเสร็จสิ้นกลุ่มงานแล้ว' : 'เปลี่ยนสถานะกลุ่มงานเป็นกำลังดำเนินการ' });
   };
 
   // Delete Task card or subtask
@@ -876,7 +934,7 @@ export default function ProjectDetailsPage() {
       </div>
 
       {/* 2. SUB-NAVIGATION TABS (Lavender horizontal tab row) */}
-      <div className="flex bg-primary/5 p-1.5 rounded-2xl border border-primary/10 overflow-x-auto print:hidden shrink-0">
+      <div className="flex bg-card p-1.5 rounded-2xl border border-border/60 shadow-xs overflow-x-auto print:hidden shrink-0">
         {((['Tasks', 'Notes', 'Calendar', 'Timesheet', 'Invoices', 'Edit'] as const).filter(t => showTimeTracker || t !== 'Timesheet')).map((tab) => {
           const isAct = activeTab === tab;
           return (
@@ -904,90 +962,70 @@ export default function ProjectDetailsPage() {
           <div className="flex items-start gap-4">
             <div className="flex-1 space-y-6 min-w-0 pb-12">
             
-            {/* Horizontal Board Views - Browser Tab Style */}
-            <div className="flex items-end gap-1 overflow-x-auto border-b border-border/70 mb-6 pl-1 pt-2">
-              {distinctViews.map(view => (
-                editingViewName === view ? (
+            {/* Horizontal Board Views - Browser Tab Style (matching Notes tab style) */}
+            <div className="flex items-end gap-1 border-b border-border/80 px-1 mb-6 overflow-x-auto scrollbar-none">
+              {distinctViews.map(view => {
+                const isActive = activeBoardView === view;
+                return editingViewName === view ? (
                   <Input
                     key={`edit-${view}`}
+                    autoFocus
                     value={editedViewNameValue}
                     onChange={(e) => setEditedViewNameValue(e.target.value)}
-                    className="h-9 w-32 text-xs rounded-t-lg rounded-b-none border-border bg-background translate-y-[1px] focus-visible:ring-0 focus-visible:ring-offset-0 relative z-10"
-                    autoFocus
                     onBlur={() => handleRenameView(view, editedViewNameValue)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleRenameView(view, editedViewNameValue);
                       else if (e.key === 'Escape') setEditingViewName(null);
                     }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-6 py-0.5 px-2 text-xs w-28 border border-primary/50 focus-visible:ring-1 focus-visible:ring-primary rounded-md bg-background mb-1"
                   />
                 ) : (
-                  <div key={view} className="relative group flex items-center">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setActiveBoardView(view)}
-                      className={cn(
-                        "rounded-t-lg rounded-b-none h-9 px-4 text-[13px] font-medium transition-all shrink-0 pr-8 border",
-                        activeBoardView === view 
-                          ? "bg-background text-primary font-bold border-t-2 border-t-primary border-x-border/70 border-b-transparent shadow-[0_-2px_10px_rgba(0,0,0,0.02)] translate-y-[1px] relative z-10" 
-                          : "text-muted-foreground border-transparent hover:bg-muted/50 hover:border-border/30 hover:text-foreground"
-                      )}
+                  <div
+                    key={view}
+                    onClick={() => setActiveBoardView(view)}
+                    className={`
+                      flex items-center gap-1.5 px-4 py-2 border rounded-t-xl select-none cursor-pointer transition-all duration-150 shrink-0
+                      ${isActive 
+                        ? 'bg-card border-border border-b-transparent text-primary font-bold shadow-[0_-3px_8px_-3px_rgba(0,0,0,0.08)] translate-y-[1px]' 
+                        : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                      }
+                    `}
+                  >
+                    <span 
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingViewName(view);
+                        setEditedViewNameValue(view);
+                      }}
+                      className="text-sm font-semibold select-none truncate max-w-[120px]"
+                      title="Double-click to rename"
                     >
                       {view}
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "absolute right-1 h-6 w-6 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-20",
-                            activeBoardView === view ? "text-foreground" : "text-muted-foreground"
-                          )}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-48 rounded-xl">
-                        <DropdownMenuItem 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingViewName(view);
-                            setEditedViewNameValue(view);
-                          }}
-                        >
-                          <Edit2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicateView(view); }}>
-                          <Copy className="h-4 w-4 mr-2 text-muted-foreground" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        {view !== 'Main View' && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                              onClick={(e) => { e.stopPropagation(); handleDeleteView(view); }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete View
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    </span>
+                    {view !== 'Main View' && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!window.confirm(`Are you sure you want to delete "${view}"?`)) return;
+                          handleDeleteView(view);
+                        }}
+                        className="p-0.5 rounded-full hover:bg-muted-foreground/15 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                )
-              ))}
+                );
+              })}
               
               {isAddViewOpen ? (
-                <div className="flex items-center gap-1 ml-1 shrink-0">
+                <div className="flex items-center gap-1 ml-2 shrink-0 mb-1.5">
                   <Input
                     value={newViewName}
                     onChange={(e) => setNewViewName(e.target.value)}
                     placeholder="New view name..."
-                    className="h-8 w-32 text-xs rounded-xl border-border/60 bg-background"
+                    className="h-6 text-xs w-28 border border-primary/50 focus-visible:ring-1 focus-visible:ring-primary rounded-md bg-background px-2 py-0.5"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && newViewName.trim()) {
@@ -998,28 +1036,28 @@ export default function ProjectDetailsPage() {
                       if (e.key === 'Escape') setIsAddViewOpen(false);
                     }}
                   />
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-lg" onClick={() => {
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600 rounded-md" onClick={() => {
                     if (newViewName.trim()) {
                       setActiveBoardView(newViewName.trim());
                       setNewViewName('');
                       setIsAddViewOpen(false);
                     }
                   }}>
-                    <Check className="w-4 h-4" />
+                    <Check className="w-3.5 h-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground rounded-lg" onClick={() => setIsAddViewOpen(false)}>
-                    <X className="w-4 h-4" />
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground rounded-md" onClick={() => setIsAddViewOpen(false)}>
+                    <X className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               ) : (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-xl h-8 w-8 text-muted-foreground ml-1 shrink-0 bg-transparent border border-dashed border-border/60"
+                  className="rounded-lg h-7 w-7 text-muted-foreground ml-2 shrink-0 bg-transparent hover:bg-muted/50 mb-1"
                   onClick={() => setIsAddViewOpen(true)}
                   title="Add new view"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                 </Button>
               )}
             </div>
@@ -1038,7 +1076,7 @@ export default function ProjectDetailsPage() {
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                   <Input
-                    placeholder="New task group..."
+                    placeholder="เพิ่มหัวข้องานหลัก..."
                     value={newGroupName}
                     onChange={(e) => setNewGroupName(e.target.value)}
                     className="h-9 w-full sm:w-48 rounded-xl text-xs border-border/60 bg-background"
@@ -1046,11 +1084,11 @@ export default function ProjectDetailsPage() {
                       if (e.key === 'Enter') handleAddTaskGroup();
                     }}
                   />
-                   <Button
+                  <Button
                     onClick={handleAddTaskGroup}
                     className="h-9 rounded-xl bg-primary text-primary-foreground font-semibold px-3 gap-1 text-xs shrink-0"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Group
+                    <Plus className="w-3.5 h-3.5" /> หัวข้องาน
                   </Button>
                   <Button
                     type="button"
@@ -1073,206 +1111,222 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            {/* List of Task Groups */}
-            <DragDropContext onDragEnd={onDragEnd}>
-              <div className="space-y-4">
-              {taskGroups.length === 0 ? (
-                <div className="py-12 text-center bg-card rounded-2xl border border-border/60 text-sm text-muted-foreground">
-                  No task groups found. Use the toolbar on the right to add a task group or search.
-                </div>
-              ) : (
-                taskGroups.map((group) => (
-                  <div key={group.id} className="bg-card border border-border/60 rounded-2xl p-4 space-y-3 shadow-sm">
-                    {/* Task Group Header */}
-                    <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-2">
-                      <div className="flex items-center gap-2 flex-grow">
-                        <ListTodo className="w-4 h-4 text-primary shrink-0" />
-                        {editingId === group.id ? (
-                          <div className="flex items-center gap-1.5 flex-grow">
-                            <Input
-                              value={editingText}
-                              onChange={(e) => setEditingText(e.target.value)}
-                              className="h-7 text-sm font-semibold max-w-xs border-primary"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRenameTaskOrGroup(group.id, editingText);
-                              }}
-                            />
-                            <Button size="icon" className="h-7 w-7 bg-green-600 hover:bg-green-700 text-white rounded" onClick={() => handleRenameTaskOrGroup(group.id, editingText)}>
-                              <Check className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded" onClick={() => setEditingId(null)}>
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <h3
-                            className="font-bold text-sm text-foreground hover:underline cursor-pointer flex items-center gap-2"
-                            onClick={() => {
-                              setEditingId(group.id);
-                              setEditingText(group.text);
-                            }}
-                          >
-                            {group.text}
-                            {group.completed && (
-                              <Badge variant="outline" className="text-[9px] text-green-600 bg-green-50">Done</Badge>
-                            )}
-                          </h3>
-                        )}
-                        <span className="text-[10px] font-bold bg-muted text-muted-foreground px-2 py-0.5 rounded-full shrink-0">
-                          {group.children?.length || 0}
-                        </span>
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
-                        onClick={() => handleDeleteTaskOrGroup(group.id)}
-                        title="Delete Group"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+            {/* List of Task Groups (Checklist Sheet) */}
+            <div className="bg-card border border-border/60 rounded-2xl shadow-xs overflow-hidden">
+              <DragDropContext onDragEnd={onDragEnd}>
+                <div className="divide-y divide-border/40">
+                  {taskGroups.length === 0 ? (
+                    <div className="py-16 text-center text-xs text-muted-foreground bg-card">
+                      <ListTodo className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                      No tasks found. Create a new main task or use AI to generate a checklist.
                     </div>
-
-                    {/* Task Group list items */}
-                    <Droppable droppableId={group.id} type="task">
-                      {(provided) => (
-                        <div
-                          {...provided.droppableProps}
-                          ref={provided.innerRef}
-                          className="space-y-2"
-                        >
-                          {(group.children || []).map((task, taskIdx) => (
-                            <Draggable key={task.id} draggableId={task.id} index={taskIdx}>
-                              {(provided, snapshot) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  className={cn(
-                                    "flex items-center justify-between p-3 rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 transition-all gap-4 group",
-                                    snapshot.isDragging && "shadow-lg bg-background border-primary/50 opacity-90 z-50"
-                                  )}
-                                >
-                                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div
-                                      {...provided.dragHandleProps}
-                                      className="cursor-grab hover:text-foreground text-muted-foreground/40 shrink-0"
-                                    >
-                                      <GripVertical className="h-4 w-4" />
-                                    </div>
-                                    <input
-                                      type="checkbox"
-                              checked={task.completed}
-                              onChange={(e) => handleToggleTask(task.id, e.target.checked, group.id)}
+                  ) : (
+                    taskGroups.map((group) => (
+                      <div key={group.id} className="p-5 space-y-3 transition-colors hover:bg-muted/5 group/section">
+                        {/* Group Header */}
+                        <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-2">
+                          <div className="flex items-center gap-2.5 flex-grow">
+                            <input
+                              type="checkbox"
+                              checked={group.completed}
+                              onChange={(e) => handleToggleGroupStatus(group.id, e.target.checked)}
                               className="h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
                             />
-                            {editingId === task.id ? (
+                            {editingId === group.id ? (
                               <div className="flex items-center gap-1.5 flex-grow">
                                 <Input
                                   value={editingText}
                                   onChange={(e) => setEditingText(e.target.value)}
-                                  className="h-8 text-xs max-w-lg border-primary"
+                                  className="h-7 text-xs font-semibold max-w-xs border-primary"
                                   autoFocus
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleRenameTaskOrGroup(task.id, editingText, group.id);
+                                    if (e.key === 'Enter') handleRenameTaskOrGroup(group.id, editingText);
                                   }}
                                 />
-                                <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700 text-white rounded" onClick={() => handleRenameTaskOrGroup(task.id, editingText, group.id)}>
-                                  <Check className="w-4 h-4" />
+                                <Button size="icon" className="h-7 w-7 bg-green-600 hover:bg-green-700 text-white rounded-lg" onClick={() => handleRenameTaskOrGroup(group.id, editingText)}>
+                                  <Check className="w-3.5 h-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded" onClick={() => setEditingId(null)}>
-                                  <X className="w-4 h-4" />
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setEditingId(null)}>
+                                  <X className="w-3.5 h-3.5" />
                                 </Button>
                               </div>
                             ) : (
-                              <span
+                              <h3
                                 className={cn(
-                                  "text-xs text-foreground cursor-pointer flex-1 truncate hover:underline",
-                                  task.completed && "line-through text-muted-foreground"
+                                  "font-bold text-sm cursor-pointer flex items-center gap-2 hover:text-primary transition-colors",
+                                  group.completed ? "line-through text-muted-foreground/60" : "text-foreground"
                                 )}
                                 onClick={() => {
-                                  setSelectedTaskDetail({ groupId: group.id, task: task as SubTask });
+                                  setEditingId(group.id);
+                                  setEditingText(group.text);
                                 }}
                               >
-                                {task.text}
-                              </span>
-                            )}
-
-                            {/* Badges and Columns */}
-                            <div className="flex items-center gap-3 shrink-0 ml-4 hidden sm:flex">
-                              <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-bold px-2 rounded-full cursor-pointer">
-                                {project.title}
-                              </Badge>
-                              <span className="text-[10px] bg-muted font-bold text-muted-foreground px-1.5 py-0.5 rounded w-10 text-center">
-                                #{String(taskIdx + 1).padStart(3, '0')}
-                              </span>
-                              
-                              <div className="flex items-center gap-2 border-l border-border/40 pl-3 ml-1">
-                                {task.assignee ? (
-                                  <Avatar className="h-6 w-6 border border-border/50">
-                                    <AvatarFallback className="text-[9px] bg-purple-100 text-purple-700">{task.assignee.charAt(0)}</AvatarFallback>
-                                  </Avatar>
-                                ) : (
-                                  <div className="h-6 w-6 rounded-full bg-muted border border-border/50 border-dashed flex items-center justify-center">
-                                    <UserCircle className="w-3 h-3 text-muted-foreground/50" />
-                                  </div>
+                                {group.text}
+                                {group.completed && (
+                                  <Badge variant="secondary" className="text-[9px] text-green-600 bg-green-50 hover:bg-green-50 border-none font-bold px-1.5 py-0">Done</Badge>
                                 )}
-                                
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-green-600 rounded-full">
-                                  <Play className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            </div>
+                              </h3>
+                            )}
+                            <span className="text-[10px] font-bold bg-muted text-muted-foreground px-2 py-0.5 rounded-full shrink-0">
+                              {group.children?.length || 0}
+                            </span>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
-                              onClick={() => handleDeleteTaskOrGroup(task.id, group.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                                </div>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg opacity-0 group-hover/section:opacity-100 transition-opacity"
+                            onClick={() => handleDeleteTaskOrGroup(group.id)}
+                            title="Delete Group"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
                         </div>
-                      )}
-                    </Droppable>
 
-                      {/* Add new task input inside group */}
-                      <div className="flex gap-1 items-center pt-2 pl-2 pb-2 mt-2">
-                        <Button
-                          onClick={() => handleAddTaskInGroup(group.id)}
-                          variant="ghost"
-                          className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md shrink-0"
-                          title="Add Task"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                        <Input
-                          placeholder="Add a new task..."
-                          value={newTasksInputs[group.id] || ''}
-                          onChange={(e) => setNewTasksInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
-                          className="h-8 text-xs border-transparent shadow-none bg-transparent hover:bg-muted/20 focus-visible:ring-0 focus-visible:bg-background focus-visible:border-border/50 max-w-sm px-2 transition-colors rounded-md"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddTaskInGroup(group.id);
-                          }}
-                        />
+                        {/* Task Group list items */}
+                        <Droppable droppableId={group.id} type="task">
+                          {(provided) => (
+                            <div
+                              {...provided.droppableProps}
+                              ref={provided.innerRef}
+                              className="space-y-1.5"
+                            >
+                              {(group.children || []).map((task, taskIdx) => (
+                                <Draggable key={task.id} draggableId={task.id} index={taskIdx}>
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      className={cn(
+                                        "flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/40 transition-all gap-4 group/row border border-transparent",
+                                        snapshot.isDragging && "shadow-lg bg-card border-primary/20 opacity-95 z-50"
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div
+                                          {...provided.dragHandleProps}
+                                          className="cursor-grab text-muted-foreground/30 hover:text-foreground opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0"
+                                        >
+                                          <GripVertical className="h-4 w-4" />
+                                        </div>
+                                        <input
+                                          type="checkbox"
+                                          checked={task.completed}
+                                          onChange={(e) => handleToggleTask(task.id, e.target.checked, group.id)}
+                                          className="h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                                        />
+                                        {editingId === task.id ? (
+                                          <div className="flex items-center gap-1.5 flex-grow">
+                                            <Input
+                                              value={editingText}
+                                              onChange={(e) => setEditingText(e.target.value)}
+                                              className="h-8 text-xs max-w-lg border-primary"
+                                              autoFocus
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleRenameTaskOrGroup(task.id, editingText, group.id);
+                                              }}
+                                            />
+                                            <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700 text-white rounded-lg" onClick={() => handleRenameTaskOrGroup(task.id, editingText, group.id)}>
+                                              <Check className="w-4 h-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setEditingId(null)}>
+                                              <X className="w-4 h-4" />
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <span
+                                            className={cn(
+                                              "text-xs text-foreground cursor-pointer flex-1 truncate hover:text-primary transition-colors",
+                                              task.completed && "line-through text-muted-foreground/60"
+                                            )}
+                                            onClick={() => {
+                                              setSelectedTaskDetail({ groupId: group.id, task: task as SubTask });
+                                            }}
+                                          >
+                                            {task.text}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Badges & Actions */}
+                                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                                        {/* Due Date Indicator */}
+                                        {task.dueDate && (
+                                          <div className={cn(
+                                            "flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border hidden sm:flex",
+                                            (() => {
+                                              const overdue = new Date(task.dueDate) < new Date() && !task.completed;
+                                              return overdue 
+                                                ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30" 
+                                                : "bg-muted text-muted-foreground border-border/40";
+                                            })()
+                                          )}>
+                                            <CalendarIcon className="w-3 h-3 text-muted-foreground/70" />
+                                            <span>{format(new Date(task.dueDate), 'dd/MM/yyyy')}</span>
+                                          </div>
+                                        )}
+
+                                        {/* Assignee Avatar */}
+                                        {task.assignee ? (
+                                          <Avatar className="h-6 w-6 border border-border/50 hidden sm:flex">
+                                            <AvatarFallback className="text-[9px] bg-purple-100 text-purple-700 font-bold">{task.assignee.charAt(0)}</AvatarFallback>
+                                          </Avatar>
+                                        ) : (
+                                          <div className="h-6 w-6 rounded-full bg-muted border border-border/50 border-dashed flex items-center justify-center hidden sm:flex">
+                                            <UserCircle className="w-3 h-3 text-muted-foreground/40" />
+                                          </div>
+                                        )}
+                                        
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover/row:opacity-100 transition-opacity rounded-lg"
+                                            onClick={() => handleDeleteTaskOrGroup(task.id, group.id)}
+                                            title="Delete Task"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                            </div>
+                          )}
+                        </Droppable>
+
+                        {/* Add new task input inside group */}
+                        <div className="flex gap-1 items-center pt-2 pl-2 pb-2 mt-1">
+                          <Button
+                            onClick={() => handleAddTaskInGroup(group.id)}
+                            variant="ghost"
+                            className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md shrink-0"
+                            title="Add Task"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                          <Input
+                            placeholder="Add a new task..."
+                            value={newTasksInputs[group.id] || ''}
+                            onChange={(e) => setNewTasksInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
+                            className="h-8 text-xs border-transparent shadow-none bg-transparent hover:bg-muted/20 focus-visible:ring-0 focus-visible:bg-background focus-visible:border-border/50 max-w-sm px-2 transition-colors rounded-md"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddTaskInGroup(group.id);
+                            }}
+                          />
+                        </div>
                       </div>
-                  </div>
-                ))
-              )}
+                    ))
+                  )}
+                </div>
+              </DragDropContext>
             </div>
-            </DragDropContext>
 
             {/* AI Generator Box inside Tasks tab */}
-            <div className="bg-primary/5 rounded-2xl p-5 border border-primary/20 space-y-3">
+            <div className="bg-card rounded-2xl p-5 border border-border/60 shadow-xs space-y-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary animate-pulse" />
                 <h4 className="font-bold text-sm text-primary">ร่างรายการงานย่อยด้วยระบบ AI (AI Checklist Creator)</h4>
@@ -1304,7 +1358,7 @@ export default function ProjectDetailsPage() {
           {selectedTaskDetail && (
             <div className="fixed right-4 xl:right-8 top-24 z-40 w-[320px] xl:w-[400px] flex flex-col bg-card rounded-2xl shadow-2xl border border-border/60 overflow-hidden h-[calc(100vh-120px)]">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-border/40 bg-muted/10">
+              <div className="flex items-center justify-between p-4 border-b border-border/40 bg-card">
                 <div className="flex flex-col gap-1 overflow-hidden">
                   <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider truncate">
                     <span className="truncate">{activeBoardView}</span>
@@ -1325,8 +1379,8 @@ export default function ProjectDetailsPage() {
               </div>
 
               {/* Toolbar */}
-              <div className="flex items-center gap-2 p-2 px-4 border-b border-border/40 bg-muted/20 overflow-x-auto shrink-0">
-                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-primary bg-primary/5">
+              <div className="flex items-center gap-2 p-2 px-4 border-b border-border/40 bg-card overflow-x-auto shrink-0">
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-primary bg-card">
                   <AlignLeft className="w-3.5 h-3.5" /> Details
                 </Button>
                 <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-muted-foreground hover:text-foreground">
@@ -1453,7 +1507,7 @@ export default function ProjectDetailsPage() {
             </CardHeader>
             <CardContent className="space-y-4 pb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex gap-4 p-4 border border-border/50 rounded-xl items-center bg-muted/20">
+                <div className="flex gap-4 p-4 border border-border/50 rounded-xl items-center bg-card shadow-xs">
                   <div className="p-3 bg-primary/10 text-primary rounded-xl shrink-0">
                     <CalendarIcon className="w-6 h-6" />
                   </div>
@@ -1465,7 +1519,7 @@ export default function ProjectDetailsPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-4 p-4 border border-border/50 rounded-xl items-center bg-muted/20">
+                <div className="flex gap-4 p-4 border border-border/50 rounded-xl items-center bg-card shadow-xs">
                   <div className="p-3 bg-destructive/10 text-destructive rounded-xl shrink-0">
                     <CalendarIcon className="w-6 h-6" />
                   </div>
@@ -1560,7 +1614,7 @@ export default function ProjectDetailsPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-border/40 bg-muted/20 text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
+                        <tr className="border-b border-border/40 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
                           <th className="p-4">Description</th>
                           <th className="p-4">Billing Rate</th>
                           <th className="p-4">Duration</th>
@@ -1618,7 +1672,7 @@ export default function ProjectDetailsPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-border/40 bg-muted/20 text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
+                      <tr className="border-b border-border/40 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
                         <th className="p-4">Invoice #</th>
                         <th className="p-4">Title / Label</th>
                         <th className="p-4">Due Date</th>
@@ -1669,7 +1723,7 @@ export default function ProjectDetailsPage() {
         {/* VIEW E: PROJECT SETTINGS (Edit) */}
         {activeTab === 'Edit' && (
           <Card className="border border-border/60 shadow-sm rounded-2xl bg-card overflow-hidden">
-            <CardHeader className="border-b border-border/40 bg-muted/10 pb-4">
+            <CardHeader className="border-b border-border/40 bg-card pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Settings2 className="w-5 h-5 text-primary" /> Project Container Settings
               </CardTitle>
@@ -1885,7 +1939,7 @@ export default function ProjectDetailsPage() {
                   </div>
 
                   {/* Billing Settings card */}
-                  <div className="border border-border/50 bg-muted/20 rounded-2xl p-4 space-y-4">
+                  <div className="border border-border/50 bg-card rounded-2xl p-4 space-y-4 shadow-xs">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <Coins className="w-4 h-4 text-primary shrink-0" />
@@ -1988,7 +2042,7 @@ export default function ProjectDetailsPage() {
             </div>
 
             {(!project.detailsSections || project.detailsSections.length === 0) ? (
-              <div className="text-center py-12 bg-muted/20 border border-dashed rounded-xl max-w-xl mx-auto w-full px-6">
+              <div className="text-center py-12 bg-card border border-dashed border-border/60 rounded-xl max-w-xl mx-auto w-full px-6 shadow-xs">
                 <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
                 <h3 className="font-semibold text-base mb-1">ยังไม่มีหัวข้อโน้ตย่อหรือรายละเอียด</h3>
                 <p className="text-sm text-muted-foreground mb-6">
@@ -2094,8 +2148,8 @@ export default function ProjectDetailsPage() {
                                   className={`
                                     flex items-center gap-1.5 px-4 py-2 border rounded-t-xl select-none cursor-pointer transition-all duration-150 shrink-0
                                     ${isActive 
-                                      ? 'bg-background border-border border-b-transparent text-primary font-bold shadow-[0_-3px_8px_-3px_rgba(0,0,0,0.08)]' 
-                                      : 'bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                                      ? 'bg-card border-border border-b-transparent text-primary font-bold shadow-[0_-3px_8px_-3px_rgba(0,0,0,0.08)]' 
+                                      : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground'
                                     }
                                   `}
                                 >
@@ -2190,7 +2244,7 @@ export default function ProjectDetailsPage() {
                   if (!activeSection) return null;
 
                   return (
-                    <div className="bg-muted/10 rounded-xl p-2 border border-border/30 mt-2">
+                    <div className="bg-card rounded-xl p-2 border border-border/60 shadow-xs mt-2">
                       <EditableNovelField
                         key={activeSection.id}
                         value={activeSection.content}
@@ -2365,7 +2419,7 @@ export default function ProjectDetailsPage() {
                   </div>
                   
                   {/* Preview Tab Content */}
-                  <div className="flex-1 overflow-y-auto border border-border/80 bg-muted/10 rounded-xl p-4">
+                  <div className="flex-1 overflow-y-auto border border-border/80 bg-card rounded-xl p-4 shadow-xs">
                     <div 
                       className="prose prose-sm dark:prose-invert max-w-none text-xs leading-relaxed space-y-4"
                       dangerouslySetInnerHTML={{ __html: aiNotesPreviewSections[aiNotesPreviewActiveTab]?.content || '' }}

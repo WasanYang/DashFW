@@ -108,7 +108,7 @@ export function FinancialDashboard() {
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">฿</span>
               </div>
             </div>
-            <div className='space-y-2 rounded-lg bg-muted p-4'>
+            <div className='space-y-2 rounded-lg bg-card p-4 border border-border/60 shadow-xs'>
               <div className='flex justify-between text-sm'>
                 <span className='text-muted-foreground'>
                   Fastwork Fee (ค่าธรรมเนียมหัก 10%)
@@ -131,13 +131,13 @@ export function FinancialDashboard() {
           </CardHeader>
           <CardContent>
             <div className='grid grid-cols-2 gap-4 mb-8'>
-              <div className='p-4 rounded-lg bg-primary/5'>
+              <div className='p-4 rounded-lg bg-card border border-border/60 shadow-xs'>
                 <p className='text-sm text-muted-foreground'>
                   Money in Pipeline (ยอดเงินที่อยู่ระหว่างดำเนินงาน)
                 </p>
                 <p className='text-2xl font-bold text-primary'>฿{pipelineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
-              <div className='p-4 rounded-lg bg-chart-2/10 text-chart-2'>
+              <div className='p-4 rounded-lg bg-card border border-border/60 shadow-xs text-chart-2'>
                 <p className='text-sm font-semibold'>Withdrawn Earnings (รายได้สุทธิที่ได้รับจริง)</p>
                 <p className='text-2xl font-bold'>฿{withdrawnTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>

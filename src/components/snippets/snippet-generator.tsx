@@ -150,7 +150,7 @@ export function SnippetGenerator() {
       </Form>
 
       {generatedSnippet && (
-        <Card className="border border-primary/20 bg-primary/5">
+        <Card className="border border-border/60 bg-card shadow-xs">
           <CardContent className="p-4 space-y-4 relative">
              <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={copyToClipboard} title="คัดลอก">
                 <Copy className="h-4 w-4" />
@@ -160,7 +160,7 @@ export function SnippetGenerator() {
               <p className="font-code text-sm text-muted-foreground whitespace-pre-wrap">{generatedSnippet}</p>
             </div>
             
-            <Separator className="bg-primary/20" />
+            <Separator className="bg-border/60" />
             
             {/* Save snippet section */}
             <div className="space-y-3 pt-2">

@@ -1039,7 +1039,7 @@ export function ClientList({ tasks }: ClientListProps) {
           <div className='grid gap-8 lg:grid-cols-3'>
             <div className='lg:col-span-1'>
               <Card className="border-border/40 shadow-sm rounded-2xl bg-card overflow-hidden">
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4 bg-muted/20 border-b border-border/30'>
+                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4 bg-card border-b border-border/30'>
                   <CardTitle className="text-lg font-black">Clients</CardTitle>
                   <Button size='sm' onClick={() => setIsCreateOpen(true)} className="h-8 rounded-lg">
                     <Plus className='mr-1.5 h-4 w-4' />
@@ -1201,7 +1201,7 @@ export function ClientList({ tasks }: ClientListProps) {
                           <h4 className='mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground'>
                             Contact & Socials
                           </h4>
-                          <div className='space-y-3 bg-muted/20 p-4 rounded-xl border border-border/30'>
+                          <div className='space-y-3 bg-card p-4 rounded-xl border border-border/60 shadow-xs'>
                             {selectedClient.socials && selectedClient.socials.length > 0 ? (
                               selectedClient.socials.map(renderSocialLink)
                             ) : (
@@ -1215,7 +1215,7 @@ export function ClientList({ tasks }: ClientListProps) {
                       
                       <div>
                         <h4 className='mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground'>Notes</h4>
-                        <div className='bg-yellow-50/50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-200/50 dark:border-yellow-900/30 h-full min-h-[120px]'>
+                        <div className='bg-card p-4 rounded-xl border border-border/60 shadow-xs h-full min-h-[120px]'>
                           {selectedClient.notes ? (
                             <p className='text-[13px] text-foreground/80 whitespace-pre-wrap leading-relaxed font-medium'>
                               {selectedClient.notes}
@@ -1272,7 +1272,7 @@ export function ClientList({ tasks }: ClientListProps) {
                             </div>
                           ))
                         ) : (
-                          <div className="col-span-2 py-8 flex flex-col items-center justify-center gap-2 border border-dashed border-border/60 rounded-xl bg-muted/10">
+                          <div className="col-span-2 py-8 flex flex-col items-center justify-center gap-2 border border-dashed border-border/60 rounded-xl bg-card shadow-2xs">
                             <FolderKanban className="h-8 w-8 text-muted-foreground/40" />
                             <p className='text-[13px] text-muted-foreground font-medium'>
                               No projects found for this client.
@@ -1284,7 +1284,7 @@ export function ClientList({ tasks }: ClientListProps) {
                   </div>
                 </Card>
               ) : (
-                <Card className='flex flex-col items-center justify-center h-full min-h-[500px] border-dashed border-border/60 bg-muted/5 shadow-none'>
+                <Card className='flex flex-col items-center justify-center h-full min-h-[500px] border-dashed border-border/60 bg-card shadow-xs'>
                   <User className="h-12 w-12 text-muted-foreground/30 mb-4" />
                   <p className='text-muted-foreground font-bold'>
                     Select a client to see details
@@ -1297,7 +1297,7 @@ export function ClientList({ tasks }: ClientListProps) {
           <div className='grid gap-8 lg:grid-cols-3'>
             <div className='lg:col-span-1'>
               <Card className="border-border/40 shadow-sm rounded-2xl bg-card overflow-hidden">
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4 bg-muted/20 border-b border-border/30'>
+                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4 bg-card border-b border-border/30'>
                   <CardTitle className="text-lg font-black">Companies</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
