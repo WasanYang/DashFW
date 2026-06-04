@@ -39,6 +39,7 @@ export type Project = {
   subtitle?: string;
   clientId?: string;
   companyId?: string;
+  jobTypeId?: string;
   details?: string;
   startDate?: string | Date;
   deadline?: string | Date;
@@ -53,6 +54,7 @@ export type Project = {
   company?: Company | null;
   status?: string;
   priority?: 'Low' | 'Medium' | 'High' | 'Urgent' | string;
+  notes?: string;
   relatedProjectIds?: string[];
   boardViews?: string[];
   detailsSections?: {
@@ -164,6 +166,7 @@ export type JobType = {
   id?: string;
   name: string;
   description?: string;
+  color?: string;
   checklists?: { id: string; text: string }[];
 };
 

@@ -296,7 +296,7 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full p-4 sm:p-6">
+    <div className="flex flex-col gap-4 w-full min-h-full p-4 sm:p-6">
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

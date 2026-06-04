@@ -798,7 +798,7 @@ export default function ProjectDetailsPage() {
   };
 
   return (
-    <div className='flex flex-col gap-6 p-4 md:px-8 md:py-6 w-full h-full'>
+    <div className='flex flex-col gap-6 p-4 md:px-8 md:py-6 w-full min-h-full'>
       {/* 1. TOP HEADER (Plutio-style Breadcrumbs & Settings) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-4 rounded-2xl border border-border/80 shadow-sm">
         <div className="flex flex-col gap-1 min-w-0">

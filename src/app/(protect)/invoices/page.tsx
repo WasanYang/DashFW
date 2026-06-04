@@ -234,7 +234,7 @@ export default function InvoicesProposalsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full p-4 sm:p-6">
+    <div className="flex flex-col gap-4 w-full min-h-full p-4 sm:p-6">
       <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Billing</h1>
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden">

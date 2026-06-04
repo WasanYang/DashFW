@@ -41,7 +41,7 @@ export default function SnippetsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full p-4 sm:p-6">
+    <div className="flex flex-col gap-4 w-full min-h-full p-4 sm:p-6">
       <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Snippet Manager</h1>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

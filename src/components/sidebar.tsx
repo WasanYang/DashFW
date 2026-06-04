@@ -83,6 +83,7 @@ const navGroups = [
     items: [
       { href: '/snippets', label: 'AI Snippets', icon: BotMessageSquare },
       { href: '/templates', label: 'Templates', icon: Settings2 },
+      { href: '/job-types', label: 'Job Types', icon: ListChecks },
     ]
   }
 ];
