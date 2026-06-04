@@ -237,3 +237,34 @@ export type Proposal = {
   client?: Client | null;
 };
 
+export interface SubTaskTemplate {
+  text: string;
+  completed: boolean;
+}
+
+export interface TaskTemplateItem {
+  title: string;
+  details?: string;
+  subTasks?: SubTaskTemplate[];
+}
+
+export interface GroupTemplate {
+  title: string;
+  tasks?: TaskTemplateItem[];
+}
+
+export interface TemplateData {
+  groups?: GroupTemplate[];
+  subTasks?: SubTaskTemplate[];
+}
+
+export interface TemplateModel {
+  _id?: string;
+  id?: string;
+  name: string;
+  description?: string;
+  type: 'project' | 'group' | 'task';
+  data: TemplateData;
+}
+
+

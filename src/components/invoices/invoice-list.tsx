@@ -1,0 +1,525 @@
+'use client';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useGetClientsQuery } from '@/services/clientApi';
+import { useGetProjectsQuery } from '@/services/projectApi';
+import {
+  useGetInvoicesQuery,
+  useUpdateInvoiceMutation,
+  useDeleteInvoiceMutation,
+} from '@/services/invoiceApi';
+import {
+  useGetProposalsQuery,
+  useUpdateProposalMutation,
+  useDeleteProposalMutation,
+} from '@/services/proposalApi';
+import { format } from 'date-fns';
+import { FileText, Plus, Trash2, CheckCircle2, Printer } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { InvoiceCreateDialog } from './invoice-create-dialog';
+
+export function InvoiceList() {
+  const { data: clients = [] } = useGetClientsQuery();
+  const { data: projects = [] } = useGetProjectsQuery();
+  
+  const { data: invoices = [], isLoading: loadingInvoices } = useGetInvoicesQuery();
+  const [updateInvoice] = useUpdateInvoiceMutation();
+  const [deleteInvoice] = useDeleteInvoiceMutation();
+
+  const { data: proposals = [], isLoading: loadingProposals } = useGetProposalsQuery();
+  const [updateProposal] = useUpdateProposalMutation();
+  const [deleteProposal] = useDeleteProposalMutation();
+
+  // Navigation tab: 'invoices' | 'proposals'
+  const [activeTab, setActiveTab] = useState<'invoices' | 'proposals'>('invoices');
+
+  const formatCurrency = (amount: number, currency?: string) => {
+    const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '฿';
+    return `${symbol}${amount?.toLocaleString()}`;
+  };
+  
+  // Selection states
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  
+  // Form Dialogs
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  // Active documents
+  const activeInvoice = useMemo(() => {
+    if (selectedInvoiceId) return invoices.find(i => i.id === selectedInvoiceId) || null;
+    return invoices[0] || null;
+  }, [selectedInvoiceId, invoices]);
+
+  const activeProposal = useMemo(() => {
+    if (selectedProposalId) return proposals.find(p => p.id === selectedProposalId) || null;
+    return proposals[0] || null;
+  }, [selectedProposalId, proposals]);
+
+  // Sync selection
+  useEffect(() => {
+    if (invoices.length > 0 && !selectedInvoiceId) {
+      setSelectedInvoiceId(invoices[0].id!);
+    }
+  }, [invoices, selectedInvoiceId]);
+
+  useEffect(() => {
+    if (proposals.length > 0 && !selectedProposalId) {
+      setSelectedProposalId(proposals[0].id!);
+    }
+  }, [proposals, selectedProposalId]);
+
+  const handleOpenCreate = () => {
+    setIsCreateOpen(true);
+  };
+
+  const handleMarkPaid = async (id: string) => {
+    await updateInvoice({ id, data: { status: 'Paid', paidAt: new Date().toISOString() } });
+  };
+
+  const handleMarkAccepted = async (id: string) => {
+    await updateProposal({ id, data: { status: 'Accepted' } });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (activeTab === 'invoices') {
+      await deleteInvoice({ id });
+      setSelectedInvoiceId(null);
+    } else {
+      await deleteProposal({ id });
+      setSelectedProposalId(null);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="flex flex-col gap-4 w-full min-h-full p-4 sm:p-6">
+      <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Billing</h1>
+      {/* HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden">
+        <div className="flex bg-muted/60 p-1 rounded-xl">
+          <Button
+            variant={activeTab === 'invoices' ? 'default' : 'ghost'}
+            className={cn("rounded-lg text-sm", activeTab === 'invoices' ? 'shadow-sm bg-primary text-primary-foreground' : 'text-muted-foreground')}
+            onClick={() => setActiveTab('invoices')}
+          >
+            Invoices
+          </Button>
+          <Button
+            variant={activeTab === 'proposals' ? 'default' : 'ghost'}
+            className={cn("rounded-lg text-sm", activeTab === 'proposals' ? 'shadow-sm bg-primary text-primary-foreground' : 'text-muted-foreground')}
+            onClick={() => setActiveTab('proposals')}
+          >
+            Proposals
+          </Button>
+        </div>
+        <Button onClick={handleOpenCreate} className="rounded-xl shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-1.5 h-10">
+          <Plus className="w-4 h-4" /> Create {activeTab === 'invoices' ? 'Invoice' : 'Proposal'}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* LEFT COLUMN: LIST CARD */}
+        <Card className="lg:col-span-1 border border-border/80 shadow-sm print:hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              {activeTab === 'invoices' ? 'Invoice History' : 'Submitted Proposals'}
+            </CardTitle>
+            <CardDescription>
+              Manage, check statuses, and log billing records
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-2 sm:px-4">
+            <ScrollArea className="h-[550px] pr-1">
+              {activeTab === 'invoices' ? (
+                loadingInvoices ? (
+                  <div className="py-12 text-center text-muted-foreground">Loading invoices...</div>
+                ) : invoices.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">No invoices generated yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {invoices.map((inv) => {
+                      const isSel = selectedInvoiceId === inv.id;
+                      return (
+                        <div
+                          key={inv.id}
+                          onClick={() => setSelectedInvoiceId(inv.id!)}
+                          className={cn(
+                            "p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
+                            isSel ? "bg-primary/10 border-primary/45 text-primary shadow-sm" : "bg-card border-border/60 hover:bg-muted/40"
+                          )}
+                        >
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-foreground truncate">{inv.invoiceNumber}</p>
+                            <p className="text-xs text-muted-foreground truncate">{inv.client?.name || 'General Client'}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold text-sm text-foreground">{formatCurrency(inv.total ?? 0, inv.currency)}</p>
+                            <Badge className={cn("text-[9px] h-4 px-1.5 rounded-full mt-1 border-0",
+                              inv.status === 'Paid' ? 'bg-green-500/10 text-green-700' :
+                              inv.status === 'Sent' ? 'bg-blue-500/10 text-blue-700' :
+                              inv.status === 'Overdue' ? 'bg-red-500/10 text-red-700' : 'bg-muted text-muted-foreground'
+                            )}>
+                              {inv.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                loadingProposals ? (
+                  <div className="py-12 text-center text-muted-foreground">Loading proposals...</div>
+                ) : proposals.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">No proposals generated yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {proposals.map((prop) => {
+                      const isSel = selectedProposalId === prop.id;
+                      return (
+                        <div
+                          key={prop.id}
+                          onClick={() => setSelectedProposalId(prop.id!)}
+                          className={cn(
+                            "p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
+                            isSel ? "bg-primary/10 border-primary/45 text-primary shadow-sm" : "bg-card border-border/60 hover:bg-muted/40"
+                          )}
+                        >
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-foreground truncate">{prop.proposalNumber}</p>
+                            <p className="text-xs text-muted-foreground truncate">{prop.title}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold text-sm text-foreground">฿{prop.total?.toLocaleString()}</p>
+                            <Badge className={cn("text-[9px] h-4 px-1.5 rounded-full mt-1 border-0",
+                              prop.status === 'Accepted' ? 'bg-green-500/10 text-green-700' :
+                              prop.status === 'Sent' ? 'bg-blue-500/10 text-blue-700' :
+                              prop.status === 'Declined' ? 'bg-red-500/10 text-red-700' : 'bg-muted text-muted-foreground'
+                            )}>
+                              {prop.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* RIGHT COLUMN: DOCUMENT PREVIEW */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          {activeTab === 'invoices' ? (
+            activeInvoice ? (
+              <Card className="border border-border/80 shadow-md bg-card overflow-hidden">
+                {/* Print controls header */}
+                <div className="bg-muted/20 px-6 py-3 border-b flex justify-between items-center print:hidden">
+                  <div className="flex gap-2">
+                    {activeInvoice.status !== 'Paid' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleMarkPaid(activeInvoice.id!)}
+                        className="bg-green-600 hover:bg-green-700 text-white gap-1 rounded-lg text-xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Mark Paid
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrint}
+                      className="gap-1 rounded-lg text-xs"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/10 rounded-lg text-xs"
+                    onClick={() => handleDelete(activeInvoice.id!)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+
+                {/* INVOICE TEMPLATE (PRINT READY) */}
+                <div className="p-8 sm:p-12 bg-white text-black min-h-[700px] flex flex-col justify-between font-sans">
+                  <div>
+                    {/* TOP SECTION */}
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">INVOICE</h2>
+                        {activeInvoice.title && (
+                          <p className="text-sm font-semibold text-slate-700 mt-1">{activeInvoice.title}</p>
+                        )}
+                        <p className="text-xs text-slate-500 font-bold mt-0.5 tracking-widest">{activeInvoice.invoiceNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <h3 className="font-bold text-base text-primary">wasan</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Freelance Full-stack Developer</p>
+                        <p className="text-xs text-slate-500">wasan.dev@gmail.com</p>
+                      </div>
+                    </div>
+
+                    <Separator className="my-8 bg-slate-200" />
+
+                    {/* METADATA SECTION */}
+                    <div className="grid grid-cols-2 gap-8 text-xs">
+                      <div>
+                        <p className="font-bold text-slate-400 uppercase tracking-wider mb-2">Billed To</p>
+                        <p className="font-bold text-sm text-slate-800">{activeInvoice.client?.name || 'General Client'}</p>
+                        <p className="text-slate-500 mt-1">{activeInvoice.client?.email}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Issue Date</p>
+                          <p className="font-semibold text-slate-700">
+                            {format(new Date(activeInvoice.issueDate), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Due Date</p>
+                          <p className="font-semibold text-slate-700">
+                            {format(new Date(activeInvoice.dueDate), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ITEMS TABLE */}
+                    <div className="mt-10 overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
+                            <th className="py-3 pr-4">Description</th>
+                            <th className="py-3 px-4 text-center w-20">QTY</th>
+                            <th className="py-3 px-4 text-right w-28">Rate</th>
+                            <th className="py-3 pl-4 text-right w-28">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {activeInvoice.items.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="py-4 pr-4 font-medium">{item.description}</td>
+                              <td className="py-4 px-4 text-center">{item.quantity}</td>
+                              <td className="py-4 px-4 text-right">{formatCurrency(item.rate ?? 0, activeInvoice.currency)}</td>
+                              <td className="py-4 pl-4 text-right font-semibold">{formatCurrency(item.amount ?? 0, activeInvoice.currency)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* SUMMARY SECTION */}
+                  <div className="mt-8 pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between gap-6 text-xs">
+                    <div className="max-w-xs space-y-4">
+                      {activeInvoice.paymentMethod && (
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Payment Method</p>
+                          <p className="text-slate-700 font-semibold">{activeInvoice.paymentMethod}</p>
+                        </div>
+                      )}
+                      {activeInvoice.notes && (
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
+                          <p className="text-slate-500 whitespace-pre-wrap leading-relaxed">{activeInvoice.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="w-64 shrink-0 space-y-2 text-right">
+                      <div className="flex justify-between text-slate-500">
+                        <span>Subtotal</span>
+                        <span>{formatCurrency(activeInvoice.items.reduce((sum, item) => sum + item.amount, 0), activeInvoice.currency)}</span>
+                      </div>
+                      {activeInvoice.taxRate > 0 && (
+                        <div className="flex justify-between text-slate-500">
+                          <span>Tax ({activeInvoice.taxRate}%)</span>
+                          <span>
+                            {formatCurrency(Math.round(activeInvoice.items.reduce((sum, item) => sum + item.amount, 0) * (activeInvoice.taxRate / 100)), activeInvoice.currency)}
+                          </span>
+                        </div>
+                      )}
+                      {activeInvoice.discount > 0 && (
+                        <div className="flex justify-between text-slate-500">
+                          <span>Discount</span>
+                          <span>-{formatCurrency(activeInvoice.discount, activeInvoice.currency)}</span>
+                        </div>
+                      )}
+                      <Separator className="bg-slate-200" />
+                      <div className="flex justify-between text-base font-bold text-slate-800">
+                        <span>Total Due</span>
+                        <span>{formatCurrency(activeInvoice.total ?? 0, activeInvoice.currency)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <Card className="flex items-center justify-center h-[500px]">
+                <p className="text-muted-foreground">Select an invoice to see details</p>
+              </Card>
+            )
+          ) : (
+            activeProposal ? (
+              <Card className="border border-border/80 shadow-md bg-card overflow-hidden">
+                {/* Print controls header */}
+                <div className="bg-muted/20 px-6 py-3 border-b flex justify-between items-center print:hidden">
+                  <div className="flex gap-2">
+                    {activeProposal.status !== 'Accepted' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleMarkAccepted(activeProposal.id!)}
+                        className="bg-green-600 hover:bg-green-700 text-white gap-1 rounded-lg text-xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Accept Proposal
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrint}
+                      className="gap-1 rounded-lg text-xs"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/10 rounded-lg text-xs"
+                    onClick={() => handleDelete(activeProposal.id!)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+
+                {/* PROPOSAL TEMPLATE (PRINT READY) */}
+                <div className="p-8 sm:p-12 bg-white text-black min-h-[700px] flex flex-col justify-between font-sans">
+                  <div>
+                    {/* TOP SECTION */}
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">PROPOSAL</h2>
+                        <p className="text-xs text-slate-500 font-bold mt-1 tracking-widest">{activeProposal.proposalNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <h3 className="font-bold text-base text-primary">wasan</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Freelance Full-stack Developer</p>
+                        <p className="text-xs text-slate-500">wasan.dev@gmail.com</p>
+                      </div>
+                    </div>
+
+                    <Separator className="my-8 bg-slate-200" />
+
+                    {/* METADATA SECTION */}
+                    <div className="grid grid-cols-2 gap-8 text-xs">
+                      <div>
+                        <p className="font-bold text-slate-400 uppercase tracking-wider mb-2">Proposal For</p>
+                        <p className="font-bold text-sm text-slate-800">{activeProposal.client?.name || 'General Client'}</p>
+                        <p className="text-slate-500 mt-1">{activeProposal.client?.email}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Issue Date</p>
+                          <p className="font-semibold text-slate-700">
+                            {format(new Date(activeProposal.issueDate), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-1">Valid Until</p>
+                          <p className="font-semibold text-slate-700">
+                            {format(new Date(activeProposal.validUntil), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PROJECT TITLE / DESC */}
+                    <div className="mt-8 text-left">
+                      <h3 className="text-lg font-bold text-slate-800 mb-2">{activeProposal.title}</h3>
+                      <p className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed">
+                        {activeProposal.description || 'No description provided.'}
+                      </p>
+                    </div>
+
+                    {/* ITEMS TABLE */}
+                    <div className="mt-10 overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
+                            <th className="py-3 pr-4">Scope of Work</th>
+                            <th className="py-3 px-4 text-center w-20">QTY</th>
+                            <th className="py-3 px-4 text-right w-28">Rate</th>
+                            <th className="py-3 pl-4 text-right w-28">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {activeProposal.items.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="py-4 pr-4 font-medium">{item.description}</td>
+                              <td className="py-4 px-4 text-center">{item.quantity}</td>
+                              <td className="py-4 px-4 text-right">฿{item.rate?.toLocaleString()}</td>
+                              <td className="py-4 pl-4 text-right font-semibold">฿{item.amount?.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* SUMMARY SECTION */}
+                  <div className="mt-8 pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between gap-6 text-xs">
+                    <div className="max-w-xs">
+                      {activeProposal.notes && (
+                        <>
+                          <p className="font-bold text-slate-400 uppercase tracking-wider mb-2">Terms & Notes</p>
+                          <p className="text-slate-500 whitespace-pre-wrap leading-relaxed">{activeProposal.notes}</p>
+                        </>
+                      )}
+                    </div>
+                    
+                    <div className="w-64 shrink-0 space-y-2 text-right">
+                      <Separator className="bg-slate-200" />
+                      <div className="flex justify-between text-base font-bold text-slate-800">
+                        <span>Project Estimate</span>
+                        <span>฿{activeProposal.total?.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <Card className="flex items-center justify-center h-[500px]">
+                <p className="text-muted-foreground">Select a proposal to see details</p>
+              </Card>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* CREATE DIALOG */}
+      <InvoiceCreateDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        activeTab={activeTab}
+        clients={clients}
+        projects={projects}
+      />
+    </div>
+  );
+}
