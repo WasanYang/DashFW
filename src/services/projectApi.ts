@@ -28,6 +28,21 @@ export const projectApi = createApi({
         body: { id, ...data },
       }),
       invalidatesTags: ['Project'],
+      async onQueryStarted({ id, data }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          projectApi.util.updateQueryData('getProjects', undefined, (draft) => {
+            const project = draft.find((p) => p.id === id);
+            if (project) {
+              Object.assign(project, data);
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
     }),
     deleteProject: builder.mutation<
       { message: string; deletedCount: number },
@@ -39,6 +54,21 @@ export const projectApi = createApi({
         body: { id },
       }),
       invalidatesTags: ['Project'],
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          projectApi.util.updateQueryData('getProjects', undefined, (draft) => {
+            const index = draft.findIndex((p) => p.id === id);
+            if (index !== -1) {
+              draft.splice(index, 1);
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
     }),
   }),
 });

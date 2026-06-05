@@ -172,24 +172,37 @@ export async function PUT(request: NextRequest) {
     const existingTask = await db.collection('tasks').findOne({ _id: new ObjectId(id) });
     
     if (existingTask) {
-      const updatedTitle = updateData.title || existingTask.title;
-      const updatedDeadline = updateData.deadline || existingTask.deadline;
+      const hasTitle = updateData.title !== undefined;
+      const hasDeadline = updateData.deadline !== undefined;
 
-      if (updatedDeadline) {
-        if (existingTask.googleEventId) {
-          // Update event on Google Calendar
-          await updateCalendarEvent(existingTask.googleEventId, {
-            title: updatedTitle,
-            deadline: updatedDeadline,
-          });
-        } else {
-          // If no previous event ID, create one
-          const newEventId = await createCalendarEvent({
-            title: updatedTitle,
-            deadline: updatedDeadline,
-          });
-          if (newEventId) {
-            updateData.googleEventId = newEventId;
+      if (hasTitle || hasDeadline) {
+        const updatedTitle = hasTitle ? updateData.title : existingTask.title;
+        const updatedDeadline = hasDeadline ? updateData.deadline : existingTask.deadline;
+
+        if (updatedDeadline) {
+          const titleChanged = hasTitle && updateData.title !== existingTask.title;
+          const deadlineChanged = hasDeadline && (
+            !existingTask.deadline || 
+            new Date(updateData.deadline).getTime() !== new Date(existingTask.deadline).getTime()
+          );
+
+          if (titleChanged || deadlineChanged || !existingTask.googleEventId) {
+            if (existingTask.googleEventId) {
+              // Update event on Google Calendar
+              await updateCalendarEvent(existingTask.googleEventId, {
+                title: updatedTitle,
+                deadline: updatedDeadline,
+              });
+            } else {
+              // If no previous event ID, create one
+              const newEventId = await createCalendarEvent({
+                title: updatedTitle,
+                deadline: updatedDeadline,
+              });
+              if (newEventId) {
+                updateData.googleEventId = newEventId;
+              }
+            }
           }
         }
       }
