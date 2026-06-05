@@ -150,10 +150,16 @@ export default function ProjectDetailsPage() {
     ...projectTasks.map(t => t.boardView).filter(Boolean) as string[]
   ]));
 
-  // Derived tasks filtered by active view
+  // Derived tasks filtered by active view (completed tasks are automatically sorted to the bottom)
   const filteredTasksByView = projectTasks
     .filter((t) => t.boardView === activeBoardView)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    .sort((a, b) => {
+      const aCompleted = a.status === 'Completed' || a.status === 'Paid';
+      const bCompleted = b.status === 'Completed' || b.status === 'Paid';
+      if (aCompleted && !bCompleted) return 1;
+      if (!aCompleted && bCompleted) return -1;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
 
   // Automatically select first view if none is selected or view was deleted
   useEffect(() => {
@@ -464,33 +470,22 @@ export default function ProjectDetailsPage() {
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
     if (type === 'task') {
-      const sourceGroupId = source.droppableId;
-      const destinationGroupId = destination.droppableId;
-      
-      const sourceGroup = projectTasks.find(t => t.id === sourceGroupId);
-      const destinationGroup = projectTasks.find(t => t.id === destinationGroupId);
-      
-      if (!sourceGroup || !destinationGroup) return;
+      const reorderedTasks = Array.from(filteredTasksByView);
+      const [moved] = reorderedTasks.splice(source.index, 1);
+      reorderedTasks.splice(destination.index, 0, moved);
 
-      if (sourceGroupId === destinationGroupId) {
-        // Reordering within the same group
-        const newSubTasks = Array.from(sourceGroup.subTasks || []);
-        const [movedTask] = newSubTasks.splice(source.index, 1);
-        newSubTasks.splice(destination.index, 0, movedTask);
-        
-        await updateTask({ id: sourceGroupId, data: { subTasks: newSubTasks } }).unwrap();
-      } else {
-        // Moving between groups
-        const sourceSubTasks = Array.from(sourceGroup.subTasks || []);
-        const destSubTasks = Array.from(destinationGroup.subTasks || []);
-        
-        const [movedTask] = sourceSubTasks.splice(source.index, 1);
-        destSubTasks.splice(destination.index, 0, movedTask);
-        
-        await Promise.all([
-          updateTask({ id: sourceGroupId, data: { subTasks: sourceSubTasks } }).unwrap(),
-          updateTask({ id: destinationGroupId, data: { subTasks: destSubTasks } }).unwrap()
-        ]);
+      // Save new orders to MongoDB
+      const updatePromises = reorderedTasks.map((t, idx) => {
+        if (t.order !== idx) {
+          return updateTask({ id: t.id, data: { order: idx } }).unwrap();
+        }
+        return Promise.resolve();
+      });
+
+      try {
+        await Promise.all(updatePromises);
+      } catch (err) {
+        console.error('Failed to save task order', err);
       }
     }
   };
@@ -635,7 +630,8 @@ export default function ProjectDetailsPage() {
     await updateTask({ 
       id: taskId, 
       data: { 
-        status: newStatus
+        status: newStatus,
+        completedAt: checked ? new Date().toISOString() : null
       } 
     }).unwrap();
 
@@ -1114,14 +1110,19 @@ export default function ProjectDetailsPage() {
                                           <div className="flex flex-col flex-1 min-w-0">
                                             <span
                                               className={cn(
-                                                "text-xs text-foreground cursor-pointer truncate hover:text-primary transition-colors",
+                                                "text-xs text-foreground cursor-pointer truncate hover:text-primary transition-colors flex items-center flex-wrap gap-2",
                                                 task.completed && "line-through text-muted-foreground/60"
                                               )}
                                               onClick={() => {
                                                 setSelectedTaskDetail({ groupId: task.id, task: task as any });
                                               }}
                                             >
-                                              {task.text}
+                                              <span className="truncate">{task.text}</span>
+                                              {task.completed && task.originalTask.completedAt && (
+                                                <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold no-underline select-none bg-green-500/10 px-1.5 py-0.5 rounded-md">
+                                                  เสร็จเมื่อ: {format(new Date(task.originalTask.completedAt), 'dd/MM/yyyy HH:mm')}
+                                                </span>
+                                              )}
                                             </span>
                                             <input
                                               type="text"

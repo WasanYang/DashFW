@@ -24,6 +24,7 @@ export type SubTask = {
   creator?: string;
   dependencies?: string[];
   customFields?: { label: string; value: string }[];
+  completedAt?: string | Date | null;
 };
 
 export type ProjectStatus =
@@ -91,6 +92,7 @@ export type Task = {
   repeats?: string | RepeatConfig;
   boardView?: string;
   assignee?: string;
+  completedAt?: string | Date | null;
 };
 
 export type Social = {
