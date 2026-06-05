@@ -8,43 +8,99 @@ import {
   deleteCalendarEvent,
 } from '@/lib/google-calendar';
 
-// CREATE Task
+// CREATE Task (Single or Bulk)
 export async function POST(request: NextRequest) {
   try {
     const { db } = await connectToDatabase();
-    const data: Task = await request.json();
-    // Remove id if present
-    const { id, ...taskData } = data;
-    // Ensure jobTypeId is string or undefined
-    if (taskData.jobTypeId === '') delete taskData.jobTypeId;
-    
-    // Insert task
-    const result = await db.collection('tasks').insertOne(taskData);
-    const taskId = result.insertedId;
+    const data = await request.json();
 
-    // Create Google Calendar event if deadline is provided
-    if (taskData.deadline) {
-      const googleEventId = await createCalendarEvent({
-        title: taskData.title,
-        deadline: taskData.deadline,
+    if (Array.isArray(data)) {
+      // Bulk insert tasks
+      const tasksToInsert = data.map((item: any) => {
+        const { id, ...taskData } = item;
+        if (taskData.jobTypeId === '') delete taskData.jobTypeId;
+        
+        // Parse dates safely if present
+        if (taskData.startDate) taskData.startDate = new Date(taskData.startDate);
+        if (taskData.deadline) taskData.deadline = new Date(taskData.deadline);
+        
+        return taskData;
       });
 
-      if (googleEventId) {
-        await db.collection('tasks').updateOne(
-          { _id: taskId },
-          { $set: { googleEventId } }
+      if (tasksToInsert.length === 0) {
+        return NextResponse.json(
+          { message: 'No tasks to insert' },
+          { status: 200 }
         );
       }
-    }
 
-    return NextResponse.json(
-      { message: 'Task created', id: taskId },
-      { status: 201 },
-    );
+      const result = await db.collection('tasks').insertMany(tasksToInsert);
+      const insertedIds = result.insertedIds;
+
+      // Handle Google Calendar events in parallel
+      const updatePromises = [];
+      for (const [index, taskData] of tasksToInsert.entries()) {
+        if (taskData.deadline) {
+          const insertedId = insertedIds[index];
+          const createEventPromise = (async () => {
+            const googleEventId = await createCalendarEvent({
+              title: taskData.title,
+              deadline: taskData.deadline,
+            });
+            if (googleEventId) {
+              await db.collection('tasks').updateOne(
+                { _id: insertedId },
+                { $set: { googleEventId } }
+              );
+            }
+          })();
+          updatePromises.push(createEventPromise);
+        }
+      }
+
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+      }
+
+      return NextResponse.json(
+        { message: 'Tasks created in bulk', count: result.insertedCount },
+        { status: 201 }
+      );
+    } else {
+      // Single task creation
+      const { id, ...taskData } = data;
+      if (taskData.jobTypeId === '') delete taskData.jobTypeId;
+      
+      // Parse dates safely if present
+      if (taskData.startDate) taskData.startDate = new Date(taskData.startDate);
+      if (taskData.deadline) taskData.deadline = new Date(taskData.deadline);
+
+      const result = await db.collection('tasks').insertOne(taskData);
+      const taskId = result.insertedId;
+
+      if (taskData.deadline) {
+        const googleEventId = await createCalendarEvent({
+          title: taskData.title,
+          deadline: taskData.deadline,
+        });
+
+        if (googleEventId) {
+          await db.collection('tasks').updateOne(
+            { _id: taskId },
+            { $set: { googleEventId } }
+          );
+        }
+      }
+
+      return NextResponse.json(
+        { message: 'Task created', id: taskId },
+        { status: 201 }
+      );
+    }
   } catch (error) {
     return NextResponse.json(
-      { error: 'Failed to create task', details: (error as Error).message },
-      { status: 500 },
+      { error: 'Failed to create task(s)', details: (error as Error).message },
+      { status: 500 }
     );
   }
 }

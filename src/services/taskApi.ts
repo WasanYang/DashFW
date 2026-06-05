@@ -18,6 +18,17 @@ export const taskApi = createApi({
       }),
       invalidatesTags: ['Task'],
     }),
+    addTasksBulk: builder.mutation<
+      { message: string; count: number },
+      Partial<Task>[]
+    >({
+      query: (body) => ({
+        url: 'task',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Task'],
+    }),
     updateTask: builder.mutation<
       { message: string; modifiedCount: number },
       { id: string; data: Partial<Task> }
@@ -48,4 +59,5 @@ export const {
   useAddTaskMutation,
   useUpdateTaskMutation,
   useDeleteTaskMutation,
+  useAddTasksBulkMutation,
 } = taskApi;

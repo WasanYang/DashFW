@@ -63,7 +63,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { useGetProjectsQuery, useUpdateProjectMutation } from '@/services/projectApi';
-import { useGetTasksQuery, useAddTaskMutation, useUpdateTaskMutation, useDeleteTaskMutation } from '@/services/taskApi';
+import { useGetTasksQuery, useAddTaskMutation, useUpdateTaskMutation, useDeleteTaskMutation, useAddTasksBulkMutation } from '@/services/taskApi';
 import { useGetClientsQuery } from '@/services/clientApi';
 import { useGetTimeLogsQuery } from '@/services/timeLogApi';
 import { useGetInvoicesQuery } from '@/services/invoiceApi';
@@ -73,7 +73,7 @@ import { generateAiProjectNotes } from '@/ai/flows/ai-project-notes-flow';
 import { useGetTaskTemplatesQuery } from '@/services/taskTemplateApiSlice';
 import { formatNumber } from '@/lib/number-format';
 import { cn } from '@/lib/utils';
-import type { Client, SubTask } from '@/lib/types';
+import type { Client, SubTask, Task } from '@/lib/types';
 
 export default function ProjectDetailsPage() {
   const showTimeTracker = false;
@@ -88,6 +88,7 @@ export default function ProjectDetailsPage() {
   const [addTask] = useAddTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
   const [deleteTask] = useDeleteTaskMutation();
+  const [addTasksBulk] = useAddTasksBulkMutation();
   
   const { toast } = useToast();
   const params = useParams();
@@ -267,12 +268,13 @@ export default function ProjectDetailsPage() {
     try {
       let order = 0;
       const highestOrder = filteredTasksByView.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+      const tasksToCreate: Partial<Task>[] = [];
 
       if (template.type === 'project') {
         const groups = template.data.groups || [];
         for (const group of groups) {
           for (const task of group.tasks || []) {
-            await addTask({
+            tasksToCreate.push({
               title: `${group.title}: ${task.title}`,
               details: task.details || '',
               projectId: id,
@@ -284,10 +286,10 @@ export default function ProjectDetailsPage() {
               subTasks: [],
               order: highestOrder + order++,
               boardView: activeBoardView || undefined
-            }).unwrap();
+            });
 
             for (const sub of task.subTasks || []) {
-              await addTask({
+              tasksToCreate.push({
                 title: `${group.title}: ${task.title} - ${sub.text}`,
                 projectId: id,
                 clientId: project.clientId,
@@ -298,7 +300,7 @@ export default function ProjectDetailsPage() {
                 subTasks: [],
                 order: highestOrder + order++,
                 boardView: activeBoardView || undefined
-              }).unwrap();
+              });
             }
           }
         }
@@ -306,7 +308,7 @@ export default function ProjectDetailsPage() {
         const group = template.data.groups?.[0];
         if (group) {
           for (const task of group.tasks || []) {
-            await addTask({
+            tasksToCreate.push({
               title: `${group.title}: ${task.title}`,
               details: task.details || '',
               projectId: id,
@@ -318,10 +320,10 @@ export default function ProjectDetailsPage() {
               subTasks: [],
               order: highestOrder + order++,
               boardView: activeBoardView || undefined
-            }).unwrap();
+            });
 
             for (const sub of task.subTasks || []) {
-              await addTask({
+              tasksToCreate.push({
                 title: `${group.title}: ${task.title} - ${sub.text}`,
                 projectId: id,
                 clientId: project.clientId,
@@ -332,13 +334,13 @@ export default function ProjectDetailsPage() {
                 subTasks: [],
                 order: highestOrder + order++,
                 boardView: activeBoardView || undefined
-              }).unwrap();
+              });
             }
           }
         }
       } else if (template.type === 'task') {
         for (const sub of template.data.subTasks || []) {
-          await addTask({
+          tasksToCreate.push({
             title: sub.text,
             projectId: id,
             clientId: project.clientId,
@@ -349,8 +351,12 @@ export default function ProjectDetailsPage() {
             subTasks: [],
             order: highestOrder + order++,
             boardView: activeBoardView || undefined
-          }).unwrap();
+          });
         }
+      }
+
+      if (tasksToCreate.length > 0) {
+        await addTasksBulk(tasksToCreate).unwrap();
       }
 
       toast({
@@ -698,20 +704,21 @@ export default function ProjectDetailsPage() {
       const highestOrder = filteredTasksByView.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
 
       // Create a flat task for each AI checklist item
-      let idx = 1;
-      for (const itemText of result.checklistItems) {
-        await addTask({
-          title: itemText,
-          projectId: id,
-          clientId: project.clientId,
-          status: 'Backlog',
-          gross_price: 0,
-          deadline: new Date(),
-          revisions: 0,
-          subTasks: [],
-          order: highestOrder + idx++,
-          boardView: activeBoardView || undefined
-        }).unwrap();
+      const tasksToCreate = result.checklistItems.map((itemText, index) => ({
+        title: itemText,
+        projectId: id,
+        clientId: project.clientId,
+        status: 'Backlog' as const,
+        gross_price: 0,
+        deadline: new Date(),
+        revisions: 0,
+        subTasks: [],
+        order: highestOrder + index + 1,
+        boardView: activeBoardView || undefined
+      }));
+
+      if (tasksToCreate.length > 0) {
+        await addTasksBulk(tasksToCreate).unwrap();
       }
 
       setAiPrompt('');
