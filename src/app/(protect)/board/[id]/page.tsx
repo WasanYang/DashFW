@@ -463,6 +463,18 @@ export default function ProjectDetailsPage() {
     await updateProject({ id: project.id, data: { detailsSections: newSections } }).unwrap();
   };
 
+  const onDragEndViews = async (result: DropResult) => {
+    if (!result.destination || !project) return;
+    const { source, destination } = result;
+    if (source.index === destination.index) return;
+
+    const newViews = Array.from(distinctViews);
+    const [moved] = newViews.splice(source.index, 1);
+    newViews.splice(destination.index, 0, moved);
+
+    await updateProject({ id: project.id, data: { boardViews: newViews } }).unwrap();
+  };
+
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, type } = result;
 
@@ -854,131 +866,155 @@ export default function ProjectDetailsPage() {
             <div className="flex-1 space-y-6 min-w-0 pb-12">
             
             {/* Horizontal Board Views - Browser Tab Style (matching Notes tab style) */}
-            <div className="flex items-end gap-1 border-b border-border/80 px-1 mb-6 overflow-x-auto scrollbar-none">
-              {distinctViews.map(view => {
-                const isActive = activeBoardView === view;
-                const viewTasks = projectTasks.filter(t => t.boardView === view);
-                const totalInView = viewTasks.reduce((sum, t) => sum + (t.subTasks?.length || 0) + 1, 0);
-                const completedInView = viewTasks.reduce((sum, t) => {
-                  const completedSubs = (t.subTasks || []).filter(st => st.completed).length;
-                  const taskCompleted = (t.status === 'Completed' || t.status === 'Paid') ? 1 : 0;
-                  return sum + completedSubs + taskCompleted;
-                }, 0);
-                const progressPercent = totalInView > 0 ? Math.round((completedInView / totalInView) * 100) : 0;
-
-                return editingViewName === view ? (
-                  <Input
-                    key={`edit-${view}`}
-                    autoFocus
-                    value={editedViewNameValue}
-                    onChange={(e) => setEditedViewNameValue(e.target.value)}
-                    onBlur={() => handleRenameView(view, editedViewNameValue)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleRenameView(view, editedViewNameValue);
-                      else if (e.key === 'Escape') setEditingViewName(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="h-6 py-0.5 px-2 text-xs w-28 border border-primary/50 focus-visible:ring-1 focus-visible:ring-primary rounded-md bg-background mb-1"
-                  />
-                ) : (
+            <DragDropContext onDragEnd={onDragEndViews}>
+              <Droppable droppableId="board-views-tabs" direction="horizontal">
+                {(provided) => (
                   <div
-                    key={view}
-                    onClick={() => setActiveBoardView(view)}
-                    className={`
-                      flex items-center gap-1.5 px-4 py-2 border rounded-t-xl select-none cursor-pointer transition-all duration-150 shrink-0
-                      ${isActive 
-                        ? 'bg-card border-border border-b-transparent text-primary font-bold shadow-[0_-3px_8px_-3px_rgba(0,0,0,0.08)] translate-y-[1px]' 
-                        : 'bg-card/60 border-border/60 text-muted-foreground hover:bg-card hover:text-foreground shadow-2xs'
-                      }
-                    `}
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="flex items-end gap-1 border-b border-border/80 px-1 mb-6 overflow-x-auto scrollbar-none"
                   >
-                    <span 
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        setEditingViewName(view);
-                        setEditedViewNameValue(view);
-                      }}
-                      className="text-sm font-semibold select-none truncate max-w-[120px]"
-                      title="Double-click to rename"
-                    >
-                      {view}
-                    </span>
+                    {distinctViews.map((view, index) => {
+                      const isActive = activeBoardView === view;
+                      const viewTasks = projectTasks.filter(t => t.boardView === view);
+                      const totalInView = viewTasks.reduce((sum, t) => sum + (t.subTasks?.length || 0) + 1, 0);
+                      const completedInView = viewTasks.reduce((sum, t) => {
+                        const completedSubs = (t.subTasks || []).filter(st => st.completed).length;
+                        const taskCompleted = (t.status === 'Completed' || t.status === 'Paid') ? 1 : 0;
+                        return sum + completedSubs + taskCompleted;
+                      }, 0);
+                      const progressPercent = totalInView > 0 ? Math.round((completedInView / totalInView) * 100) : 0;
 
-                    {totalInView > 0 ? (
-                      <span className={cn(
-                        "text-[9px] font-bold px-1.5 py-0.5 rounded-full select-none shrink-0 transition-colors ml-1",
-                        isActive 
-                          ? "bg-primary/10 text-primary" 
-                          : "bg-muted text-muted-foreground"
-                      )}>
-                        {completedInView}/{totalInView} ({progressPercent}%)
-                      </span>
+                      return (
+                        <Draggable key={view} draggableId={view} index={index}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className="shrink-0 mb-[1px]"
+                            >
+                              {editingViewName === view ? (
+                                <Input
+                                  autoFocus
+                                  value={editedViewNameValue}
+                                  onChange={(e) => setEditedViewNameValue(e.target.value)}
+                                  onBlur={() => handleRenameView(view, editedViewNameValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleRenameView(view, editedViewNameValue);
+                                    else if (e.key === 'Escape') setEditingViewName(null);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-6 py-0.5 px-2 text-xs w-28 border border-primary/50 focus-visible:ring-1 focus-visible:ring-primary rounded-md bg-background"
+                                />
+                              ) : (
+                                <div
+                                  onClick={() => setActiveBoardView(view)}
+                                  className={`
+                                    flex items-center gap-1.5 px-4 py-2 border rounded-t-xl select-none cursor-pointer transition-all duration-150 shrink-0
+                                    ${isActive 
+                                      ? 'bg-card border-border border-b-transparent text-primary font-bold shadow-[0_-3px_8px_-3px_rgba(0,0,0,0.08)] translate-y-[1px]' 
+                                      : 'bg-card/60 border-border/60 text-muted-foreground hover:bg-card hover:text-foreground shadow-2xs'
+                                    }
+                                  `}
+                                >
+                                  <div {...provided.dragHandleProps} className="cursor-grab text-muted-foreground/30 hover:text-foreground shrink-0">
+                                    <GripVertical className="w-3.5 h-3.5" />
+                                  </div>
+                                  <span 
+                                    onDoubleClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingViewName(view);
+                                      setEditedViewNameValue(view);
+                                    }}
+                                    className="text-sm font-semibold select-none truncate max-w-[120px]"
+                                    title="Double-click to rename"
+                                  >
+                                    {view}
+                                  </span>
+
+                                  {totalInView > 0 ? (
+                                    <span className={cn(
+                                      "text-[9px] font-bold px-1.5 py-0.5 rounded-full select-none shrink-0 transition-colors ml-1",
+                                      isActive 
+                                        ? "bg-primary/10 text-primary" 
+                                        : "bg-muted text-muted-foreground"
+                                    )}>
+                                      {completedInView}/{totalInView} ({progressPercent}%)
+                                    </span>
+                                  ) : (
+                                    <span className={cn(
+                                      "text-[9px] font-bold px-1.5 py-0.5 rounded-full select-none shrink-0 ml-1",
+                                      isActive 
+                                        ? "bg-primary/5 text-primary/60" 
+                                        : "bg-muted/40 text-muted-foreground/50"
+                                    )}>
+                                      0/0
+                                    </span>
+                                  )}
+
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      handleDeleteView(view);
+                                    }}
+                                    className="p-0.5 rounded-full hover:bg-muted-foreground/15 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                    
+                    {isAddViewOpen ? (
+                      <div className="flex items-center gap-1 ml-2 shrink-0 mb-1.5">
+                        <Input
+                          value={newViewName}
+                          onChange={(e) => setNewViewName(e.target.value)}
+                          placeholder="New view name..."
+                          className="h-6 text-xs w-28 border border-primary/50 focus-visible:ring-1 focus-visible:ring-primary rounded-md bg-background px-2 py-0.5"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newViewName.trim()) {
+                              handleAddView(newViewName);
+                              setNewViewName('');
+                              setIsAddViewOpen(false);
+                            }
+                            if (e.key === 'Escape') setIsAddViewOpen(false);
+                          }}
+                        />
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600 rounded-md" onClick={() => {
+                          if (newViewName.trim()) {
+                            setActiveBoardView(newViewName.trim());
+                            setNewViewName('');
+                            setIsAddViewOpen(false);
+                          }
+                        }}>
+                          <Check className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground rounded-md" onClick={() => setIsAddViewOpen(false)}>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     ) : (
-                      <span className={cn(
-                        "text-[9px] font-bold px-1.5 py-0.5 rounded-full select-none shrink-0 ml-1",
-                        isActive 
-                          ? "bg-primary/5 text-primary/60" 
-                          : "bg-muted/40 text-muted-foreground/50"
-                      )}>
-                        0/0
-                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-lg h-7 w-7 text-muted-foreground ml-2 shrink-0 bg-transparent hover:bg-muted/50 mb-1"
+                        onClick={() => setIsAddViewOpen(true)}
+                        title="Add new view"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </Button>
                     )}
-
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        handleDeleteView(view);
-                      }}
-                      className="p-0.5 rounded-full hover:bg-muted-foreground/15 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
                   </div>
-                );
-              })}
-              
-              {isAddViewOpen ? (
-                <div className="flex items-center gap-1 ml-2 shrink-0 mb-1.5">
-                  <Input
-                    value={newViewName}
-                    onChange={(e) => setNewViewName(e.target.value)}
-                    placeholder="New view name..."
-                    className="h-6 text-xs w-28 border border-primary/50 focus-visible:ring-1 focus-visible:ring-primary rounded-md bg-background px-2 py-0.5"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newViewName.trim()) {
-                        handleAddView(newViewName);
-                        setNewViewName('');
-                        setIsAddViewOpen(false);
-                      }
-                      if (e.key === 'Escape') setIsAddViewOpen(false);
-                    }}
-                  />
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600 rounded-md" onClick={() => {
-                    if (newViewName.trim()) {
-                      setActiveBoardView(newViewName.trim());
-                      setNewViewName('');
-                      setIsAddViewOpen(false);
-                    }
-                  }}>
-                    <Check className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground rounded-md" onClick={() => setIsAddViewOpen(false)}>
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-lg h-7 w-7 text-muted-foreground ml-2 shrink-0 bg-transparent hover:bg-muted/50 mb-1"
-                  onClick={() => setIsAddViewOpen(true)}
-                  title="Add new view"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </Button>
-              )}
-            </div>
+                )}
+              </Droppable>
+            </DragDropContext>
 
             {!activeBoardView ? (
               <div className="flex flex-col items-center justify-center p-16 text-center bg-card rounded-2xl border border-dashed border-border/80 max-w-xl mx-auto my-8 space-y-4 shadow-sm">
