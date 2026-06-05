@@ -80,7 +80,7 @@ export function TemplateList() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground/90 px-1 mb-2">Templates</h1>
           <p className="text-xs text-muted-foreground px-1">
-            สร้างและนำเทมเพลตโครงสร้างกลุ่มงาน (Task Groups), งานย่อย (Tasks) หรือเช็คลิสต์ไปใช้จริงในหน้าบอร์ดโครงการ
+            สร้างและนำเทมเพลตรายการงานไปใช้จริงในหน้าบอร์ดโครงการ
           </p>
         </div>
         
@@ -132,17 +132,21 @@ export function TemplateList() {
                     </p>
                   </div>
                   <Badge variant="secondary" className="shrink-0 text-[10px] font-bold rounded-lg uppercase tracking-wide px-2 py-0.5">
-                    {tpl.type === 'project' && <><FolderKanban className="w-3 h-3 mr-1" /> Project</>}
-                    {tpl.type === 'group' && <><LayoutGrid className="w-3 h-3 mr-1" /> Group</>}
-                    {tpl.type === 'task' && <><ListTodo className="w-3 h-3 mr-1" /> Checklist</>}
+                    <ListTodo className="w-3 h-3 mr-1" /> Task Template
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="pt-0 border-t border-border/40 bg-card p-4 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                  {tpl.type === 'project' && `${tpl.data?.groups?.length || 0} Groups`}
-                  {tpl.type === 'group' && `${tpl.data?.groups?.[0]?.tasks?.length || 0} Tasks`}
-                  {tpl.type === 'task' && `${tpl.data?.subTasks?.length || 0} Items`}
+                  {(() => {
+                    if (tpl.type === 'task') return `${tpl.data?.subTasks?.length || 0} Tasks`;
+                    if (tpl.type === 'group') return `${tpl.data?.groups?.[0]?.tasks?.length || 0} Tasks`;
+                    if (tpl.type === 'project') {
+                      const count = (tpl.data?.groups || []).reduce((sum: number, g: any) => sum + (g.tasks?.length || 0), 0);
+                      return `${count} Tasks`;
+                    }
+                    return '0 Tasks';
+                  })()}
                 </span>
                 
                 <div className="flex items-center gap-1">

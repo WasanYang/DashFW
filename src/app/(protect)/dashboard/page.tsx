@@ -334,11 +334,14 @@ export default function DashboardPage() {
     let completed = 0;
     let total = 0;
     tasks.forEach((p) => {
-      if (p.subTasks) {
+      if (p.subTasks && p.subTasks.length > 0) {
         p.subTasks.forEach((t) => {
           total++;
           if (t.completed) completed++;
         });
+      } else {
+        total++;
+        if (p.status === 'Completed' || p.status === 'Paid') completed++;
       }
     });
 

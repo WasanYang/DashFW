@@ -94,13 +94,15 @@ export default function ProjectDetailsPage() {
   const router = useRouter();
   const id = params?.id as string;
 
+  const { data: allTemplates = [] } = useGetTaskTemplatesQuery();
+
   const [activeTab, setActiveTab] = useState<'Tasks' | 'Notes' | 'Calendar' | 'Timesheet' | 'Invoices' | 'Edit'>('Tasks');
 
   // Search task query
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
 
   // Horizontal Board Views
-  const [activeBoardView, setActiveBoardView] = useState('Main View');
+  const [activeBoardView, setActiveBoardView] = useState<string>('');
   const [isAddViewOpen, setIsAddViewOpen] = useState(false);
   const [newViewName, setNewViewName] = useState('');
   
@@ -121,6 +123,59 @@ export default function ProjectDetailsPage() {
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabTitle, setEditingTabTitle] = useState('');
 
+  // AI Notes Generator states
+  const [isAiNotesOpen, setIsAiNotesOpen] = useState(false);
+  const [isGeneratingAiNotes, setIsGeneratingAiNotes] = useState(false);
+
+  // Templates Import states
+  const [isImportTemplateOpen, setIsImportTemplateOpen] = useState(false);
+
+  // Task Details Sidebar State
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<{ groupId: string, task: SubTask } | null>(null);
+
+  // New item inputs
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newTasksInputs, setNewTasksInputs] = useState<Record<string, string>>({});
+  const [taskNotesInputs, setTaskNotesInputs] = useState<Record<string, string>>({});
+
+  const project = projects.find((p) => p.id === id);
+
+  // Filter tasks that belong to this project container
+  const projectTasks = tasks.filter((t) => t.projectId === id);
+
+  // Extract distinct views from tasks
+  const distinctViews = Array.from(new Set([
+    ...(project?.boardViews || []),
+    ...projectTasks.map(t => t.boardView).filter(Boolean) as string[]
+  ]));
+
+  // Derived tasks filtered by active view
+  const filteredTasksByView = projectTasks
+    .filter((t) => t.boardView === activeBoardView)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  // Automatically select first view if none is selected or view was deleted
+  useEffect(() => {
+    if (distinctViews.length > 0) {
+      if (!activeBoardView || !distinctViews.includes(activeBoardView)) {
+        setActiveBoardView(distinctViews[0]);
+      }
+    } else {
+      setActiveBoardView('');
+    }
+  }, [distinctViews, activeBoardView]);
+
+  // Synchronize active details section tab
+  useEffect(() => {
+    if (project?.detailsSections && project.detailsSections.length > 0) {
+      if (!activeSectionId || !project.detailsSections.some(s => s.id === activeSectionId)) {
+        setActiveSectionId(project.detailsSections[0].id);
+      }
+    } else {
+      setActiveSectionId(null);
+    }
+  }, [project, activeSectionId]);
+
   // Helper to add template sections
   const addTemplateSection = async (title: string, defaultContent: string) => {
     if (!project) return;
@@ -134,10 +189,6 @@ export default function ProjectDetailsPage() {
     await updateProject({ id: project.id, data: { detailsSections: [...currentSections, newSection] } }).unwrap();
     setActiveSectionId(newSectionId);
   };
-
-  // AI Notes Generator states & handlers
-  const [isAiNotesOpen, setIsAiNotesOpen] = useState(false);
-  const [isGeneratingAiNotes, setIsGeneratingAiNotes] = useState(false);
 
   const handleGenerateAiNotes = async (rawText: string) => {
     if (!rawText.trim()) return null;
@@ -208,104 +259,97 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  // Templates Import states & handler
-  const [isImportTemplateOpen, setIsImportTemplateOpen] = useState(false);
-  const { data: allTemplates = [] } = useGetTaskTemplatesQuery();
-
   const handleImportTemplate = async (templateId: string, targetGroupId: string) => {
     if (!project) return;
     const template = allTemplates.find((t: any) => t._id === templateId || t.id === templateId);
     if (!template) return;
 
     try {
+      let order = 0;
+      const highestOrder = filteredTasksByView.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+
       if (template.type === 'project') {
         const groups = template.data.groups || [];
         for (const group of groups) {
-          const formattedSubTasks: SubTask[] = [];
-          (group.tasks || []).forEach((task: any, taskIdx: number) => {
-            const parentSubTaskId = `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`;
-            formattedSubTasks.push({
-              id: parentSubTaskId,
-              text: task.title,
-              description: task.details || '',
-              completed: false
-            });
+          for (const task of group.tasks || []) {
+            await addTask({
+              title: `${group.title}: ${task.title}`,
+              details: task.details || '',
+              projectId: id,
+              clientId: project.clientId,
+              status: 'Backlog',
+              gross_price: 0,
+              deadline: new Date(),
+              revisions: 0,
+              subTasks: [],
+              order: highestOrder + order++,
+              boardView: activeBoardView || undefined
+            }).unwrap();
 
-            (task.subTasks || []).forEach((sub: any, subIdx: number) => {
-              formattedSubTasks.push({
-                id: `imported-sub-${Date.now()}-${taskIdx}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
-                text: `  ${sub.text}`,
-                completed: false
-              });
-            });
-          });
-
-          await addTask({
-            title: group.title,
-            projectId: id,
-            clientId: project.clientId,
-            status: 'Backlog',
-            gross_price: 0,
-            deadline: new Date(),
-            revisions: 0,
-            subTasks: formattedSubTasks,
-            boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
-          }).unwrap();
+            for (const sub of task.subTasks || []) {
+              await addTask({
+                title: `${group.title}: ${task.title} - ${sub.text}`,
+                projectId: id,
+                clientId: project.clientId,
+                status: 'Backlog',
+                gross_price: 0,
+                deadline: new Date(),
+                revisions: 0,
+                subTasks: [],
+                order: highestOrder + order++,
+                boardView: activeBoardView || undefined
+              }).unwrap();
+            }
+          }
         }
       } else if (template.type === 'group') {
         const group = template.data.groups?.[0];
         if (group) {
-          const formattedSubTasks: SubTask[] = [];
-          (group.tasks || []).forEach((task: any, taskIdx: number) => {
-            const parentSubTaskId = `imported-task-${Date.now()}-${taskIdx}-${Math.random().toString(36).substr(2, 9)}`;
-            formattedSubTasks.push({
-              id: parentSubTaskId,
-              text: task.title,
-              description: task.details || '',
-              completed: false
-            });
+          for (const task of group.tasks || []) {
+            await addTask({
+              title: `${group.title}: ${task.title}`,
+              details: task.details || '',
+              projectId: id,
+              clientId: project.clientId,
+              status: 'Backlog',
+              gross_price: 0,
+              deadline: new Date(),
+              revisions: 0,
+              subTasks: [],
+              order: highestOrder + order++,
+              boardView: activeBoardView || undefined
+            }).unwrap();
 
-            (task.subTasks || []).forEach((sub: any, subIdx: number) => {
-              formattedSubTasks.push({
-                id: `imported-sub-${Date.now()}-${taskIdx}-${subIdx}-${Math.random().toString(36).substr(2, 9)}`,
-                text: `  ${sub.text}`,
-                completed: false
-              });
-            });
-          });
-
+            for (const sub of task.subTasks || []) {
+              await addTask({
+                title: `${group.title}: ${task.title} - ${sub.text}`,
+                projectId: id,
+                clientId: project.clientId,
+                status: 'Backlog',
+                gross_price: 0,
+                deadline: new Date(),
+                revisions: 0,
+                subTasks: [],
+                order: highestOrder + order++,
+                boardView: activeBoardView || undefined
+              }).unwrap();
+            }
+          }
+        }
+      } else if (template.type === 'task') {
+        for (const sub of template.data.subTasks || []) {
           await addTask({
-            title: group.title,
+            title: sub.text,
             projectId: id,
             clientId: project.clientId,
             status: 'Backlog',
             gross_price: 0,
             deadline: new Date(),
             revisions: 0,
-            subTasks: formattedSubTasks,
-            boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
+            subTasks: [],
+            order: highestOrder + order++,
+            boardView: activeBoardView || undefined
           }).unwrap();
-        }
-      } else if (template.type === 'task') {
-        if (!targetGroupId) {
-          toast({
-            title: "โปรดเลือกกลุ่มงาน",
-            description: "คุณต้องเลือกกลุ่มงานเป้าหมายเพื่อนำเช็คลิสต์นี้ไปบันทึก",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        const targetTask = projectTasks.find(t => t.id === targetGroupId);
-        if (targetTask) {
-          const newSubTasks = (template.data.subTasks || []).map((sub: any, subIdx: number) => ({
-            id: `imported-checklist-${Date.now()}-${subIdx}`,
-            text: sub.text,
-            completed: false
-          }));
-
-          const updatedSubTasks = [...(targetTask.subTasks || []), ...newSubTasks];
-          await updateTask({ id: targetGroupId, data: { subTasks: updatedSubTasks } }).unwrap();
         }
       }
 
@@ -324,25 +368,6 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  // Task Details Sidebar State
-  const [selectedTaskDetail, setSelectedTaskDetail] = useState<{ groupId: string, task: SubTask } | null>(null);
-
-  // New item inputs
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newTasksInputs, setNewTasksInputs] = useState<Record<string, string>>({});
-
-  const project = projects.find((p) => p.id === id);
-
-  // Synchronize active details section tab
-  useEffect(() => {
-    if (project?.detailsSections && project.detailsSections.length > 0) {
-      if (!activeSectionId || !project.detailsSections.some(s => s.id === activeSectionId)) {
-        setActiveSectionId(project.detailsSections[0].id);
-      }
-    } else {
-      setActiveSectionId(null);
-    }
-  }, [project, activeSectionId]);
 
   if (loadingProjects || loadingTasks || loadingClients || loadingTimeLogs || loadingInvoices) {
     return <div className="p-8 text-center text-muted-foreground">Loading workspace...</div>;
@@ -363,50 +388,35 @@ export default function ProjectDetailsPage() {
     (c) => c._id === project.clientId,
   );
 
-  // Filter tasks that belong to this project container
-  const projectTasks = tasks.filter((t) => t.projectId === id);
 
-  // Extract distinct views from tasks
-  const distinctViews = Array.from(new Set([
-    ...(project?.boardViews || []),
-    ...projectTasks.map(t => t.boardView || 'Main View')
-  ]));
-  if (!distinctViews.includes('Main View')) {
-    distinctViews.unshift('Main View');
-  }
-
-  // Filter tasks in active view
-  const filteredTasksByView = projectTasks.filter(t => (t.boardView || 'Main View') === activeBoardView);
-
-  // Map tasks to taskGroups format for UI checklist
-  const taskGroups = (() => {
-    let rawGroups = filteredTasksByView.map((t) => ({
+  // Map tasks to flat taskList format for UI checklist
+  const taskList = (() => {
+    let rawTasks = filteredTasksByView.map((t) => ({
       id: t.id,
       text: t.title,
       completed: t.status === 'Completed' || t.status === 'Paid',
-      children: t.subTasks || []
+      description: t.details || '',
+      startDate: t.startDate,
+      dueDate: t.deadline,
+      repeats: t.repeats,
+      assignee: t.assignee,
+      notes: t.notes || '',
+      originalTask: t
     }));
 
-    if (rawGroups.length === 0) {
+    if (rawTasks.length === 0) {
       return [];
     }
 
     // Filter by search query if set
-    if (!taskSearchQuery.trim()) return rawGroups;
+    if (!taskSearchQuery.trim()) return rawTasks;
     const query = taskSearchQuery.toLowerCase();
-    return rawGroups.map(g => ({
-      ...g,
-      children: g.children.filter(t => t.text.toLowerCase().includes(query))
-    })).filter(g => g.children.length > 0 || g.text.toLowerCase().includes(query));
+    return rawTasks.filter((t) => t.text.toLowerCase().includes(query));
   })();
 
   // Calculate statistics based on current active view
-  const totalTasksCount = filteredTasksByView.reduce((sum, t) => sum + (t.subTasks?.length || 0) + 1, 0);
-  const completedTasksCount = filteredTasksByView.reduce((sum, t) => {
-    const completedSubs = (t.subTasks || []).filter(st => st.completed).length;
-    const taskCompleted = (t.status === 'Completed' || t.status === 'Paid') ? 1 : 0;
-    return sum + completedSubs + taskCompleted;
-  }, 0);
+  const totalTasksCount = filteredTasksByView.length;
+  const completedTasksCount = filteredTasksByView.filter(t => t.status === 'Completed' || t.status === 'Paid').length;
 
   const progressPercent = totalTasksCount > 0 ? (completedTasksCount / totalTasksCount) * 100 : 0;
 
@@ -495,7 +505,7 @@ export default function ProjectDetailsPage() {
       await updateProject({ id, data: { boardViews: Array.from(new Set(newViews)) } }).unwrap();
       
       // 2. Find all tasks currently in this view and update them
-      const tasksInView = projectTasks.filter(t => (t.boardView || 'Main View') === oldName);
+      const tasksInView = projectTasks.filter(t => t.boardView === oldName);
       if (tasksInView.length > 0) {
         await Promise.all(
           tasksInView.map(t => 
@@ -533,7 +543,7 @@ export default function ProjectDetailsPage() {
       await updateProject({ id, data: { boardViews: newViews } }).unwrap();
       
       // 2. Duplicate all tasks
-      const tasksInView = projectTasks.filter(t => (t.boardView || 'Main View') === viewName);
+      const tasksInView = projectTasks.filter(t => t.boardView === viewName);
       if (tasksInView.length > 0) {
         await Promise.all(
           tasksInView.map(t => {
@@ -552,10 +562,6 @@ export default function ProjectDetailsPage() {
   };
 
   const handleDeleteView = async (viewName: string) => {
-    if (viewName === 'Main View') {
-      toast({ title: 'ไม่สามารถลบได้', description: 'Main View เป็นมุมมองหลักของโปรเจกต์', variant: 'destructive' });
-      return;
-    }
     if (!window.confirm(`คุณต้องการลบ View "${viewName}" และงานทั้งหมดที่อยู่ในนี้ใช่หรือไม่?`)) return;
     
     // 1. Remove from project.boardViews
@@ -571,7 +577,7 @@ export default function ProjectDetailsPage() {
         );
       }
       toast({ title: 'ลบสำเร็จ', description: `ลบ View "${viewName}" เรียบร้อยแล้ว` });
-      setActiveBoardView('Main View');
+      setActiveBoardView(newViews.length > 0 ? newViews[0] : '');
     } catch (err) {
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถลบ View ได้', variant: 'destructive' });
     }
@@ -588,14 +594,17 @@ export default function ProjectDetailsPage() {
       gross_price: 0,
       deadline: new Date(),
       revisions: 0,
-      boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
+      boardView: activeBoardView || undefined
     });
   };
 
-  // CRUD Task Group handlers (creating a Task card under the Project)
-  const handleAddTaskGroup = async () => {
-    if (!newGroupName.trim()) return;
+  // Create flat task
+  const handleAddTaskDirectly = async () => {
+    if (!newGroupName.trim() || !project || !project.clientId) return;
     
+    // Find highest order in current view
+    const highestOrder = filteredTasksByView.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+
     await addTask({
       title: newGroupName.trim(),
       projectId: id,
@@ -605,144 +614,74 @@ export default function ProjectDetailsPage() {
       deadline: new Date(),
       revisions: 0,
       subTasks: [],
-      boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
+      order: highestOrder + 1,
+      boardView: activeBoardView || undefined
     }).unwrap();
 
     setNewGroupName('');
-    toast({ title: 'สร้างกลุ่มงานใหม่สำเร็จ' });
+    toast({ title: 'สร้างงานสำเร็จ' });
   };
 
-  // Adding a subtask inside a Task card
-  const handleAddTaskInGroup = async (groupId: string) => {
-    const taskText = newTasksInputs[groupId];
-    if (!taskText || !taskText.trim()) return;
-
-    const targetTask = projectTasks.find(t => t.id === groupId);
-    if (!targetTask) return;
-
-    const newSubTask: SubTask = {
-      id: `sub-${Date.now()}`,
-      text: taskText.trim(),
-      completed: false
-    };
-
-    const updatedSubTasks = [...(targetTask.subTasks || []), newSubTask];
-    await updateTask({ id: groupId, data: { subTasks: updatedSubTasks } }).unwrap();
+  // Toggle task completed status
+  const handleToggleTaskStatus = async (taskId: string, checked: boolean) => {
+    const newStatus = checked ? 'Completed' : 'In Progress';
     
-    setNewTasksInputs(prev => ({ ...prev, [groupId]: '' }));
-    toast({ title: 'เพิ่มรายการงานย่อยสำเร็จ' });
-  };
-
-  // Toggle checklist item status
-  const handleToggleTask = async (subTaskId: string, checked: boolean, parentTaskId: string) => {
-    const targetTask = projectTasks.find(t => t.id === parentTaskId);
-    if (!targetTask) return;
-
-    const updatedSubTasks = (targetTask.subTasks || []).map(st => {
-      if (st.id === subTaskId) {
-        return { ...st, completed: checked };
-      }
-      return st;
-    });
-
-    // Check if all subtasks are completed
-    const allCompleted = updatedSubTasks.length > 0 && updatedSubTasks.every(st => st.completed);
-    
-    // Determine new status for parent task
-    let newStatus = targetTask.status;
-    if (allCompleted) {
-      newStatus = 'Completed';
-    } else if (!checked && targetTask.status === 'Completed') {
-      newStatus = 'In Progress';
-    }
-
     await updateTask({ 
-      id: parentTaskId, 
+      id: taskId, 
       data: { 
-        subTasks: updatedSubTasks,
         status: newStatus
       } 
     }).unwrap();
+
+    toast({ title: checked ? 'ทำเครื่องหมายเสร็จสิ้นแล้ว' : 'เปลี่ยนสถานะเป็นกำลังดำเนินการ' });
   };
 
-  // Toggle parent task (group) status directly
-  const handleToggleGroupStatus = async (groupId: string, checked: boolean) => {
-    const targetTask = projectTasks.find(t => t.id === groupId);
-    if (!targetTask) return;
-
-    const newStatus = checked ? 'Completed' : 'In Progress';
-    
-    // Also toggle all subtasks to match group checked state
-    const updatedSubTasks = (targetTask.subTasks || []).map(st => ({
-      ...st,
-      completed: checked
-    }));
-
-    await updateTask({ 
-      id: groupId, 
-      data: { 
-        status: newStatus,
-        subTasks: updatedSubTasks
-      } 
-    }).unwrap();
-
-    toast({ title: checked ? 'ทำเครื่องหมายเสร็จสิ้นกลุ่มงานแล้ว' : 'เปลี่ยนสถานะกลุ่มงานเป็นกำลังดำเนินการ' });
-  };
-
-  // Delete Task card or subtask
-  const handleDeleteTaskOrGroup = async (targetId: string, parentTaskId?: string) => {
-    if (parentTaskId) {
-      const targetTask = projectTasks.find(t => t.id === parentTaskId);
-      if (!targetTask) return;
-
-      const updatedSubTasks = (targetTask.subTasks || []).filter(st => st.id !== targetId);
-      await updateTask({ id: parentTaskId, data: { subTasks: updatedSubTasks } }).unwrap();
-    } else {
-      await deleteTask({ id: targetId }).unwrap();
-    }
+  // Delete task
+  const handleDeleteTask = async (taskId: string) => {
+    await deleteTask({ id: taskId }).unwrap();
     toast({ title: 'ลบรายการออกเรียบร้อยแล้ว' });
   };
 
-  // Rename Task card or subtask
-  const handleRenameTaskOrGroup = async (targetId: string, textVal: string, parentTaskId?: string) => {
+  // Rename task
+  const handleRenameTask = async (taskId: string, textVal: string) => {
     if (!textVal.trim()) return;
-    if (parentTaskId) {
-      const targetTask = projectTasks.find(t => t.id === parentTaskId);
-      if (!targetTask) return;
-
-      const updatedSubTasks = (targetTask.subTasks || []).map(st => {
-        if (st.id === targetId) {
-          return { ...st, text: textVal.trim() };
-        }
-        return st;
-      });
-      await updateTask({ id: parentTaskId, data: { subTasks: updatedSubTasks } }).unwrap();
-    } else {
-      await updateTask({ id: targetId, data: { title: textVal.trim() } }).unwrap();
-    }
+    await updateTask({ id: taskId, data: { title: textVal.trim() } }).unwrap();
     setEditingId(null);
     toast({ title: 'แก้ไขข้อความสำเร็จ' });
   };
 
-  // Update specific field inside SubTask from the Sidebar
+  // Save note / remark
+  const handleUpdateTaskNotes = async (taskId: string, notesVal: string) => {
+    try {
+      await updateTask({ id: taskId, data: { notes: notesVal } }).unwrap();
+    } catch (err) {
+      toast({ title: 'เกิดข้อผิดพลาดในการบันทึกหมายเหตุ', variant: 'destructive' });
+    }
+  };
+
+  // Update specific field inside Task from the Sidebar
   const handleUpdateTaskDetail = async (field: keyof SubTask, value: any) => {
     if (!selectedTaskDetail) return;
     const { groupId, task } = selectedTaskDetail;
-    const targetTask = projectTasks.find(t => t.id === groupId);
-    if (!targetTask) return;
+    const taskId = groupId;
+
+    let dbField = field as string;
+    let dbValue = value;
+    if (field === 'text') dbField = 'title';
+    if (field === 'description') dbField = 'details';
+    if (field === 'dueDate') dbField = 'deadline';
 
     const updatedTask = { ...task, [field]: value };
-    const updatedSubTasks = (targetTask.subTasks || []).map(st => st.id === task.id ? updatedTask : st);
     
     // Optimistic UI update
     setSelectedTaskDetail({ groupId, task: updatedTask });
     
     try {
-      await updateTask({ id: groupId, data: { subTasks: updatedSubTasks } }).unwrap();
+      await updateTask({ id: taskId, data: { [dbField]: dbValue } }).unwrap();
     } catch (err) {
       toast({ title: 'อัปเดตล้มเหลว', description: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', variant: 'destructive' });
       // Revert on fail
-      setSelectedTaskDetail({ groupId, task });
+      setSelectedTaskDetail(selectedTaskDetail);
     }
   };
 
@@ -754,24 +693,26 @@ export default function ProjectDetailsPage() {
     setIsGeneratingAi(true);
     try {
       const result = await createAiChecklist({ description: aiPrompt.trim() });
-      const newAiSubTasks: SubTask[] = result.checklistItems.map((itemText, idx) => ({
-        id: `sub-ai-${Date.now()}-${idx}`,
-        text: itemText,
-        completed: false,
-      }));
+      
+      // Find highest order in current view
+      const highestOrder = filteredTasksByView.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
 
-      // Create a new task card for these AI suggestions
-      await addTask({
-        title: `⚡ AI: ${aiPrompt.trim().substring(0, 30)}...`,
-        projectId: id,
-        clientId: project.clientId,
-        status: 'Backlog',
-        gross_price: 0,
-        deadline: new Date(),
-        revisions: 0,
-        subTasks: newAiSubTasks,
-        boardView: activeBoardView !== 'Main View' ? activeBoardView : undefined
-      }).unwrap();
+      // Create a flat task for each AI checklist item
+      let idx = 1;
+      for (const itemText of result.checklistItems) {
+        await addTask({
+          title: itemText,
+          projectId: id,
+          clientId: project.clientId,
+          status: 'Backlog',
+          gross_price: 0,
+          deadline: new Date(),
+          revisions: 0,
+          subTasks: [],
+          order: highestOrder + idx++,
+          boardView: activeBoardView || undefined
+        }).unwrap();
+      }
 
       setAiPrompt('');
       toast({
@@ -782,7 +723,7 @@ export default function ProjectDetailsPage() {
       console.error(err);
       toast({
         title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถสร้างรายการงานย่อยจาก AI ได้',
+        description: 'ไม่สามารถสร้างรายการงานจาก AI ได้',
         variant: 'destructive',
       });
     } finally {
@@ -913,7 +854,7 @@ export default function ProjectDetailsPage() {
             <div className="flex items-end gap-1 border-b border-border/80 px-1 mb-6 overflow-x-auto scrollbar-none">
               {distinctViews.map(view => {
                 const isActive = activeBoardView === view;
-                const viewTasks = projectTasks.filter(t => (t.boardView || 'Main View') === view);
+                const viewTasks = projectTasks.filter(t => t.boardView === view);
                 const totalInView = viewTasks.reduce((sum, t) => sum + (t.subTasks?.length || 0) + 1, 0);
                 const completedInView = viewTasks.reduce((sum, t) => {
                   const completedSubs = (t.subTasks || []).filter(st => st.completed).length;
@@ -980,18 +921,15 @@ export default function ProjectDetailsPage() {
                       </span>
                     )}
 
-                    {view !== 'Main View' && (
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (!window.confirm(`Are you sure you want to delete "${view}"?`)) return;
-                          handleDeleteView(view);
-                        }}
-                        className="p-0.5 rounded-full hover:bg-muted-foreground/15 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        handleDeleteView(view);
+                      }}
+                      className="p-0.5 rounded-full hover:bg-muted-foreground/15 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 );
               })}
@@ -1039,159 +977,114 @@ export default function ProjectDetailsPage() {
               )}
             </div>
 
-            {/* Search and task stats toolbar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60">
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                <div className="relative w-full sm:max-w-xs">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search tasks..."
-                    value={taskSearchQuery}
-                    onChange={(e) => setTaskSearchQuery(e.target.value)}
-                    className="pl-9 h-9 rounded-xl border-border/60 text-xs bg-background"
-                  />
+            {!activeBoardView ? (
+              <div className="flex flex-col items-center justify-center p-16 text-center bg-card rounded-2xl border border-dashed border-border/80 max-w-xl mx-auto my-8 space-y-4 shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <ListTodo className="w-6 h-6 animate-pulse" />
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Input
-                    placeholder="เพิ่มหัวข้องานหลัก..."
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    className="h-9 w-full sm:w-48 rounded-xl text-xs border-border/60 bg-background"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAddTaskGroup();
-                    }}
-                  />
-                  <Button
-                    onClick={handleAddTaskGroup}
-                    className="h-9 rounded-xl bg-primary text-primary-foreground font-semibold px-3 gap-1 text-xs shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> หัวข้องาน
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setIsImportTemplateOpen(true)}
-                    className="h-9 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 hover:text-primary transition-all font-semibold px-3 gap-1 text-xs shrink-0"
-                  >
-                    <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                    ใช้เทมเพลต (Templates)
-                  </Button>
-                </div>
+                <h3 className="text-base font-bold text-foreground">ยังไม่มีมุมมอง (View) ในบอร์ดนี้</h3>
+                <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+                  กรุณาสร้างมุมมองใหม่เพื่อเริ่มต้นสร้างและจัดการรายการงานย่อยของคุณอย่างเป็นระเบียบ เช่น "Phase 1", "Phase 2"
+                </p>
+                <Button
+                  onClick={() => setIsAddViewOpen(true)}
+                  className="rounded-xl h-10 px-5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> สร้างมุมมองแรกของคุณ
+                </Button>
               </div>
-
-              <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                <div className="flex items-center gap-2 flex-grow sm:flex-grow-0">
-                  <Progress value={progressPercent} className="w-24 sm:w-32 h-2" />
-                  <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">
-                    {completedTasksCount}/{totalTasksCount} items ({Math.round(progressPercent)}%)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* List of Task Groups (Checklist Sheet) */}
-            <div className="bg-card border border-border/60 rounded-2xl shadow-xs overflow-hidden">
-              <DragDropContext onDragEnd={onDragEnd}>
-                <div className="divide-y divide-border/40">
-                  {taskGroups.length === 0 ? (
-                    <div className="py-16 text-center text-xs text-muted-foreground bg-card">
-                      <ListTodo className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                      No tasks found. Create a new main task or use AI to generate a checklist.
+            ) : (
+              <>
+                {/* Search and task stats toolbar */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60">
+                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                    <div className="relative w-full sm:max-w-xs">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search tasks..."
+                        value={taskSearchQuery}
+                        onChange={(e) => setTaskSearchQuery(e.target.value)}
+                        className="pl-9 h-9 rounded-xl border-border/60 text-xs bg-background"
+                      />
                     </div>
-                  ) : (
-                    taskGroups.map((group) => (
-                      <div key={group.id} className="p-5 space-y-3 transition-colors hover:bg-muted/5 group/section">
-                        {/* Group Header */}
-                        <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-2">
-                          <div className="flex items-center gap-2.5 flex-grow">
-                            <input
-                              type="checkbox"
-                              checked={group.completed}
-                              onChange={(e) => handleToggleGroupStatus(group.id, e.target.checked)}
-                              className="h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
-                            />
-                            {editingId === group.id ? (
-                              <div className="flex items-center gap-1.5 flex-grow">
-                                <Input
-                                  value={editingText}
-                                  onChange={(e) => setEditingText(e.target.value)}
-                                  className="h-7 text-xs font-semibold max-w-xs border-primary"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleRenameTaskOrGroup(group.id, editingText);
-                                  }}
-                                />
-                                <Button size="icon" className="h-7 w-7 bg-green-600 hover:bg-green-700 text-white rounded-lg" onClick={() => handleRenameTaskOrGroup(group.id, editingText)}>
-                                  <Check className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setEditingId(null)}>
-                                  <X className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <h3
-                                className={cn(
-                                  "font-bold text-sm cursor-pointer flex items-center gap-2 hover:text-primary transition-colors",
-                                  group.completed ? "line-through text-muted-foreground/60" : "text-foreground"
-                                )}
-                                onClick={() => {
-                                  setEditingId(group.id);
-                                  setEditingText(group.text);
-                                }}
-                              >
-                                {group.text}
-                                {group.completed && (
-                                  <Badge variant="secondary" className="text-[9px] text-green-600 bg-green-50 hover:bg-green-50 border-none font-bold px-1.5 py-0">Done</Badge>
-                                )}
-                              </h3>
-                            )}
-                            <span className="text-[10px] font-bold bg-muted text-muted-foreground px-2 py-0.5 rounded-full shrink-0">
-                              {group.children?.length || 0}
-                            </span>
-                          </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Input
+                        placeholder="เพิ่มงานใหม่..."
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        className="h-9 w-full sm:w-48 rounded-xl text-xs border-border/60 bg-background"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddTaskDirectly();
+                        }}
+                      />
+                      <Button
+                        onClick={handleAddTaskDirectly}
+                        className="h-9 rounded-xl bg-primary text-primary-foreground font-semibold px-3 gap-1 text-xs shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> สร้างงาน
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => setIsImportTemplateOpen(true)}
+                        className="h-9 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 hover:text-primary transition-all font-semibold px-3 gap-1 text-xs shrink-0"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+                        ใช้เทมเพลต (Templates)
+                      </Button>
+                    </div>
+                  </div>
 
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg opacity-0 group-hover/section:opacity-100 transition-opacity"
-                            onClick={() => handleDeleteTaskOrGroup(group.id)}
-                            title="Delete Group"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
+                  <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                    <div className="flex items-center gap-2 flex-grow sm:flex-grow-0">
+                      <Progress value={progressPercent} className="w-24 sm:w-32 h-2" />
+                      <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">
+                        {completedTasksCount}/{totalTasksCount} items ({Math.round(progressPercent)}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                        {/* Task Group list items */}
-                        <Droppable droppableId={group.id} type="task">
-                          {(provided) => (
-                            <div
-                              {...provided.droppableProps}
-                              ref={provided.innerRef}
-                              className="space-y-1.5"
-                            >
-                              {(group.children || []).map((task, taskIdx) => (
-                                <Draggable key={task.id} draggableId={task.id} index={taskIdx}>
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      className={cn(
-                                        "flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/40 transition-all gap-4 group/row border border-transparent",
-                                        snapshot.isDragging && "shadow-lg bg-card border-primary/20 opacity-95 z-50"
-                                      )}
-                                    >
-                                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        <div
-                                          {...provided.dragHandleProps}
-                                          className="cursor-grab text-muted-foreground/30 hover:text-foreground opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0"
-                                        >
-                                          <GripVertical className="h-4 w-4" />
-                                        </div>
-                                        <input
-                                          type="checkbox"
-                                          checked={task.completed}
-                                          onChange={(e) => handleToggleTask(task.id, e.target.checked, group.id)}
-                                          className="h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
-                                        />
+                {/* List of Tasks (Checklist Sheet) */}
+                <div className="bg-card border border-border/60 rounded-2xl shadow-xs overflow-hidden">
+                  <DragDropContext onDragEnd={onDragEnd}>
+                    <Droppable droppableId="project-tasks-list" type="task">
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="divide-y divide-border/40"
+                        >
+                          {taskList.length === 0 ? (
+                            <div className="py-16 text-center text-xs text-muted-foreground bg-card">
+                              <ListTodo className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                              No tasks found. Create a new task or use AI to generate tasks.
+                            </div>
+                          ) : (
+                            taskList.map((task, taskIdx) => (
+                              <Draggable key={task.id} draggableId={task.id} index={taskIdx}>
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    className={cn(
+                                      "flex items-center justify-between p-5 transition-all gap-4 group/row border border-transparent hover:bg-muted/5",
+                                      snapshot.isDragging && "shadow-lg bg-card border-primary/20 opacity-95 z-50"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      <div
+                                        {...provided.dragHandleProps}
+                                        className="cursor-grab text-muted-foreground/30 hover:text-foreground opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0"
+                                      >
+                                        <GripVertical className="h-4 w-4" />
+                                      </div>
+                                      <input
+                                        type="checkbox"
+                                        checked={task.completed}
+                                        onChange={(e) => handleToggleTaskStatus(task.id, e.target.checked)}
+                                        className="h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                                      />
+                                      <div className="flex flex-col flex-1 min-w-0">
                                         {editingId === task.id ? (
                                           <div className="flex items-center gap-1.5 flex-grow">
                                             <Input
@@ -1200,10 +1093,10 @@ export default function ProjectDetailsPage() {
                                               className="h-8 text-xs max-w-lg border-primary"
                                               autoFocus
                                               onKeyDown={(e) => {
-                                                if (e.key === 'Enter') handleRenameTaskOrGroup(task.id, editingText, group.id);
+                                                if (e.key === 'Enter') handleRenameTask(task.id, editingText);
                                               }}
                                             />
-                                            <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700 text-white rounded-lg" onClick={() => handleRenameTaskOrGroup(task.id, editingText, group.id)}>
+                                            <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700 text-white rounded-lg" onClick={() => handleRenameTask(task.id, editingText)}>
                                               <Check className="w-4 h-4" />
                                             </Button>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setEditingId(null)}>
@@ -1211,103 +1104,91 @@ export default function ProjectDetailsPage() {
                                             </Button>
                                           </div>
                                         ) : (
-                                          <span
-                                            className={cn(
-                                              "text-xs text-foreground cursor-pointer flex-1 truncate hover:text-primary transition-colors",
-                                              task.completed && "line-through text-muted-foreground/60"
-                                            )}
-                                            onClick={() => {
-                                              setSelectedTaskDetail({ groupId: group.id, task: task as SubTask });
-                                            }}
-                                          >
-                                            {task.text}
-                                          </span>
-                                        )}
-                                      </div>
-
-                                      {/* Badges & Actions */}
-                                      <div className="flex items-center gap-3 shrink-0 ml-4">
-                                        {/* Due Date Indicator */}
-                                        {task.dueDate && (
-                                          <div className={cn(
-                                            "flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border hidden sm:flex",
-                                            (() => {
-                                              const overdue = new Date(task.dueDate) < new Date() && !task.completed;
-                                              return overdue 
-                                                ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30" 
-                                                : "bg-muted text-muted-foreground border-border/40";
-                                            })()
-                                          )}>
-                                            <CalendarIcon className="w-3 h-3 text-muted-foreground/70" />
-                                            <span>{format(new Date(task.dueDate), 'dd/MM/yyyy')}</span>
+                                          <div className="flex flex-col flex-1 min-w-0">
+                                            <span
+                                              className={cn(
+                                                "text-xs text-foreground cursor-pointer truncate hover:text-primary transition-colors",
+                                                task.completed && "line-through text-muted-foreground/60"
+                                              )}
+                                              onClick={() => {
+                                                setSelectedTaskDetail({ groupId: task.id, task: task as any });
+                                              }}
+                                            >
+                                              {task.text}
+                                            </span>
+                                            <input
+                                              type="text"
+                                              placeholder="เพิ่มหมายเหตุ..."
+                                              value={taskNotesInputs[task.id] !== undefined ? taskNotesInputs[task.id] : (task.notes || '')}
+                                              onChange={(e) => setTaskNotesInputs((prev: Record<string, string>) => ({ ...prev, [task.id]: e.target.value }))}
+                                              onBlur={() => handleUpdateTaskNotes(task.id, taskNotesInputs[task.id] !== undefined ? taskNotesInputs[task.id] : (task.notes || ''))}
+                                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                              className="text-[10px] text-muted-foreground bg-transparent border-none p-0 focus:ring-0 focus:outline-none focus:border-none focus-visible:ring-0 focus-visible:outline-none w-full mt-0.5 hover:text-foreground/80 focus:text-foreground transition-colors"
+                                            />
                                           </div>
                                         )}
-
-                                        {/* Assignee Avatar */}
-                                        {task.assignee ? (
-                                          <Avatar className="h-6 w-6 border border-border/50 hidden sm:flex">
-                                            <AvatarFallback className="text-[9px] bg-purple-100 text-purple-700 font-bold">{task.assignee.charAt(0)}</AvatarFallback>
-                                          </Avatar>
-                                        ) : (
-                                          <div className="h-6 w-6 rounded-full bg-muted border border-border/50 border-dashed flex items-center justify-center hidden sm:flex">
-                                            <UserCircle className="w-3 h-3 text-muted-foreground/40" />
-                                          </div>
-                                        )}
-                                        
-                                        <div className="flex items-center gap-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover/row:opacity-100 transition-opacity rounded-lg"
-                                            onClick={() => handleDeleteTaskOrGroup(task.id, group.id)}
-                                            title="Delete Task"
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                          </Button>
-                                        </div>
                                       </div>
                                     </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
+
+                                    {/* Badges & Actions */}
+                                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                                      {/* Due Date Indicator */}
+                                      {task.dueDate && (
+                                        <div className={cn(
+                                          "flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border hidden sm:flex",
+                                          (() => {
+                                            const overdue = new Date(task.dueDate) < new Date() && !task.completed;
+                                            return overdue 
+                                              ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30" 
+                                              : "bg-muted text-muted-foreground border-border/40";
+                                          })()
+                                        )}>
+                                          <CalendarIcon className="w-3 h-3 text-muted-foreground/70" />
+                                          <span>{format(new Date(task.dueDate), 'dd/MM/yyyy')}</span>
+                                        </div>
+                                      )}
+
+                                      {/* Assignee Avatar */}
+                                      {task.assignee ? (
+                                        <Avatar className="h-6 w-6 border border-border/50 hidden sm:flex">
+                                          <AvatarFallback className="text-[9px] bg-purple-100 text-purple-700 font-bold">{task.assignee.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                      ) : (
+                                        <div className="h-6 w-6 rounded-full bg-muted border border-border/50 border-dashed flex items-center justify-center hidden sm:flex">
+                                          <UserCircle className="w-3 h-3 text-muted-foreground/40" />
+                                        </div>
+                                      )}
+                                      
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover/row:opacity-100 transition-opacity rounded-lg"
+                                          onClick={() => handleDeleteTask(task.id)}
+                                          title="Delete Task"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))
                           )}
-                        </Droppable>
-
-                        {/* Add new task input inside group */}
-                        <div className="flex gap-1 items-center pt-2 pl-2 pb-2 mt-1">
-                          <Button
-                            onClick={() => handleAddTaskInGroup(group.id)}
-                            variant="ghost"
-                            className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md shrink-0"
-                            title="Add Task"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                          <Input
-                            placeholder="Add a new task..."
-                            value={newTasksInputs[group.id] || ''}
-                            onChange={(e) => setNewTasksInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
-                            className="h-8 text-xs border-transparent shadow-none bg-transparent hover:bg-muted/20 focus-visible:ring-0 focus-visible:bg-background focus-visible:border-border/50 max-w-sm px-2 transition-colors rounded-md"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleAddTaskInGroup(group.id);
-                            }}
-                          />
+                          {provided.placeholder}
                         </div>
-                      </div>
-                    ))
-                  )}
+                      )}
+                    </Droppable>
+                  </DragDropContext>
                 </div>
-              </DragDropContext>
-            </div>
 
-            {/* AI Generator Box inside Tasks tab */}
-            <div className="bg-card rounded-2xl p-5 border border-border/60 shadow-xs space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-                <h4 className="font-bold text-sm text-primary">ร่างรายการงานย่อยด้วยระบบ AI (AI Checklist Creator)</h4>
-              </div>
+                {/* AI Generator Box inside Tasks tab */}
+                <div className="bg-card rounded-2xl p-5 border border-border/60 shadow-xs space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                    <h4 className="font-bold text-sm text-primary">ร่างรายการงานย่อยด้วยระบบ AI (AI Checklist Creator)</h4>
+                  </div>
               <p className="text-xs text-muted-foreground">
                 พิมพ์คำอธิบายรายละเอียดโปรเจกต์หรือความต้องการ เพื่อให้ AI แนะนำรายการสิ่งที่ต้องทำแบบแยกย่อย
               </p>
@@ -1329,7 +1210,9 @@ export default function ProjectDetailsPage() {
                 </Button>
               </form>
             </div>
-          </div>
+          </>
+        )}
+      </div>
           
           {/* FLOATING RIGHT PANEL (Task Details) */}
           <TaskDetailsSidebar

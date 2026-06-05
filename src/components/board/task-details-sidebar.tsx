@@ -54,7 +54,7 @@ export const TaskDetailsSidebar: React.FC<TaskDetailsSidebarProps> = ({
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider truncate">
             <span className="truncate">{activeBoardView}</span>
             <span>/</span>
-            <span className="truncate">{groupTask?.title || 'Group'}</span>
+            <span className="truncate">{groupTask?.title || 'Task Details'}</span>
           </div>
           <input
             type="text"
@@ -211,6 +211,19 @@ export const TaskDetailsSidebar: React.FC<TaskDetailsSidebarProps> = ({
                 />
               )}
             </div>
+          </div>
+
+          {/* Notes */}
+          <div className="grid grid-cols-[100px_1fr] items-start gap-4">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-2 mt-1">
+              <AlignLeft className="w-4 h-4 text-blue-500" /> Note
+            </label>
+            <textarea
+              value={selectedTaskDetail.task.notes || ''}
+              onChange={(e) => onUpdate('notes', e.target.value)}
+              placeholder="หมายเหตุเพิ่มเติม..."
+              className="min-h-[60px] w-full rounded-lg border border-border/60 bg-transparent px-3 py-1.5 text-xs shadow-none placeholder:text-muted-foreground/40 focus:outline-hidden focus:ring-1 focus:ring-primary resize-y"
+            />
           </div>
         </div>
       </div>

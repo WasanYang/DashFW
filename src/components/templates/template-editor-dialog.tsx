@@ -33,7 +33,7 @@ export function TemplateEditorDialog({
   // Editor Form States
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formType, setFormType] = useState<'project' | 'group' | 'task'>('project');
+  const [formType, setFormType] = useState<'project' | 'group' | 'task'>('task');
   const [formData, setFormData] = useState<TemplateData>({ groups: [], subTasks: [] });
 
   useEffect(() => {
@@ -41,18 +41,48 @@ export function TemplateEditorDialog({
       if (editingTemplate) {
         setFormName(editingTemplate.name);
         setFormDescription(editingTemplate.description || '');
-        setFormType(editingTemplate.type);
-        setFormData(JSON.parse(JSON.stringify(editingTemplate.data))); // Deep copy
+        setFormType('task');
+        
+        let flatItems: any[] = [];
+        if (editingTemplate.type === 'project' || editingTemplate.type === 'group') {
+          const groups = editingTemplate.data.groups || [];
+          groups.forEach((group: any) => {
+            (group.tasks || []).forEach((task: any) => {
+              flatItems.push({ text: `${group.title}: ${task.title}`, completed: false });
+              (task.subTasks || []).forEach((sub: any) => {
+                flatItems.push({ text: `${group.title}: ${task.title} - ${sub.text}`, completed: false });
+              });
+            });
+          });
+        } else {
+          flatItems = editingTemplate.data.subTasks || [];
+        }
+        setFormData({ subTasks: flatItems });
       } else if (prepopulatedData) {
         setFormName(prepopulatedData.name || '');
         setFormDescription(prepopulatedData.description || '');
-        setFormType(prepopulatedData.type || 'project');
-        setFormData(prepopulatedData.data || { groups: [], subTasks: [] });
+        setFormType('task');
+        
+        let flatItems: any[] = [];
+        if (prepopulatedData.type === 'project' || prepopulatedData.type === 'group') {
+          const groups = prepopulatedData.data?.groups || [];
+          groups.forEach((group: any) => {
+            (group.tasks || []).forEach((task: any) => {
+              flatItems.push({ text: `${group.title}: ${task.title}`, completed: false });
+              (task.subTasks || []).forEach((sub: any) => {
+                flatItems.push({ text: `${group.title}: ${task.title} - ${sub.text}`, completed: false });
+              });
+            });
+          });
+        } else {
+          flatItems = prepopulatedData.data?.subTasks || [];
+        }
+        setFormData({ subTasks: flatItems });
       } else {
         setFormName('');
         setFormDescription('');
-        setFormType('project');
-        setFormData({ groups: [{ title: 'Group 1', tasks: [] }], subTasks: [] });
+        setFormType('task');
+        setFormData({ subTasks: [{ text: 'New task', completed: false }] });
       }
     }
   }, [open, editingTemplate, prepopulatedData]);
@@ -200,9 +230,9 @@ export function TemplateEditorDialog({
 
         <form onSubmit={handleSave} className="flex-grow flex flex-col overflow-hidden my-1">
           <div className="flex-grow overflow-y-auto space-y-5 pr-1.5 py-1">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {/* Template Name */}
-              <div className="md:col-span-2 space-y-1">
+              <div className="space-y-1">
                 <Label className="text-xs font-semibold text-muted-foreground">ชื่อเทมเพลต (Template Name)</Label>
                 <Input
                   required
@@ -211,25 +241,6 @@ export function TemplateEditorDialog({
                   placeholder="เช่น Standard Web Dev Project, SEO Checklist"
                   className="rounded-xl h-10 text-sm font-medium"
                 />
-              </div>
-
-              {/* Template Type */}
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-muted-foreground">ประเภทโครงสร้าง</Label>
-                <Select
-                  value={formType}
-                  onValueChange={(val: any) => setFormType(val)}
-                  disabled={!!editingTemplate}
-                >
-                  <SelectTrigger className="rounded-xl h-10">
-                    <SelectValue placeholder="เลือกประเภท" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="project">Project / Tab Level</SelectItem>
-                    <SelectItem value="group">Task Group Level</SelectItem>
-                    <SelectItem value="task">Checklist / Tasks</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -246,171 +257,39 @@ export function TemplateEditorDialog({
 
             <div className="border-t border-border/40 pt-4 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-foreground">โครงสร้างภายในเทมเพลต (Internal Structure)</h3>
+                <h3 className="text-sm font-bold text-foreground">รายการงานในเทมเพลต (Tasks List)</h3>
                 
-                {formType === 'project' && (
-                  <Button type="button" size="sm" onClick={addGroup} className="rounded-xl gap-1 h-8 text-xs font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20">
-                    <Plus className="w-3.5 h-3.5" /> เพิ่มกลุ่มงาน (Group)
-                  </Button>
-                )}
-                {formType === 'task' && (
-                  <Button type="button" size="sm" onClick={addTaskLevelSubtask} className="rounded-xl gap-1 h-8 text-xs font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20">
-                    <Plus className="w-3.5 h-3.5" /> เพิ่มรายการเช็คลิสต์
-                  </Button>
-                )}
+                <Button type="button" size="sm" onClick={addTaskLevelSubtask} className="rounded-xl gap-1 h-8 text-xs font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20">
+                  <Plus className="w-3.5 h-3.5" /> เพิ่มรายการงาน
+                </Button>
               </div>
 
-              {/* HIERARCHICAL BUILDER CONTENT */}
-              <div className="space-y-4">
-                {/* PROJECT & GROUP TYPES EDITOR */}
-                {(formType === 'project' || formType === 'group') && (
-                  <div className="space-y-6">
-                    {(formType === 'group' ? (formData.groups?.slice(0, 1) || []) : (formData.groups || [])).map((group, groupIdx) => (
-                      <div key={groupIdx} className="border border-border/80 rounded-2xl bg-muted/5 p-4 space-y-4 relative">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline" className="text-[10px] font-bold rounded-lg border-primary/30 text-primary uppercase shrink-0">
-                            {formType === 'group' ? 'Task Group' : `Group ${groupIdx + 1}`}
-                          </Badge>
-                          <Input
-                            required
-                            value={group.title}
-                            onChange={(e) => updateGroupTitle(groupIdx, e.target.value)}
-                            placeholder="เช่น การวางแผนและบรีฟงาน"
-                            className="h-8 rounded-lg text-xs font-bold w-full max-w-sm bg-background"
-                          />
-                          
-                          {formType === 'project' && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/5 ml-auto"
-                              onClick={() => removeGroup(groupIdx)}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Group Tasks List */}
-                        <div className="space-y-4 pl-4 border-l border-border/70">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">งานย่อยในกลุ่มนี้ ({group.tasks?.length || 0})</span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => addTask(groupIdx)}
-                              className="rounded-lg h-7 px-2 text-[10px] font-bold text-primary hover:bg-primary/5 hover:text-primary gap-1"
-                            >
-                              <PlusCircle className="w-3.5 h-3.5" /> เพิ่มงานย่อย (Task)
-                            </Button>
-                          </div>
-
-                          <div className="space-y-3">
-                            {group.tasks?.map((task, taskIdx) => (
-                              <div key={taskIdx} className="border border-border/60 rounded-xl bg-background p-3 space-y-3 relative">
-                                <div className="flex items-center gap-2">
-                                  <Input
-                                    required
-                                    value={task.title}
-                                    onChange={(e) => updateTaskTitle(groupIdx, taskIdx, e.target.value)}
-                                    placeholder="ชื่องานย่อย เช่น สรุป Asset กับลูกค้า"
-                                    className="h-8 rounded-lg text-xs font-medium w-full max-w-xs"
-                                  />
-                                  <Input
-                                    value={task.details || ''}
-                                    onChange={(e) => updateTaskDetails(groupIdx, taskIdx, e.target.value)}
-                                    placeholder="รายละเอียดงานย่อยย่อๆ"
-                                    className="h-8 rounded-lg text-xs text-muted-foreground w-full"
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/5 shrink-0"
-                                    onClick={() => removeTask(groupIdx, taskIdx)}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                </div>
-
-                                {/* Task Subtasks (Checklist Level) */}
-                                <div className="pl-4 space-y-2 border-l border-primary/20">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[9px] font-bold text-muted-foreground/80 uppercase">เช็คลิสต์ย่อย</span>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => addSubTask(groupIdx, taskIdx)}
-                                      className="h-6 px-1.5 text-[9px] text-muted-foreground hover:text-foreground gap-1"
-                                    >
-                                      <Plus className="w-3 h-3" /> เพิ่มเช็คลิสต์
-                                    </Button>
-                                  </div>
-
-                                  <div className="grid grid-cols-1 gap-2">
-                                    {task.subTasks?.map((subtask, subIdx) => (
-                                      <div key={subIdx} className="flex items-center gap-1.5">
-                                        <Input
-                                          required
-                                          value={subtask.text}
-                                          onChange={(e) => updateSubTaskText(groupIdx, taskIdx, subIdx, e.target.value)}
-                                          placeholder="ข้อความเช็คลิสต์..."
-                                          className="h-7 rounded-md text-[11px] w-full max-w-md bg-muted/10 border-dashed"
-                                        />
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 rounded-full text-muted-foreground hover:text-destructive shrink-0"
-                                          onClick={() => removeSubTask(groupIdx, taskIdx, subIdx)}
-                                        >
-                                          <X className="w-3 h-3" />
-                                        </Button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* CHECKLIST / TASK TYPE EDITOR */}
-                {formType === 'task' && (
-                  <div className="border border-border/80 rounded-2xl bg-muted/5 p-5 space-y-3">
-                    <span className="text-xs font-semibold text-muted-foreground block mb-2">รายการเช็คลิสต์ที่ถูกจัดเก็บในแม่แบบ ({formData.subTasks?.length || 0})</span>
-                    <div className="grid grid-cols-1 gap-3">
-                      {formData.subTasks?.map((subtask, subIdx) => (
-                        <div key={subIdx} className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground w-6 font-mono font-bold">{subIdx + 1}.</span>
-                          <Input
-                            required
-                            value={subtask.text}
-                            onChange={(e) => updateTaskLevelSubtaskText(subIdx, e.target.value)}
-                            placeholder="ป้อนรายการเช็คลิสต์ เช่น ติดตั้งปลั๊กอินความปลอดภัย"
-                            className="h-9 rounded-xl text-sm font-medium w-full max-w-xl bg-background"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/5 shrink-0"
-                            onClick={() => removeTaskLevelSubtask(subIdx)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+              {/* CHECKLIST / TASK TYPE EDITOR */}
+              <div className="border border-border/80 rounded-2xl bg-muted/5 p-5 space-y-3">
+                <span className="text-xs font-semibold text-muted-foreground block mb-2">รายการงานที่ถูกจัดเก็บในแม่แบบ ({formData.subTasks?.length || 0})</span>
+                <div className="grid grid-cols-1 gap-3 max-h-[40vh] overflow-y-auto pr-1">
+                  {(formData.subTasks || []).map((subtask, subIdx) => (
+                    <div key={subIdx} className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-6 font-mono font-bold">{subIdx + 1}.</span>
+                      <Input
+                        required
+                        value={subtask.text}
+                        onChange={(e) => updateTaskLevelSubtaskText(subIdx, e.target.value)}
+                        placeholder="ป้อนรายการงาน เช่น ติดตั้งปลั๊กอินความปลอดภัย"
+                        className="h-9 rounded-xl text-sm font-medium w-full max-w-xl bg-background"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/5 shrink-0"
+                        onClick={() => removeTaskLevelSubtask(subIdx)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             </div>
           </div>

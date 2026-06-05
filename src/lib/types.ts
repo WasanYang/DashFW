@@ -78,6 +78,7 @@ export type Task = {
   deadline: any;
   revisions: number;
   subTasks?: SubTask[];
+  notes?: string;
   client?: Client | null;
   projectTitle?: string; // De-normalized title for convenience
   color?: string;
@@ -89,6 +90,7 @@ export type Task = {
   currency?: string;
   repeats?: string | RepeatConfig;
   boardView?: string;
+  assignee?: string;
 };
 
 export type Social = {

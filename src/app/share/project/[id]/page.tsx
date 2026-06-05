@@ -10,45 +10,43 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { useGetTasksQuery } from '@/services/taskApi';
+import { useGetProjectsQuery } from '@/services/projectApi';
 import { format } from 'date-fns';
 import { Clock, CheckCircle2, AlertCircle, Mail, Globe, Sparkles, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { SubTask } from '@/lib/types';
 
 export default function PublicProjectSharePage() {
   const params = useParams();
   const projectId = params?.id as string;
 
-  const { data: tasks = [], isLoading } = useGetTasksQuery();
+  const { data: projects = [], isLoading: isLoadingProjects } = useGetProjectsQuery();
+  const { data: tasks = [], isLoading: isLoadingTasks } = useGetTasksQuery();
 
   const project = useMemo(() => {
-    return tasks.find((t) => t.id === projectId) || null;
+    return projects.find((p) => p.id === projectId) || null;
+  }, [projects, projectId]);
+
+  const projectTasks = useMemo(() => {
+    return tasks.filter((t) => t.projectId === projectId);
   }, [tasks, projectId]);
 
-  // Calculate Subtask Completion
+  // Calculate Flat Task Completion
   const stats = useMemo(() => {
-    if (!project || !project.subTasks || project.subTasks.length === 0) {
+    if (projectTasks.length === 0) {
       return { total: 0, completed: 0, percent: 0 };
     }
     
-    let total = 0;
-    let completed = 0;
+    const total = projectTasks.length;
+    const completed = projectTasks.filter(t => t.status === 'Completed' || t.status === 'Paid').length;
     
-    const countTasks = (tasks: SubTask[]) => {
-      tasks.forEach((task) => {
-        total++;
-        if (task.completed) completed++;
-        if (task.children) countTasks(task.children);
-      });
-    };
-    
-    countTasks(project.subTasks);
     return {
       total,
       completed,
       percent: Math.round((completed / total) * 100)
     };
-  }, [project]);
+  }, [projectTasks]);
+
+  const isLoading = isLoadingProjects || isLoadingTasks;
 
   if (isLoading) {
     return (
@@ -77,30 +75,35 @@ export default function PublicProjectSharePage() {
     );
   }
 
-  const renderSubtasksReadOnly = (tasks: SubTask[], level = 0) => (
-    <div className="space-y-2.5 mt-1">
-      {tasks.map((task) => (
-        <div key={task.id} style={{ paddingLeft: `${level * 1.25}rem` }} className="space-y-1">
-          <div className="flex items-start gap-2.5">
+  const renderTasksReadOnly = (taskList: any[]) => (
+    <div className="space-y-3.5">
+      {taskList.map((task) => {
+        const isCompleted = task.status === 'Completed' || task.status === 'Paid';
+        return (
+          <div key={task.id} className="flex items-start gap-2.5">
             <Checkbox
-              id={`subtask-${task.id}`}
-              checked={task.completed}
+              id={`task-${task.id}`}
+              checked={isCompleted}
               disabled
               className="mt-0.5 border-border/80 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600 shrink-0"
             />
             <Label
-              htmlFor={`subtask-${task.id}`}
+              htmlFor={`task-${task.id}`}
               className={cn(
                 "text-sm leading-tight cursor-default select-none",
-                task.completed ? "line-through text-muted-foreground font-normal" : "text-slate-800 font-semibold"
+                isCompleted ? "line-through text-muted-foreground font-normal" : "text-slate-800 font-semibold"
               )}
             >
-              {task.text}
+              {task.title}
+              {task.boardView && (
+                <span className="text-[10px] font-bold text-muted-foreground/60 ml-2 bg-muted px-1.5 py-0.5 rounded-sm">
+                  {task.boardView}
+                </span>
+              )}
             </Label>
           </div>
-          {task.children && task.children.length > 0 && renderSubtasksReadOnly(task.children, level + 1)}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -194,13 +197,13 @@ export default function PublicProjectSharePage() {
                 <h3 className="text-lg font-bold text-slate-800">Milestone Checklists</h3>
               </div>
               
-              {project.subTasks && project.subTasks.length > 0 ? (
+              {projectTasks && projectTasks.length > 0 ? (
                 <div className="bg-muted/10 p-5 rounded-2xl border space-y-4">
-                  {renderSubtasksReadOnly(project.subTasks)}
+                  {renderTasksReadOnly(projectTasks)}
                 </div>
               ) : (
                 <div className="text-center py-8 text-sm text-muted-foreground bg-muted/20 rounded-2xl border border-dashed">
-                  No subtasks logged for this project.
+                  No tasks logged for this project.
                 </div>
               )}
             </div>

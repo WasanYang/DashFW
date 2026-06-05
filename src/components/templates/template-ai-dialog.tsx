@@ -22,7 +22,7 @@ export function TemplateAiDialog({
 }: TemplateAiDialogProps) {
   const { toast } = useToast();
   const [aiPrompt, setAiPrompt] = useState('');
-  const [aiType, setAiType] = useState<'project' | 'group' | 'task'>('project');
+  const [aiType, setAiType] = useState<'project' | 'group' | 'task'>('task');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   const handleGenerateAiTemplate = async () => {
@@ -57,28 +57,14 @@ export function TemplateAiDialog({
         <DialogHeader>
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-            ร่างโครงสร้างเทมเพลตด้วย AI
+            ร่างรายการงานย่อยด้วย AI
           </DialogTitle>
           <DialogDescription>
-            อธิบายประเภทงานที่ต้องการสร้างเทมเพลต แล้วระบบ AI จะเขียนโครงสร้างกลุ่มงาน (Groups), งานย่อย (Tasks), และเช็คลิสต์ย่อย (Subtasks) ให้ทันที
+            อธิบายประเภทงานที่ต้องการสร้างเทมเพลต แล้วระบบ AI จะเขียนรายการสิ่งที่ต้องทำเดี่ยว ๆ (Tasks List) ให้ทันที
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 my-2">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-muted-foreground">ระดับโครงสร้างเทมเพลต (Template Type)</Label>
-            <Select value={aiType} onValueChange={(val: any) => setAiType(val)}>
-              <SelectTrigger className="rounded-xl h-10">
-                <SelectValue placeholder="เลือกระดับเทมเพลต" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                <SelectItem value="project">Project / Tab Level (แบ่งหลายกลุ่มงาน in หน้าเดียว)</SelectItem>
-                <SelectItem value="group">Task Group Level (มีกลุ่มงานเดียวที่มีหลายการ์ด)</SelectItem>
-                <SelectItem value="task">Checklist / Tasks (มีรายการเช็คลิสต์ย่อย ๆ)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-muted-foreground">คำอธิบายงานเพื่อป้อน AI (Prompt)</Label>
             <textarea
