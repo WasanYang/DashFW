@@ -19,6 +19,7 @@ const config = {
     },
     extend: {
       fontFamily: {
+        sans: ['Inter', '"Noto Sans Thai"', 'sans-serif'],
         body: ['Inter', '"Noto Sans Thai"', 'sans-serif'],
         headline: ['Inter', '"Noto Sans Thai"', 'sans-serif'],
         code: ['"Source Code Pro"', '"Noto Sans Thai"', 'monospace'],
