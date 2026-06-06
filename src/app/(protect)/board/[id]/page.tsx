@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -93,17 +93,26 @@ export default function ProjectDetailsPage() {
   const { toast } = useToast();
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
 
   const { data: allTemplates = [] } = useGetTaskTemplatesQuery();
 
-  const [activeTab, setActiveTab] = useState<'Tasks' | 'Notes' | 'Calendar' | 'Timesheet' | 'Invoices' | 'Edit'>('Tasks');
+  // URL State Synchronizers
+  const urlTab = searchParams?.get('tab');
+  const urlView = searchParams?.get('view');
+  const urlSection = searchParams?.get('section');
+
+  const [activeTab, setActiveTabState] = useState<'Tasks' | 'Notes' | 'Calendar' | 'Timesheet' | 'Invoices' | 'Edit'>(
+    (urlTab as any) || 'Tasks'
+  );
 
   // Search task query
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
 
   // Horizontal Board Views
-  const [activeBoardView, setActiveBoardView] = useState<string>('');
+  const [activeBoardView, setActiveBoardViewState] = useState<string>(urlView || '');
   const [isAddViewOpen, setIsAddViewOpen] = useState(false);
   const [newViewName, setNewViewName] = useState('');
   
@@ -120,9 +129,42 @@ export default function ProjectDetailsPage() {
   const [editingText, setEditingText] = useState('');
 
   // Active Details Section Tab State
-  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const [activeSectionId, setActiveSectionIdState] = useState<string | null>(urlSection || null);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabTitle, setEditingTabTitle] = useState('');
+
+  const updateUrl = (tabVal: string, viewVal?: string, sectionVal?: string | null) => {
+    const nextParams = new URLSearchParams();
+    nextParams.set('tab', tabVal);
+    if (tabVal === 'Tasks' && viewVal) {
+      nextParams.set('view', viewVal);
+    }
+    if (tabVal === 'Notes' && sectionVal) {
+      nextParams.set('section', sectionVal);
+    }
+    const newSearch = nextParams.toString();
+    const newUrl = `${pathname}${newSearch ? '?' + newSearch : ''}`;
+    window.history.replaceState(null, '', newUrl);
+  };
+
+  const setActiveTab = (tab: 'Tasks' | 'Notes' | 'Calendar' | 'Timesheet' | 'Invoices' | 'Edit') => {
+    setActiveTabState(tab);
+    updateUrl(
+      tab,
+      tab === 'Tasks' ? activeBoardView : undefined,
+      tab === 'Notes' ? activeSectionId : undefined
+    );
+  };
+
+  const setActiveBoardView = (view: string) => {
+    setActiveBoardViewState(view);
+    updateUrl(activeTab, view, undefined);
+  };
+
+  const setActiveSectionId = (sectionId: string | null) => {
+    setActiveSectionIdState(sectionId);
+    updateUrl(activeTab, undefined, sectionId);
+  };
 
   // AI Notes Generator states
   const [isAiNotesOpen, setIsAiNotesOpen] = useState(false);
